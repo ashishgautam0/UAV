@@ -5,6 +5,7 @@ Utility functions for visualization and result analysis
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+from mpl_toolkits.mplot3d import Axes3D
 import json
 from datetime import datetime
 
@@ -272,6 +273,85 @@ def print_summary_table(results_dict, algorithm_names):
     print("=" * 100 + "\n")
 
 
+def plot_3d_delay_comparison(results_dict, algorithm_names, prefix="", task_counts=None):
+    """
+    Create a 3D bar chart showing delay (execution time) for different algorithms and task counts
+
+    Args:
+        results_dict: Dictionary with results for each algorithm
+        algorithm_names: List of algorithm names
+        prefix: Prefix for output filenames
+        task_counts: List of task counts (if running sensitivity analysis)
+    """
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # If task_counts not provided, use execution times from single run
+    if task_counts is None:
+        # Single task count scenario - show execution times in seconds (×10^-3)
+        task_counts = [520]  # Default from Config
+
+    # Prepare data
+    num_algorithms = len(algorithm_names)
+    num_tasks = len(task_counts)
+
+    # Colors for different algorithms (matching the image)
+    colors = ['#d62728', '#2ca02c', '#8dd3c7', '#808080', '#fb8072',
+              '#1f77b4', '#ff7f0e', '#9467bd', '#8c564b', '#e377c2']
+
+    # Create bar positions
+    xpos = []
+    ypos = []
+    zpos = []
+    dx = []
+    dy = []
+    dz = []
+    bar_colors = []
+
+    for i, task_count in enumerate(task_counts):
+        for j, algo_name in enumerate(algorithm_names):
+            xpos.append(i)
+            ypos.append(j)
+            zpos.append(0)
+            dx.append(0.8)
+            dy.append(0.8)
+
+            # Get execution time in milliseconds (×10^-3 seconds)
+            if algo_name in results_dict:
+                exec_time = results_dict[algo_name]['execution_time'] * 1000  # Convert to ms
+                dz.append(exec_time)
+            else:
+                dz.append(0)
+
+            bar_colors.append(colors[j % len(colors)])
+
+    # Create 3D bars
+    ax.bar3d(xpos, ypos, zpos, dx, dy, dz, color=bar_colors, alpha=0.8, edgecolor='black', linewidth=0.5)
+
+    # Set labels and title
+    ax.set_xlabel('Task Count', fontsize=12, labelpad=10)
+    ax.set_ylabel('Method', fontsize=12, labelpad=10)
+    ax.set_zlabel('Delay (seconds) ×10⁻³', fontsize=12, labelpad=10)
+    ax.set_title('(a)', fontsize=14, fontweight='bold', pad=20)
+
+    # Set ticks
+    ax.set_xticks(range(len(task_counts)))
+    ax.set_xticklabels(task_counts)
+    ax.set_yticks(range(len(algorithm_names)))
+    ax.set_yticklabels(algorithm_names)
+
+    # Adjust viewing angle
+    ax.view_init(elev=20, azim=45)
+
+    plt.tight_layout()
+
+    # Save figure
+    filename = f"{prefix}_3d_delay_comparison.png" if prefix else "3d_delay_comparison.png"
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    print(f"3D delay comparison plot saved as: {filename}")
+    plt.close()
+
+
 def plot_all_results(results_dict, algorithm_names, prefix=""):
     """
     Generate all visualization plots
@@ -289,6 +369,7 @@ def plot_all_results(results_dict, algorithm_names, prefix=""):
     energy_breakdowns = [results_dict[name]['energy_breakdown'] for name in algorithm_names]
 
     # Create plots with prefix
+    plot_3d_delay_comparison(results_dict, algorithm_names, prefix)
     plot_convergence_with_prefix(convergence_data, algorithm_names, prefix, title="Fitness Convergence")
     plot_energy_convergence_with_prefix(energy_data, algorithm_names, prefix)
     plot_load_imbalance_convergence_with_prefix(load_imbalance_data, algorithm_names, prefix)

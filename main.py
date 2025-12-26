@@ -7,7 +7,8 @@ import numpy as np
 import time
 from config import Config
 from digital_twin import DigitalTwin
-from comparison_algorithms import GA, WOA, DE, ALO, SCA
+from comparison_algorithms import (GA, WOA, DE, ALO, HSA,
+                                   AIA, TLBO, CS, FA, Rao)
 from utils import (plot_all_results, print_summary_table, save_results_to_json)
 
 
@@ -120,7 +121,12 @@ def run_comparison(num_tasks=520, num_gbs=3, population_size=50, max_iterations=
         ('GA', GA, {'crossover_rate': 0.8, 'mutation_rate': 0.1}),
         ('WOA', WOA, {}),
         ('ALO', ALO, {}),
-        ('SCA', SCA, {'a': 2.0}),
+        ('HSA', HSA, {'HMCR': 0.9, 'PAR': 0.3, 'BW': 1}),
+        ('AIA', AIA, {'clone_rate': 10, 'mutation_rate': 0.3}),
+        ('TLBO', TLBO, {}),
+        ('CS', CS, {'pa': 0.25, 'beta': 1.5}),
+        ('FA', FA, {'alpha': 0.5, 'beta0': 1.0, 'gamma': 1.0}),
+        ('Rao', Rao, {}),
     ]
 
     # Run all algorithms
@@ -146,7 +152,7 @@ def main():
     print("STARTING SIMULATION")
     print("=" * 70)
 
-    algorithm_names = ['GA', 'WOA', 'DE', 'ALO', 'SCA']
+    algorithm_names = ['DE', 'GA', 'WOA', 'ALO', 'HSA', 'AIA', 'TLBO', 'CS', 'FA', 'Rao']
 
     # Run full simulation with Digital Twin
     print("\nRunning full simulation with Digital Twin (520 tasks, 200 iterations)...")
@@ -201,7 +207,7 @@ def run_sensitivity_analysis():
 
     for size, results in results_by_size.items():
         print(f"\n{size} tasks:")
-        algorithm_names = ['GA', 'WOA', 'DE', 'ALO', 'SCA']
+        algorithm_names = ['DE', 'GA', 'WOA', 'ALO', 'HSA', 'AIA', 'TLBO', 'CS', 'FA', 'Rao']
         for name in algorithm_names:
             print(f"  {name}: {results[name]['best_fitness']:.6f} "
                   f"({results[name]['execution_time']:.2f}s)")
