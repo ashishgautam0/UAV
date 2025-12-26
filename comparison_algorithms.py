@@ -7,7 +7,6 @@ Comparison algorithms for UAV task allocation:
 - Harmony Search Algorithm (HSA)
 - Firework Algorithm (FWA)
 - Artificial Immune Algorithm (AIA)
-- Teaching-Learning-Based Optimization (TLBO)
 - Charged System Algorithm (CSA)
 - Cuckoo Search (CS)
 - Firefly Algorithm (FA)
@@ -1441,111 +1440,6 @@ class AIA(BaseOptimizer):
         return self.best_solution
 
 
-class TLBO(BaseOptimizer):
-    """Teaching-Learning-Based Optimization"""
-
-    def __init__(self, tasks, population_size=None, max_iterations=None, verbose=True, digital_twin=None):
-        """
-        Initialize Teaching-Learning-Based Optimization
-
-        Based on the teaching-learning process in a classroom. Has two phases:
-        1. Teacher Phase: Learning from the best student (teacher)
-        2. Learner Phase: Learning from interaction with other students
-        """
-        super().__init__(tasks, population_size, max_iterations, verbose, digital_twin)
-
-    def teacher_phase(self):
-        """Teacher Phase: Learn from the best solution (teacher)"""
-        # Teacher is the best solution
-        teacher = self.best_solution
-
-        # Calculate mean of population
-        mean_solution = np.mean(self.population, axis=0)
-
-        new_population = []
-        new_fitness = []
-
-        for i in range(self.population_size):
-            # Teaching factor (1 or 2)
-            TF = np.random.choice([1, 2])
-
-            # New solution based on difference between teacher and mean
-            new_sol = np.zeros(self.num_tasks)
-            for j in range(self.num_tasks):
-                diff = np.random.random() * (teacher[j] - TF * mean_solution[j])
-                new_sol[j] = self.discretize(self.population[i][j] + diff)
-
-            # Evaluate and greedy selection
-            fitness = self.fitness_func.calculate_fitness(new_sol, update_bounds=True)
-
-            if fitness < self.fitness_values[i]:
-                new_population.append(new_sol)
-                new_fitness.append(fitness)
-            else:
-                new_population.append(self.population[i])
-                new_fitness.append(self.fitness_values[i])
-
-        self.population = np.array(new_population)
-        self.fitness_values = np.array(new_fitness)
-
-    def learner_phase(self):
-        """Learner Phase: Learn from interaction with other learners"""
-        new_population = []
-        new_fitness = []
-
-        for i in range(self.population_size):
-            # Select random partner
-            partner_idx = np.random.randint(0, self.population_size)
-            while partner_idx == i:
-                partner_idx = np.random.randint(0, self.population_size)
-
-            new_sol = np.zeros(self.num_tasks)
-
-            for j in range(self.num_tasks):
-                # Learn from better student
-                if self.fitness_values[i] < self.fitness_values[partner_idx]:
-                    diff = np.random.random() * (self.population[i][j] - self.population[partner_idx][j])
-                else:
-                    diff = np.random.random() * (self.population[partner_idx][j] - self.population[i][j])
-
-                new_sol[j] = self.discretize(self.population[i][j] + diff)
-
-            # Evaluate and greedy selection
-            fitness = self.fitness_func.calculate_fitness(new_sol, update_bounds=True)
-
-            if fitness < self.fitness_values[i]:
-                new_population.append(new_sol)
-                new_fitness.append(fitness)
-            else:
-                new_population.append(self.population[i])
-                new_fitness.append(self.fitness_values[i])
-
-        self.population = np.array(new_population)
-        self.fitness_values = np.array(new_fitness)
-
-    def optimize(self):
-        """Run TLBO optimization"""
-        self.initialize_population()
-
-        for iteration in range(self.max_iterations):
-            # Teacher Phase
-            self.teacher_phase()
-
-            # Learner Phase
-            self.learner_phase()
-
-            # Update best solution and track convergence
-            self.evaluate_population()
-            self.convergence_history.append(self.best_fitness)
-            self.track_metrics()
-
-            if self.verbose and (iteration + 1) % 20 == 0:
-                print(f"Iteration {iteration + 1}/{self.max_iterations}: Best fitness = {self.best_fitness:.6f}")
-
-        self.update_digital_twin()
-        return self.best_solution
-
-
 class CS(BaseOptimizer):
     """Cuckoo Search Algorithm"""
 
@@ -1890,7 +1784,6 @@ if __name__ == "__main__":
         ("HSA", HSA(tasks, population_size=20, max_iterations=30, verbose=False)),
         ("FWA", FWA(tasks, population_size=20, max_iterations=30, verbose=False)),
         ("AIA", AIA(tasks, population_size=20, max_iterations=30, verbose=False)),
-        ("TLBO", TLBO(tasks, population_size=20, max_iterations=30, verbose=False)),
         ("CS", CS(tasks, population_size=20, max_iterations=30, verbose=False)),
         ("FA", FA(tasks, population_size=20, max_iterations=30, verbose=False)),
         ("BFO", BFO(tasks, population_size=20, max_iterations=30, verbose=False)),

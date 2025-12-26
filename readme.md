@@ -1,4 +1,36 @@
-
+    # Plot convergence comparison
+        plt.figure(figsize=(10, 6))
+        plt.plot(scenario_results['QPSO']['convergence'], 'b-', label='BQPSO', linewidth=2)
+        plt.plot(scenario_results['GA']['convergence'], 'r--', label='GA', linewidth=2)
+        plt.plot(scenario_results['DE']['convergence'], 'g-.', label='DE', linewidth=2)
+        plt.plot(scenario_results['PSO']['convergence'], 'm:', label='PSO', linewidth=2)
+        plt.xlabel('Generation', fontsize=12)
+        plt.ylabel('Best Fitness', fontsize=12)
+        plt.title(f'Convergence Comparison - Scenario S{idx+1}', fontsize=14)
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.show()
+    
+    # Print summary
+    print(f"\n{'='*60}")
+    print("EXPERIMENT SUMMARY")
+    print(f"{'='*60}")
+    
+    for scenario, scenario_results in results.items():
+        print(f"\n{scenario}:")
+        for algo, metrics in scenario_results.items():
+            print(f"  {algo}: Fitness = {metrics['fitness']:.4f}")
+            if 'latency' in metrics:
+                print(f"       Latency = {metrics['latency']:.4f} s, Energy = {metrics['energy']:.4f} J")
+                print(f"       Throughput = {metrics['throughput']:.4f}, Imbalance = {metrics['imbalance']:.4f}")
+                print(f"       Channel Gain = {metrics['channel_gain']:.6f}, Trans Rate = {metrics['transmission_rate']:.4f} Mbps")
+                print(f"       Noise Power = {metrics['noise_power']:.2e} W")
+    
+    # Create 3D performance comparison
+    plot_3d_performance(results)
+    
+    return results
+    
 def plot_3d_performance(results):
     """Create visually appealing 3D bar charts showing performance comparison"""
     
