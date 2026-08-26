@@ -1,11 +1,11 @@
 # Job Search HQ
 
-A full-stack AI-powered job search automation platform for AI/ML roles. Combines intelligent job scraping from 12+ sources, LLM-generated personalized outreach, application tracking, and analytics — with hourly automated runs via GitHub Actions.
+A full-stack AI-powered job search automation platform for AI/ML roles. Combines intelligent LinkedIn job scraping, LLM-generated personalized outreach, application tracking, and analytics — with hourly automated runs via GitHub Actions.
 
 ## Features
 
 ### Job Scraper
-- Scrapes from **12+ sources**: LinkedIn (via JobSpy), Remotive, HackerNews Who's Hiring, Arbeitnow, Internshala, RemoteOK, Himalayas, Jobicy, The Muse, Jooble, SimplifyJobs, and Unstop
+- Scrapes **LinkedIn** via JobSpy across 24 AI/ML search queries × 2 locations (India, Remote)
 - Filters by AI/ML keywords, role level, and location
 - LLM-powered relevance scoring (0–100) using Groq
 - Deduplication and company blacklist filtering
@@ -131,7 +131,6 @@ GMAIL_APP_PASSWORD=your_app_pass  # Gmail app password
 Optional:
 
 ```env
-JOOBLE_API_KEY=your_jooble_key
 FRONTEND_URL=https://your-frontend.vercel.app
 CORS_ORIGINS=https://your-domain.com
 ```
