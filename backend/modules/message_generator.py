@@ -1,4 +1,13 @@
-from groq import Groq
+"""
+Prompt builders for outreach messages.
+
+These used to call a hosted LLM. They no longer call anything: each builder
+returns the prompt that would have been sent, and the scheduled Claude routine
+answers it itself (see pending_messages.py). The prompt text below is unchanged
+from the version that was sent to the model — the tone rules, cliche blocklists
+and character limits are the point of this module.
+"""
+
 
 # Default fallback — used when profile DB is unavailable
 _DEFAULT_PROFILE = """
@@ -26,7 +35,7 @@ def _get_profile_text():
 # Backward-compatible reference for other modules that import SUBIDH_PROFILE
 SUBIDH_PROFILE = _DEFAULT_PROFILE
 
-def generate_cold_dm(client, company_name, role_title, company_description,
+def build_cold_dm_prompt(company_name, role_title, company_description,
                      platform="LinkedIn", tone="professional", project_link="",
                      profile_text=""):
     """Generate a personalized cold DM for a specific company."""
@@ -64,16 +73,9 @@ VARIANT 2: Curiosity-driven (lead with a question or observation about their pro
 Format each as ready-to-copy text.
 """
     
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.8,
-        max_tokens=600
-    )
-    
-    return response.choices[0].message.content
+    return {"prompt": prompt, "system": None, "char_limit": 600}
 
-def generate_follow_up(client, company_name, role_title, days_since_applied,
+def build_follow_up_prompt(company_name, role_title, days_since_applied,
                        original_platform="LinkedIn", profile_text="",
                        follow_up_number=1, previous_messages=None):
     """Generate a follow-up message after no response."""
@@ -157,32 +159,9 @@ RULES:
 Generate 1 follow-up message, ready to copy. Output ONLY the message text, nothing else.
 """
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": system_msg},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.4,
-        max_tokens=max_tok
-    )
+    return {"prompt": prompt, "system": system_msg, "char_limit": char_limit}
 
-    result = response.choices[0].message.content.strip()
-
-    # --- Post-generation character enforcement ---
-    if len(result) > char_limit:
-        sentences = result.replace("? ", "?|").replace(". ", ".|").replace("! ", "!|").split("|")
-        truncated = ""
-        for s in sentences:
-            if len(truncated + s) <= char_limit:
-                truncated += s + " "
-            else:
-                break
-        result = truncated.strip() or result[:char_limit]
-
-    return result
-
-def generate_cover_letter(client, company_name, role_title, job_description,
+def build_cover_letter_prompt(company_name, role_title, job_description,
                           company_info="", profile_text=""):
     """Generate a concise, non-generic cover letter."""
     sender_profile = profile_text or _get_profile_text()
@@ -213,16 +192,9 @@ RULES:
 Generate the cover letter, ready to copy.
 """
     
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-        max_tokens=400
-    )
-    
-    return response.choices[0].message.content
+    return {"prompt": prompt, "system": None, "char_limit": 1200}
 
-def generate_thank_you(client, company_name, interviewer_name, 
+def build_thank_you_prompt(company_name, interviewer_name, 
                        key_discussion_point=""):
     """Generate a post-interview thank you message."""
     
@@ -242,17 +214,10 @@ RULES:
 Generate the thank-you message.
 """
     
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.6,
-        max_tokens=200
-    )
-
-    return response.choices[0].message.content
+    return {"prompt": prompt, "system": None, "char_limit": 600}
 
 
-def generate_referral_request(client, contact_name, contact_role, company,
+def build_referral_request_prompt(contact_name, contact_role, company,
                               role_applying_for, relationship, profile_text=""):
     """Generate a referral request message tailored to the relationship type."""
     sender_profile = profile_text or _get_profile_text()
@@ -287,17 +252,10 @@ RULES:
 Generate 1 message, ready to copy.
 """
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-        max_tokens=200,
-    )
-
-    return response.choices[0].message.content
+    return {"prompt": prompt, "system": None, "char_limit": 600}
 
 
-def generate_demo_outreach(client, company, role, demo_url, demo_description,
+def build_demo_outreach_prompt(company, role, demo_url, demo_description,
                            company_desc, profile_text=""):
     """Generate an outreach message that leads with a demo you built."""
     sender_profile = profile_text or _get_profile_text()
@@ -327,11 +285,31 @@ RULES:
 Generate both variants.
 """
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-        max_tokens=500,
-    )
+    return {"prompt": prompt, "system": None, "char_limit": 900}
 
-    return response.choices[0].message.content
+
+def enforce_char_limit(text, char_limit):
+    """Trim to whole sentences within char_limit (was inline in the follow-up
+    generator; now applied to every message type by pending_messages.py)."""
+    text = (text or "").strip()
+    if not char_limit or len(text) <= char_limit:
+        return text
+
+    sentences = text.replace("? ", "?|").replace(". ", ".|").replace("! ", "!|").split("|")
+    truncated = ""
+    for sentence in sentences:
+        if len(truncated + sentence) <= char_limit:
+            truncated += sentence + " "
+        else:
+            break
+    return truncated.strip() or text[:char_limit]
+
+
+PROMPT_BUILDERS = {
+    "cold-dm": build_cold_dm_prompt,
+    "follow-up": build_follow_up_prompt,
+    "cover-letter": build_cover_letter_prompt,
+    "thank-you": build_thank_you_prompt,
+    "referral-request": build_referral_request_prompt,
+    "demo-outreach": build_demo_outreach_prompt,
+}

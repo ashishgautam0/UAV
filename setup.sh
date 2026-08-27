@@ -20,13 +20,16 @@ echo "Testing module imports..."
 cd backend/modules && python -c "from hourly import score_job; print('Module imports OK')" && cd ../..
 echo ""
 
-# Check for API keys
-echo "=== API Key Check ==="
-if [ -z "$GROQ_API_KEY" ]; then
-    echo "  GROQ_API_KEY:      not set (needed for message generation)"
-else
-    echo "  GROQ_API_KEY:      set"
-fi
+# Check for required environment
+echo "=== Environment Check ==="
+for var in SUPABASE_URL SUPABASE_KEY; do
+    if [ -z "$(eval echo \$$var)" ]; then
+        echo "  $var: not set"
+    else
+        echo "  $var: set"
+    fi
+done
+echo "  (no LLM API key is needed — messages are written by the Claude routine)"
 echo ""
 
 echo "=== Setup Complete ==="

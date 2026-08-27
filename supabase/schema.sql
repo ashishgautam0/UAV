@@ -247,6 +247,46 @@ create table if not exists user_profile (
 
 
 -- ---------------------------------------------------------------------------
+-- job_messages — outreach messages written by the scheduled Claude routine
+-- Deliberately not columns on scraped_jobs: get_scraped_jobs() does select("*")
+-- over thousands of rows, and inlining message bodies would bloat every listing.
+-- ---------------------------------------------------------------------------
+create table if not exists job_messages (
+    id              bigserial primary key,
+    scraped_job_id  bigint      not null references scraped_jobs(id) on delete cascade,
+    message_type    text        not null default 'cold_dm',
+    content         text        not null,
+    generated_by    text        not null default 'claude-routine',
+    generated_at    timestamptz not null default now(),
+    unique (scraped_job_id, message_type)
+);
+
+create index if not exists idx_job_messages_job on job_messages (scraped_job_id);
+
+
+-- ---------------------------------------------------------------------------
+-- message_requests — freeform message requests queued from the UI
+-- The app has no LLM credential; POSTing to /api/messages/* parks the request
+-- here and the scheduled Claude routine writes it on its next run.
+-- ---------------------------------------------------------------------------
+create table if not exists message_requests (
+    id            bigserial   primary key,
+    message_type  text        not null,
+    params        jsonb       not null default '{}'::jsonb,
+    status        text        not null default 'pending',
+    content       text,
+    error         text,
+    created_at    timestamptz not null default now(),
+    completed_at  timestamptz,
+    constraint message_requests_status_check
+        check (status in ('pending', 'ready', 'failed'))
+);
+
+create index if not exists idx_message_requests_queue   on message_requests (status, created_at);
+create index if not exists idx_message_requests_created on message_requests (created_at desc);
+
+
+-- ---------------------------------------------------------------------------
 -- Row Level Security
 -- Enabled with no policies: anon and authenticated are denied everything, and
 -- only the service_role key reaches the data. See ACCESS MODEL at the top.
@@ -261,3 +301,5 @@ alter table email_logs             enable row level security;
 alter table notifications          enable row level security;
 alter table push_subscriptions     enable row level security;
 alter table user_profile           enable row level security;
+alter table job_messages           enable row level security;
+alter table message_requests       enable row level security;
