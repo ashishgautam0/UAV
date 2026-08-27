@@ -266,6 +266,76 @@ def get_scraped_jobs(source=None):
     return pd.DataFrame(resp.data)
 
 
+# ===================== JOB MESSAGE FUNCTIONS =====================
+# Outreach messages are written by the scheduled Claude routine, not by a
+# hosted LLM call — see backend/modules/pending_messages.py.
+
+DEFAULT_MESSAGE_TYPE = "cold_dm"
+
+
+def get_job_message(scraped_job_id, message_type=DEFAULT_MESSAGE_TYPE):
+    """Return the stored message row for a job, or None."""
+    try:
+        db = _get_client()
+        resp = (db.table("job_messages")
+                .select("*")
+                .eq("scraped_job_id", scraped_job_id)
+                .eq("message_type", message_type)
+                .execute())
+        return resp.data[0] if resp.data else None
+    except Exception:
+        return None
+
+
+def save_job_message(scraped_job_id, content, message_type=DEFAULT_MESSAGE_TYPE,
+                     generated_by="claude-routine"):
+    """Store (or replace) the message for a job. Returns True on success."""
+    db = _get_client()
+    try:
+        db.table("job_messages").upsert({
+            "scraped_job_id": int(scraped_job_id),
+            "message_type": message_type,
+            "content": content,
+            "generated_by": generated_by,
+            "generated_at": datetime.now().isoformat(),
+        }, on_conflict="scraped_job_id,message_type").execute()
+        return True
+    except Exception as e:
+        print(f"Failed to save job message for {scraped_job_id}: {e}")
+        return False
+
+
+def get_jobs_needing_messages(limit=20, message_type=DEFAULT_MESSAGE_TYPE):
+    """Active jobs that have no stored message of this type yet, newest first.
+
+    PostgREST has no NOT EXISTS, so the anti-join is done here: pull the
+    candidate jobs, pull the ids that already have a message, subtract.
+    """
+    try:
+        db = _get_client()
+        jobs = (db.table("scraped_jobs")
+                .select("id, title, company, location, url, description")
+                .eq("dismissed", 0)
+                .eq("applied", 0)
+                .order("scraped_at", desc=True)
+                .limit(max(limit * 5, limit))
+                .execute()).data or []
+        if not jobs:
+            return []
+
+        done = (db.table("job_messages")
+                .select("scraped_job_id")
+                .eq("message_type", message_type)
+                .in_("scraped_job_id", [j["id"] for j in jobs])
+                .execute()).data or []
+        have = {r["scraped_job_id"] for r in done}
+
+        return [j for j in jobs if j["id"] not in have][:limit]
+    except Exception as e:
+        print(f"Failed to list jobs needing messages: {e}")
+        return []
+
+
 def mark_scraped_job(job_id, action):
     db = _get_client()
     if action == 'applied':

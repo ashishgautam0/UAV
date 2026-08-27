@@ -42,6 +42,8 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 - A scheduled Claude routine runs the scraper once a day at 18:00 IST
 - Scrapes LinkedIn, filters and deduplicates against previous runs
 - Saves new jobs and a markdown digest to Supabase
+- Writes a cold outreach DM for each new job — the routine session is Claude, so
+  it composes them itself and stores them in `job_messages`. No LLM API key.
 - Raises an in-app notification and a web push
 
 ### Additional Tools
@@ -82,6 +84,7 @@ job_search_tool/
 │       ├── jd_analyzer.py       # Job description analysis
 │       ├── resume_tailor.py     # Resume tailoring
 │       ├── company_research.py  # Company research & caching
+│       ├── pending_messages.py  # CLI the Claude routine drives to write DMs
 │       └── digest.py            # Markdown digest builder
 ├── frontend/
 │   └── src/app/
@@ -201,7 +204,16 @@ checks out this repository, installs `backend/requirements.txt`, and runs:
 cd backend/modules && python hourly.py
 ```
 
-That environment needs `SUPABASE_URL`, `SUPABASE_KEY` and `GROQ_API_KEY`.
+It then writes the outreach messages itself — there is no hosted LLM call in
+this path. The routine lists jobs with no message yet, composes one per job, and
+saves it:
+
+```bash
+python pending_messages.py list --limit 10
+python pending_messages.py save --job-id <ID> < message.txt
+```
+
+That environment needs `SUPABASE_URL` and `SUPABASE_KEY` only.
 
 ## API Routes
 
@@ -209,6 +221,7 @@ That environment needs `SUPABASE_URL`, `SUPABASE_KEY` and `GROQ_API_KEY`.
 GET/POST /api/applications    # Application CRUD
 GET      /api/stats           # Dashboard analytics
 GET      /api/scraped-jobs    # Scraped job listings
+GET      /api/scraped-jobs/{id}/message  # Routine-written outreach message
 GET      /api/tonight         # Tonight's Plan jobs
 POST     /api/messages        # AI message generation
 POST     /api/analyze         # JD analysis
