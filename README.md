@@ -221,6 +221,18 @@ python pending_messages.py requests
 python pending_messages.py fulfil --request-id <ID> < message.txt
 ```
 
+Each run ends with a summary notification — saved in-app and pushed to every
+device subscribed through the installed PWA:
+
+```bash
+python pending_messages.py notify --title "Job scan" --body "3 new jobs, 3 DMs"
+```
+
+Web push needs `VAPID_PRIVATE_KEY` and `VAPID_CLAIM_EMAIL` in the routine's
+environment, and `VAPID_PUBLIC_KEY` on the API project (the bell icon in the
+app uses it to subscribe the device). Without them the push is skipped and the
+in-app notification still lands.
+
 That environment needs `SUPABASE_URL` and `SUPABASE_KEY` only.
 
 ## API Routes
