@@ -38,11 +38,11 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 - Sort by relevance score, source, or company
 - Quick-apply button to log applications directly
 
-### Hourly Automation
-- GitHub Actions workflow runs every hour
-- Scrapes all sources, scores and ranks jobs
-- Sends formatted HTML email summary
-- Saves results to Supabase
+### Daily Automation
+- A scheduled Claude routine runs the scraper once a day at 18:00 IST
+- Scrapes LinkedIn, filters and deduplicates against previous runs
+- Saves new jobs and a markdown digest to Supabase
+- Raises an in-app notification and a web push
 
 ### Additional Tools
 - **JD Analyzer** — NOC compatibility check, skill match scoring, red flag detection, ATS compatibility
@@ -78,11 +78,11 @@ job_search_tool/
 │       ├── scraper.py           # 12+ job source scrapers
 │       ├── message_generator.py # LLM-powered message generation
 │       ├── tracker.py           # Application tracking (Supabase)
-│       ├── hourly.py            # Hourly automation script
+│       ├── hourly.py            # Daily automation script
 │       ├── jd_analyzer.py       # Job description analysis
 │       ├── resume_tailor.py     # Resume tailoring
 │       ├── company_research.py  # Company research & caching
-│       └── send_email.py        # Email notifications
+│       └── digest.py            # Markdown digest builder
 ├── frontend/
 │   └── src/app/
 │       ├── (app)/
@@ -96,8 +96,8 @@ job_search_tool/
 │       │   ├── links/           # Quick links
 │       │   └── settings/        # Settings
 │       └── page.tsx             # Landing page
-└── .github/workflows/
-    └── nightly.yml              # Hourly scraper cron job
+└── supabase/
+    └── schema.sql               # Database schema
 ```
 
 ## Setup
@@ -140,8 +140,6 @@ Required environment variables:
 SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_supabase_service_role_key  # service_role: RLS is on with no policies
 GROQ_API_KEY=your_groq_api_key
-GMAIL_ADDRESS=your_email          # For email notifications
-GMAIL_APP_PASSWORD=your_app_pass  # Gmail app password
 ```
 
 Optional:
@@ -184,17 +182,26 @@ Environment variables:
 
 - **API project** — `SUPABASE_URL`, `SUPABASE_KEY`, `GROQ_API_KEY`,
   `APP_USERNAME`, `APP_PASSWORD`, `JWT_SECRET`, and `FRONTEND_URL` (so CORS
-  allows the frontend origin). `OPENAI_API_KEY`, `GMAIL_ADDRESS`,
-  `GMAIL_APP_PASSWORD` and the `VAPID_*` keys are optional — see
-  `backend/app/config.py`.
+  allows the frontend origin). `OPENAI_API_KEY` and the `VAPID_*` keys are
+  optional — see `backend/app/config.py`.
 - **Frontend project** — `NEXT_PUBLIC_API_URL`, set to the API project's URL.
   This is read at build time (`frontend/src/lib/api.ts` falls back to
   `http://localhost:8000`), so set it **before** the first build, or redeploy
   after adding it.
 
-The hourly scraper runs from `.github/workflows/nightly.yml`, which is
-`workflow_dispatch`-only — trigger it from the Actions tab or an external cron
-service. It needs the same secrets set on the repository.
+### Scheduled scraping
+
+The scraper is not triggered by the deployed API — a full run makes 48 LinkedIn
+queries with pauses between them, far longer than a serverless function may run.
+It is instead executed once a day at 18:00 IST (12:30 UTC) by a scheduled
+Claude routine, which
+checks out this repository, installs `backend/requirements.txt`, and runs:
+
+```bash
+cd backend/modules && python hourly.py
+```
+
+That environment needs `SUPABASE_URL`, `SUPABASE_KEY` and `GROQ_API_KEY`.
 
 ## API Routes
 
