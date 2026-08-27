@@ -256,10 +256,16 @@ export default function ReferralsPage() {
         role_applying_for: role.trim(),
         relationship: referral.relationship || undefined,
       });
-      setGeneratedMessages((prev) => ({
-        ...prev,
-        [referral.id]: response.content,
-      }));
+      if (response.content) {
+        setGeneratedMessages((prev) => ({
+          ...prev,
+          [referral.id]: response.content as string,
+        }));
+      } else {
+        toast.success(
+          "Queued — Claude writes this on the next hourly run. It'll appear on the Messages page."
+        );
+      }
     } catch (err) {
       console.error("Failed to generate referral request", err);
       toast.error("Failed to generate referral request. Please try again.");

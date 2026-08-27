@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   generateColdDM,
+  getMessageRequest,
   generateFollowUp,
   generateCoverLetter,
   generateThankYou,
@@ -13,7 +14,7 @@ import {
   getFollowUpHistory,
   logFollowUp,
 } from "@/lib/api";
-import type { Application } from "@/lib/types";
+import type { Application, MessageResponse } from "@/lib/types";
 import {
   Dialog,
   DialogContent,
@@ -66,6 +67,8 @@ function MessagesPageInner() {
   const [messageType, setMessageType] = useState<MessageType | "">("");
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [result, setResult] = useState("");
+  const [pendingId, setPendingId] = useState<number | null>(null);
+  const [checking, setChecking] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showLogDialog, setShowLogDialog] = useState(false);
@@ -94,6 +97,7 @@ function MessagesPageInner() {
     setMessageType(value as MessageType);
     setFormData({});
     setResult("");
+    setPendingId(null);
   }
 
   function updateField(field: string, value: string) {
@@ -104,11 +108,12 @@ function MessagesPageInner() {
     if (!messageType) return;
     setLoading(true);
     setResult("");
+    setPendingId(null);
     setCopied(false);
     setLogged(false);
 
     try {
-      let response: { content: string };
+      let response: MessageResponse;
 
       switch (messageType) {
         case "cold-dm":
@@ -193,12 +198,42 @@ function MessagesPageInner() {
           break;
       }
 
-      setResult(response.content);
+      if (response.content) {
+        setResult(response.content);
+        setPendingId(null);
+      } else {
+        // Queued: the scheduled Claude routine writes it on its next run.
+        setResult("");
+        setPendingId(response.request_id ?? null);
+        toast.success("Queued — Claude will write this on the next hourly run.");
+      }
     } catch (err) {
       console.error("Failed to generate message", err);
       toast.error("Failed to generate message. Please try again.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleCheckPending() {
+    if (pendingId === null) return;
+    setChecking(true);
+    try {
+      const req = await getMessageRequest(pendingId);
+      if (req.status === "ready" && req.content) {
+        setResult(req.content);
+        setPendingId(null);
+        toast.success("Your message is ready.");
+      } else if (req.status === "failed") {
+        setPendingId(null);
+        toast.error(req.error || "The routine could not write this message.");
+      } else {
+        toast.info("Still queued — the routine runs hourly.");
+      }
+    } catch {
+      toast.error("Could not check the request.");
+    } finally {
+      setChecking(false);
     }
   }
 
@@ -640,6 +675,27 @@ function MessagesPageInner() {
       </Card>
 
       {/* ---- Result Card ---- */}
+      {pendingId !== null && (
+        <Card className="mt-6">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div>
+              <p className="font-medium">Queued as request #{pendingId}</p>
+              <p className="text-sm text-muted-foreground">
+                Messages are written by the scheduled Claude routine, which runs
+                hourly — there is no live model call.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleCheckPending}
+              disabled={checking}
+            >
+              {checking ? "Checking..." : "Check now"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {result && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">

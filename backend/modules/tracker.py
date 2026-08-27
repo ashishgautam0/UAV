@@ -336,6 +336,87 @@ def get_jobs_needing_messages(limit=20, message_type=DEFAULT_MESSAGE_TYPE):
         return []
 
 
+# ===================== MESSAGE REQUEST QUEUE =====================
+# The UI queues freeform message requests here; the scheduled Claude routine
+# writes them. No hosted LLM call is involved.
+
+MESSAGE_REQUEST_TYPES = (
+    "cold-dm", "follow-up", "cover-letter",
+    "thank-you", "referral-request", "demo-outreach",
+)
+
+
+def create_message_request(message_type, params):
+    """Queue a request. Returns the new row, or None on failure."""
+    db = _get_client()
+    try:
+        resp = db.table("message_requests").insert({
+            "message_type": message_type,
+            "params": params or {},
+            "status": "pending",
+        }).execute()
+        return resp.data[0] if resp.data else None
+    except Exception as e:
+        print(f"Failed to queue message request: {e}")
+        return None
+
+
+def get_message_request(request_id):
+    """Fetch a single queued request, or None."""
+    try:
+        db = _get_client()
+        resp = (db.table("message_requests")
+                .select("*")
+                .eq("id", request_id)
+                .execute())
+        return resp.data[0] if resp.data else None
+    except Exception:
+        return None
+
+
+def get_message_requests(status=None, limit=50):
+    """Recent requests, newest first, optionally filtered by status."""
+    try:
+        db = _get_client()
+        query = db.table("message_requests").select("*")
+        if status:
+            query = query.eq("status", status)
+        resp = query.order("created_at", desc=True).limit(limit).execute()
+        return resp.data or []
+    except Exception:
+        return []
+
+
+def complete_message_request(request_id, content):
+    """Attach the written message and mark the request ready."""
+    db = _get_client()
+    try:
+        db.table("message_requests").update({
+            "status": "ready",
+            "content": content,
+            "error": None,
+            "completed_at": datetime.now().isoformat(),
+        }).eq("id", request_id).execute()
+        return True
+    except Exception as e:
+        print(f"Failed to complete request {request_id}: {e}")
+        return False
+
+
+def fail_message_request(request_id, error):
+    """Mark a request failed so the UI stops showing it as pending forever."""
+    db = _get_client()
+    try:
+        db.table("message_requests").update({
+            "status": "failed",
+            "error": str(error)[:500],
+            "completed_at": datetime.now().isoformat(),
+        }).eq("id", request_id).execute()
+        return True
+    except Exception:
+        return False
+
+
 def mark_scraped_job(job_id, action):
     db = _get_client()
     if action == 'applied':

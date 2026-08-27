@@ -7,10 +7,11 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 ### Job Scraper
 - Scrapes **LinkedIn** via JobSpy across 24 AI/ML search queries × 2 locations (India, Remote)
 - Filters by AI/ML keywords, role level, and location
-- LLM-powered relevance scoring (0–100) using Groq
 - Deduplication and company blacklist filtering
 
 ### AI Message Generator
+- No LLM API key: every message is written by the scheduled Claude routine
+- Requests queued from the UI are fulfilled on the next hourly run
 - **Cold DMs** — 2 variants per company (direct + curiosity-driven)
 - **Follow-ups** — Value-add messages, not generic check-ins
 - **Cover Letters** — Under 200 words, personalized
@@ -60,7 +61,7 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 | Frontend | Next.js 16, React 19, TypeScript |
 | Styling | Tailwind CSS 4, shadcn/ui, Lucide icons |
 | Backend | FastAPI, Uvicorn |
-| AI/LLM | Groq (llama-3.3-70b-versatile) |
+| AI/LLM | Claude, via the scheduled routine (no API key) |
 | Database | Supabase (PostgreSQL) |
 | Scraping | requests, BeautifulSoup4, python-jobspy |
 | Automation | GitHub Actions (hourly cron) |
@@ -109,7 +110,6 @@ job_search_tool/
 - Python 3.11+
 - Node.js 18+
 - Supabase project
-- Groq API key
 
 ### Database
 
@@ -142,7 +142,6 @@ Required environment variables:
 ```env
 SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_supabase_service_role_key  # service_role: RLS is on with no policies
-GROQ_API_KEY=your_groq_api_key
 ```
 
 Optional:
@@ -183,7 +182,7 @@ the Root Directory as above.
 
 Environment variables:
 
-- **API project** — `SUPABASE_URL`, `SUPABASE_KEY`, `GROQ_API_KEY`,
+- **API project** — `SUPABASE_URL`, `SUPABASE_KEY`,
   `APP_USERNAME`, `APP_PASSWORD`, `JWT_SECRET`, and `FRONTEND_URL` (so CORS
   allows the frontend origin). `OPENAI_API_KEY` and the `VAPID_*` keys are
   optional — see `backend/app/config.py`.
@@ -213,6 +212,15 @@ python pending_messages.py list --limit 10
 python pending_messages.py save --job-id <ID> < message.txt
 ```
 
+It also drains the freeform queue. Anything requested from the Messages or
+Referrals page lands in `message_requests`; the routine renders each request
+back into the prompt the app would have sent and answers it:
+
+```bash
+python pending_messages.py requests
+python pending_messages.py fulfil --request-id <ID> < message.txt
+```
+
 That environment needs `SUPABASE_URL` and `SUPABASE_KEY` only.
 
 ## API Routes
@@ -222,6 +230,8 @@ GET/POST /api/applications    # Application CRUD
 GET      /api/stats           # Dashboard analytics
 GET      /api/scraped-jobs    # Scraped job listings
 GET      /api/scraped-jobs/{id}/message  # Routine-written outreach message
+GET      /api/messages/requests   # Queued message requests
+GET      /api/messages/requests/{id}  # Poll one queued request
 GET      /api/tonight         # Tonight's Plan jobs
 POST     /api/messages        # AI message generation
 POST     /api/analyze         # JD analysis

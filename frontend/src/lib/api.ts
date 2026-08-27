@@ -17,6 +17,8 @@ import type {
   FollowUpRequest,
   FullAnalyzeRequest,
   LogFollowUpRequest,
+  MessageRequest,
+  MessageRequestStatus,
   MessageResponse,
   MiniDemo,
   PlatformEffectiveness,
@@ -182,6 +184,17 @@ export async function generateDemoOutreach(data: DemoOutreachRequest): Promise<M
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+export async function listMessageRequests(
+  status?: MessageRequestStatus
+): Promise<MessageRequest[]> {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiFetch<MessageRequest[]>(`/api/messages/requests${qs}`);
+}
+
+export async function getMessageRequest(id: number): Promise<MessageRequest> {
+  return apiFetch<MessageRequest>(`/api/messages/requests/${id}`);
 }
 
 // ---- JD Analyzer ----

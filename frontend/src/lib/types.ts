@@ -165,7 +165,23 @@ export interface DemoOutreachRequest {
 }
 
 export interface MessageResponse {
-  content: string;
+  /** Null while the request is queued — the Claude routine writes it. */
+  content: string | null;
+  request_id?: number;
+  status?: MessageRequestStatus;
+}
+
+export type MessageRequestStatus = "pending" | "ready" | "failed";
+
+export interface MessageRequest {
+  id: number;
+  message_type: string;
+  params: Record<string, unknown>;
+  status: MessageRequestStatus;
+  content: string | null;
+  error: string | null;
+  created_at: string;
+  completed_at: string | null;
 }
 
 // ---- JD Analyzer ----

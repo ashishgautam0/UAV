@@ -9,7 +9,7 @@ The follow-up system spans three layers:
 | **Database** | Supabase (PostgreSQL) | 3 tables: `applications`, `referrals`, `follow_up_history` |
 | **Backend API** | FastAPI (Python) | `tracker.py`, `message_generator.py`, `follow_ups.py`, `messages.py`, `schemas.py` |
 | **Frontend** | Next.js 16 + React 19 | `dashboard/page.tsx`, `messages/page.tsx`, `tracker/page.tsx`, `api.ts`, `types.ts` |
-| **LLM** | Groq API (llama-3.3-70b-versatile) | `message_generator.py` |
+| **LLM** | Claude, via the scheduled routine — no API key | `message_generator.py` builds the prompt; `pending_messages.py` is the routine's interface |
 
 ---
 
@@ -190,7 +190,7 @@ Generate 1 follow-up message, ready to copy. Output ONLY the message text, nothi
 ```
 
 **LLM API call parameters:**
-- Model: `llama-3.3-70b-versatile` (Groq)
+- Written by Claude in the scheduled routine (no hosted model call)
 - Temperature: `0.7` (moderate creativity)
 - Max tokens: `300` (hard cap on output length)
 - Message format: `[{"role": "system", ...}, {"role": "user", ...}]` — two-message pair, NOT a single user message
@@ -412,7 +412,7 @@ User applies to a job
                   -> Selects #1 (polite check-in)
                       -> POST /api/messages/follow-up
                           -> generate_follow_up() builds system + user prompt
-                              -> Groq API (llama-3.3-70b) generates 300-char message
+                              -> queued; the Claude routine writes the 300-char message
                                   -> User copies message, sends via LinkedIn
                                       -> User clicks "Log as Sent"
                                           -> POST /api/follow-ups/log

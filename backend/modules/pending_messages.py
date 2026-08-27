@@ -11,6 +11,10 @@ script is the interface it drives.
     # save one message (body on stdin avoids shell-quoting multi-line text)
     python pending_messages.py save --job-id 4821 < message.txt
 
+    # freeform requests queued from the UI, each with its ready-made prompt
+    python pending_messages.py requests
+    python pending_messages.py fulfil --request-id 12 < message.txt
+
 Requires SUPABASE_URL and SUPABASE_KEY. No LLM key of any kind.
 """
 
@@ -20,8 +24,12 @@ import sys
 
 from tracker import (
     DEFAULT_MESSAGE_TYPE,
+    complete_message_request,
+    fail_message_request,
     get_job_message,
     get_jobs_needing_messages,
+    get_message_request,
+    get_message_requests,
     save_job_message,
 )
 
@@ -84,9 +92,82 @@ def main():
                         help="message text; omit to read from stdin")
     p_save.set_defaults(func=cmd_save)
 
+    p_req = sub.add_parser("requests", help="pending UI requests, with prompts")
+    p_req.add_argument("--limit", type=int, default=20)
+    p_req.set_defaults(func=cmd_requests)
+
+    p_ful = sub.add_parser("fulfil", help="answer one queued request")
+    p_ful.add_argument("--request-id", type=int, required=True)
+    p_ful.add_argument("--content", default=None,
+                       help="message text; omit to read from stdin")
+    p_ful.set_defaults(func=cmd_fulfil)
+
+    p_fail = sub.add_parser("fail", help="mark a request failed")
+    p_fail.add_argument("--request-id", type=int, required=True)
+    p_fail.add_argument("--error", required=True)
+    p_fail.set_defaults(func=cmd_fail)
+
     args = parser.parse_args()
     sys.exit(args.func(args))
 
 
 if __name__ == "__main__":
     main()
+
+
+def _build_prompt(message_type, params):
+    """Render the stored request into the prompt the app would have sent."""
+    from message_generator import PROMPT_BUILDERS
+
+    builder = PROMPT_BUILDERS.get(message_type)
+    if builder is None:
+        return {"error": f"unknown message_type {message_type!r}"}
+    try:
+        return builder(**(params or {}))
+    except TypeError as e:
+        return {"error": f"params do not match {message_type} builder: {e}"}
+
+
+def cmd_requests(args):
+    rows = get_message_requests(status="pending", limit=args.limit)
+    out = []
+    for r in rows:
+        spec = _build_prompt(r["message_type"], r.get("params"))
+        out.append({
+            "request_id": r["id"],
+            "message_type": r["message_type"],
+            "created_at": r.get("created_at"),
+            **spec,
+        })
+    json.dump({"pending": out}, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_fulfil(args):
+    row = get_message_request(args.request_id)
+    if not row:
+        print(f"No request {args.request_id}.", file=sys.stderr)
+        return 1
+
+    content = (args.content if args.content is not None else sys.stdin.read()).strip()
+    if not content:
+        print("Refusing to save an empty message.", file=sys.stderr)
+        return 1
+
+    # Apply the same sentence-boundary trim the old inline generator used.
+    from message_generator import enforce_char_limit
+    spec = _build_prompt(row["message_type"], row.get("params"))
+    content = enforce_char_limit(content, spec.get("char_limit"))
+
+    if not complete_message_request(args.request_id, content):
+        return 1
+    print(f"Request {args.request_id} ({row['message_type']}) ready — {len(content)} chars.")
+    return 0
+
+
+def cmd_fail(args):
+    if not fail_message_request(args.request_id, args.error):
+        return 1
+    print(f"Request {args.request_id} marked failed.")
+    return 0
