@@ -28,7 +28,7 @@ from .routers import (
 
 # Inject env vars from settings so modules read them via os.environ
 settings = get_settings()
-for key in ("SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY", "JOOBLE_API_KEY", "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_CLAIM_EMAIL"):
+for key in ("SUPABASE_URL", "SUPABASE_KEY", "GROQ_API_KEY", "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_CLAIM_EMAIL"):
     val = getattr(settings, key, "")
     if val:
         os.environ[key] = val
