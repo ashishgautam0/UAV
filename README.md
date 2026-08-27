@@ -108,6 +108,22 @@ job_search_tool/
 - Supabase project
 - Groq API key
 
+### Database
+
+Create a Supabase project, then apply the schema once:
+
+Supabase dashboard -> **SQL Editor** -> **New query** -> paste [`supabase/schema.sql`](supabase/schema.sql) -> **Run**.
+
+That creates all 10 tables the backend expects (`applications`, `scraped_jobs`,
+`referrals`, `follow_up_history`, `company_research_cache`, `mini_demos`,
+`email_logs`, `notifications`, `push_subscriptions`, `user_profile`) with their
+indexes, and enables Row Level Security on each.
+
+RLS is enabled with **no policies**, so anon and authenticated keys are denied
+everything and only the `service_role` key reaches the data. The frontend never
+talks to Supabase directly — it calls the FastAPI backend — so set `SUPABASE_KEY`
+to the **service_role** key on the backend and keep it out of the browser.
+
 ### Backend
 
 ```bash
@@ -122,7 +138,7 @@ Required environment variables:
 
 ```env
 SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_anon_key
+SUPABASE_KEY=your_supabase_service_role_key  # service_role: RLS is on with no policies
 GROQ_API_KEY=your_groq_api_key
 GMAIL_ADDRESS=your_email          # For email notifications
 GMAIL_APP_PASSWORD=your_app_pass  # Gmail app password
@@ -150,6 +166,35 @@ npm run dev
 ```
 
 The frontend runs on `http://localhost:3000` and the backend on `http://localhost:8000`.
+
+## Deployment
+
+The repo deploys as **two Vercel projects from this one repository**, plus the
+Supabase project above.
+
+| Project | Root Directory | Framework |
+| --- | --- | --- |
+| Frontend | `frontend` | Next.js (auto-detected) |
+| API | *(repository root)* | Python; `vercel.json` rewrites `/api/(.*)` to `api/index.py` |
+
+At [vercel.com/new](https://vercel.com/new), import the repository twice and set
+the Root Directory as above.
+
+Environment variables:
+
+- **API project** — `SUPABASE_URL`, `SUPABASE_KEY`, `GROQ_API_KEY`,
+  `APP_USERNAME`, `APP_PASSWORD`, `JWT_SECRET`, and `FRONTEND_URL` (so CORS
+  allows the frontend origin). `OPENAI_API_KEY`, `GMAIL_ADDRESS`,
+  `GMAIL_APP_PASSWORD` and the `VAPID_*` keys are optional — see
+  `backend/app/config.py`.
+- **Frontend project** — `NEXT_PUBLIC_API_URL`, set to the API project's URL.
+  This is read at build time (`frontend/src/lib/api.ts` falls back to
+  `http://localhost:8000`), so set it **before** the first build, or redeploy
+  after adding it.
+
+The hourly scraper runs from `.github/workflows/nightly.yml`, which is
+`workflow_dispatch`-only — trigger it from the Actions tab or an external cron
+service. It needs the same secrets set on the repository.
 
 ## API Routes
 
