@@ -1,7 +1,7 @@
 """
-Hourly Job Search Automation
-Runs all scrapers, scores/ranks jobs, sends email, and saves to Supabase.
-Designed to run both locally and in GitHub Actions.
+Daily Job Search Automation
+Runs the LinkedIn scraper, filters jobs, and saves them to Supabase along with
+a markdown digest. Invoked once a day by a scheduled Claude routine.
 """
 
 import os
@@ -14,7 +14,7 @@ from tracker import (
     send_push_notifications,
 )
 from scraper import run_all_scrapers
-from send_email import build_email_content, send_email, get_alert_number
+from digest import build_email_content, get_alert_number
 
 # Default fallback blocked list
 _DEFAULT_BLOCKED = {"turing"}
@@ -273,13 +273,13 @@ def main():
         except Exception:
             pass
 
-    # Only send email if there are any new jobs
+    # Nothing to record if there are no new jobs
     if not new_jobs:
-        print("\nNo new jobs found this run. Skipping email.")
+        print("\nNo new jobs found this run.")
         print("Done!")
         return
 
-    print("\nBuilding email content...")
+    print("\nBuilding digest...")
     alert_number = get_alert_number()
 
     for job in new_jobs:
@@ -287,12 +287,8 @@ def main():
 
     md_content = build_email_content(new_jobs, sources_status, sources_errors)
 
-    # Send email
-    print(f"Sending Job Alert #{alert_number}...")
-    email_sent = send_email(md_content, alert_number=alert_number)
-
-    # Save to Supabase so frontend can display it
-    print("Saving email log to database...")
+    # Save to Supabase so the frontend can display it
+    print("Saving digest to database...")
     try:
         save_email_log(
             subject=f"Job Alert #{alert_number}",
@@ -300,10 +296,9 @@ def main():
             html_content="",
             jobs_count=len(new_jobs),
             sources_summary=sources_status,
-            email_sent=email_sent,
         )
     except Exception as e:
-        print(f"  WARNING: Could not save email log to database: {e}")
+        print(f"  WARNING: Could not save digest to database: {e}")
 
     # Save in-app notification
     print("Saving in-app notification...")
@@ -332,7 +327,7 @@ def main():
     except Exception as e:
         print(f"  WARNING: Could not send push notification: {e}")
 
-    print(f"\nDone! Job Alert #{alert_number} sent: {email_sent}. {len(new_jobs)} jobs saved.")
+    print(f"\nDone! Job Alert #{alert_number}: {len(new_jobs)} jobs saved.")
 
 
 if __name__ == "__main__":
