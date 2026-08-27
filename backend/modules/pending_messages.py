@@ -15,6 +15,9 @@ script is the interface it drives.
     python pending_messages.py requests
     python pending_messages.py fulfil --request-id 12 < message.txt
 
+    # end-of-run summary: in-app notification + web push to the installed PWA
+    python pending_messages.py notify --title "Hourly run" --body "3 jobs, 3 DMs"
+
 Requires SUPABASE_URL and SUPABASE_KEY. No LLM key of any kind.
 """
 
@@ -32,6 +35,7 @@ from tracker import (
     get_message_requests,
     save_job_message,
 )
+from tracker import save_notification, send_push_notifications
 
 
 def _profile_text():
@@ -107,6 +111,12 @@ def main():
     p_fail.add_argument("--error", required=True)
     p_fail.set_defaults(func=cmd_fail)
 
+    p_not = sub.add_parser("notify", help="in-app notification + web push")
+    p_not.add_argument("--title", required=True)
+    p_not.add_argument("--body", required=True)
+    p_not.add_argument("--url", default="/tonight")
+    p_not.set_defaults(func=cmd_notify)
+
     args = parser.parse_args()
     sys.exit(args.func(args))
 
@@ -170,4 +180,31 @@ def cmd_fail(args):
     if not fail_message_request(args.request_id, args.error):
         return 1
     print(f"Request {args.request_id} marked failed.")
+    return 0
+
+
+def cmd_notify(args):
+    """Save an in-app notification and push it to every subscribed device.
+
+    The routine calls this once at the very end of each run — after the DMs are
+    written — so the push can carry the whole summary and fires even when the
+    scrape found nothing. Push delivery needs VAPID_PRIVATE_KEY and
+    VAPID_CLAIM_EMAIL; without them send_push_notifications() prints a notice
+    and skips, and the in-app notification is still saved.
+    """
+    try:
+        save_notification(
+            title=args.title,
+            body=args.body,
+            notification_type="run_summary",
+        )
+        print("In-app notification saved.")
+    except Exception as e:
+        print(f"Could not save in-app notification: {e}", file=sys.stderr)
+
+    try:
+        send_push_notifications(title=args.title, body=args.body, url=args.url)
+    except Exception as e:
+        print(f"Could not send push: {e}", file=sys.stderr)
+        return 1
     return 0
