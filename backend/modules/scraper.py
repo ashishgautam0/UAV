@@ -113,13 +113,17 @@ def check_apply_type(job_url, timeout=10):
         if resp.status_code != 200 or not resp.text:
             return ""
         html = resp.text
+        # LinkedIn's guest job page tags its Apply button with exactly one of
+        # these tracking markers: "offsite" postings hand applicants to an
+        # external site, "onsite" ones are Easy Apply. Require a positive
+        # marker for either answer — never guess from absence.
+        if "apply-link-offsite" in html or "offsite-apply-icon" in html:
+            return "EXTERNAL"
+        if "apply-link-onsite" in html or "onsite-apply-icon" in html:
+            return "EASY_APPLY"
         applyurl = re.search(r'id="applyUrl"[^>]*>(.*?)</code>', html, re.S)
         if applyurl and "url=" in applyurl.group(1):
             return "EXTERNAL"
-        # Only trust "no applyUrl means Easy Apply" when the page actually
-        # rendered job content rather than a login wall.
-        if "topcard" in html or "decorated-job-posting" in html:
-            return "EASY_APPLY"
         return ""
     except Exception:
         return ""
