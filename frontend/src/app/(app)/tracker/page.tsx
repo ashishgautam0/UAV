@@ -154,6 +154,8 @@ export default function TrackerPage() {
 
   // ---- Applications state ----
   const [applications, setApplications] = useState<Application[]>([]);
+  const [appPage, setAppPage] = useState(1);
+  const APPS_PER_PAGE = 10;
   const [appsLoading, setAppsLoading] = useState(true);
 
   // ---- Add application form ----
@@ -346,6 +348,21 @@ export default function TrackerPage() {
   useEffect(() => {
     fetchApplications();
   }, [fetchApplications]);
+
+  // Back to the first page whenever the filters change
+  useEffect(() => {
+    setAppPage(1);
+  }, [filterStatus, filterType, filterPlatform]);
+
+  const appTotalPages = Math.max(
+    1,
+    Math.ceil(applications.length / APPS_PER_PAGE)
+  );
+  const appSafePage = Math.min(appPage, appTotalPages);
+  const pagedApplications = applications.slice(
+    (appSafePage - 1) * APPS_PER_PAGE,
+    appSafePage * APPS_PER_PAGE
+  );
 
   useEffect(() => {
     fetchDemos();
@@ -702,7 +719,7 @@ export default function TrackerPage() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {applications.map((app) => (
+            {pagedApplications.map((app) => (
               <Card key={app.id}>
                 <Collapsible>
                   <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors pb-3 pt-3">
@@ -1122,6 +1139,31 @@ export default function TrackerPage() {
                 </Collapsible>
               </Card>
             ))}
+
+            {/* Pagination */}
+            {appTotalPages > 1 && (
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={appSafePage <= 1}
+                  onClick={() => setAppPage(appSafePage - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  Page {appSafePage} of {appTotalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={appSafePage >= appTotalPages}
+                  onClick={() => setAppPage(appSafePage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
