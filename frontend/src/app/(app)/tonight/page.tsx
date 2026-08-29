@@ -515,6 +515,27 @@ export default function TonightPage() {
                             <p className="text-sm leading-relaxed whitespace-pre-wrap">
                               {dmByJob[job.id]}
                             </p>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-emerald-600/20 pt-2 text-xs">
+                              <span className="text-muted-foreground">Send to:</span>
+                              <a
+                                href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${job.company} recruiter`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-sky-400 hover:underline"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Recruiters at {job.company}
+                              </a>
+                              <a
+                                href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${job.company} hiring manager`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-sky-400 hover:underline"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Hiring managers
+                              </a>
+                            </div>
                           </div>
                         )}
 
