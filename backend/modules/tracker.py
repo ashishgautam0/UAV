@@ -403,6 +403,30 @@ def complete_message_request(request_id, content):
         return False
 
 
+def get_follow_up_draft(application_id):
+    """Latest auto-queued follow-up request for one tracked application.
+
+    Returns the newest pending/ready 'follow-up' message_request whose params
+    carry _application_id == application_id, or None.
+    """
+    try:
+        db = _get_client()
+        resp = (db.table("message_requests")
+                .select("*")
+                .eq("message_type", "follow-up")
+                .order("created_at", desc=True)
+                .limit(100)
+                .execute())
+        for r in resp.data or []:
+            params = r.get("params") or {}
+            if (params.get("_application_id") == application_id
+                    and r.get("status") in ("pending", "ready")):
+                return r
+    except Exception:
+        pass
+    return None
+
+
 def fail_message_request(request_id, error):
     """Mark a request failed so the UI stops showing it as pending forever."""
     db = _get_client()

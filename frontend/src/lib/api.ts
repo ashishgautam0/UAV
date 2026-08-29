@@ -12,6 +12,7 @@ import type {
   DashboardStats,
   DemoOutreachRequest,
   FollowUp,
+  FollowUpDraft,
   FollowUpEffectiveness,
   FollowUpHistory,
   FollowUpRequest,
@@ -142,6 +143,10 @@ export async function markScrapedJob(id: number, action: string) {
     method: "PATCH",
     body: JSON.stringify({ action }),
   });
+}
+
+export async function getFollowUpDraft(entityId: number): Promise<FollowUpDraft> {
+  return apiFetch<FollowUpDraft>(`/api/follow-ups/draft?entity_id=${entityId}`);
 }
 
 export async function getJobMessage(
