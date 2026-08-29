@@ -18,7 +18,12 @@ class Settings(BaseSettings):
 
     def get_cors_origins(self) -> list[str]:
         """Build the list of allowed CORS origins from config."""
-        origins = ["http://localhost:3000", "http://localhost:3001"]
+        origins = [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            # Public production domain of the frontend (uav Vercel project)
+            "https://uav-theta.vercel.app",
+        ]
         if self.FRONTEND_URL:
             origins.append(self.FRONTEND_URL.rstrip("/"))
         if self.CORS_ORIGINS:
