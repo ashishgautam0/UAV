@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from ..models.schemas import PushSubscriptionRequest
 from tracker import (
+    get_all_push_subscriptions,
     get_notifications,
     get_unread_count,
     mark_notification_read,
@@ -50,6 +51,26 @@ def subscribe_push(
         keys_auth=data.keys.get("auth", ""),
     )
     return {"success": True}
+
+
+@router.get("/push/subscriptions")
+def list_push_subscriptions():
+    """Diagnostic view of registered push subscriptions.
+
+    Exposes only non-secret fields (no p256dh/auth keys) so device
+    registration can be verified from the outside.
+    """
+    from urllib.parse import urlparse
+
+    rows = get_all_push_subscriptions()
+    return [
+        {
+            "id": r.get("id"),
+            "created_at": r.get("created_at"),
+            "endpoint_host": urlparse(r.get("endpoint", "")).netloc,
+        }
+        for r in rows
+    ]
 
 
 @router.post("/push/unsubscribe")

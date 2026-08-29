@@ -117,6 +117,14 @@ export interface ScrapedJob {
   noc_verdict?: string;
 }
 
+export interface JobMessage {
+  job_id: number;
+  message_type: string;
+  content: string | null;
+  generated_by?: string;
+  generated_at?: string;
+}
+
 // ---- Messages ----
 export interface ColdDMRequest {
   company: string;

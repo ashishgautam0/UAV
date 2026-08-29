@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getScrapedJobs, getFollowUps, createApplication, markScrapedJob } from "@/lib/api";
+import { getScrapedJobs, getFollowUps, createApplication, markScrapedJob, getJobMessage } from "@/lib/api";
 import type { ScrapedJob, FollowUp } from "@/lib/types";
 
 import {
@@ -30,8 +30,10 @@ import {
   MapPin,
   AlertTriangle,
   Check,
+  Copy,
   FileText,
   MessageSquare,
+  MessageSquareText,
   RefreshCw,
   XCircle,
 } from "lucide-react";
@@ -65,6 +67,9 @@ export default function TonightPage() {
   const [loggedJobs, setLoggedJobs] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<"score" | "source" | "company">("score");
   const [filterMode, setFilterMode] = useState<"all" | "remote" | "hybrid" | "onsite">("all");
+  const [dmByJob, setDmByJob] = useState<Record<number, string | null>>({});
+  const [dmOpen, setDmOpen] = useState<Set<number>>(new Set());
+  const [dmLoading, setDmLoading] = useState<number | null>(null);
 
   const filteredJobs = useMemo(() => {
     let filtered = [...jobs];
@@ -120,6 +125,47 @@ export default function TonightPage() {
       toast.error("Failed to log application");
     }
   }, []);
+
+  // ------- View pre-written cold DM handler -------
+  const handleToggleDm = useCallback(
+    async (job: ScrapedJob) => {
+      if (!job.id) return;
+      const id = job.id;
+      if (dmOpen.has(id)) {
+        setDmOpen((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        return;
+      }
+      if (!(id in dmByJob)) {
+        setDmLoading(id);
+        try {
+          const res = await getJobMessage(id);
+          setDmByJob((prev) => ({ ...prev, [id]: res.content }));
+          if (res.content === null) {
+            toast.info(
+              "No DM written for this job yet — the hourly run will pick it up."
+            );
+            return;
+          }
+        } catch {
+          toast.error("Failed to load the DM");
+          return;
+        } finally {
+          setDmLoading(null);
+        }
+      } else if (dmByJob[id] === null) {
+        toast.info(
+          "No DM written for this job yet — the hourly run will pick it up."
+        );
+        return;
+      }
+      setDmOpen((prev) => new Set(prev).add(id));
+    },
+    [dmOpen, dmByJob]
+  );
 
   // ------- Dismiss handler -------
   const handleDismiss = useCallback(async (job: ScrapedJob) => {
@@ -360,6 +406,32 @@ export default function TonightPage() {
                           </p>
                         )}
 
+                        {/* Pre-written cold DM (from the hourly Claude routine) */}
+                        {job.id && dmOpen.has(job.id) && dmByJob[job.id] && (
+                          <div className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-emerald-400">
+                                Cold DM (auto-written)
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(dmByJob[job.id!] || "");
+                                  toast.success("DM copied to clipboard");
+                                }}
+                              >
+                                <Copy className="mr-1 h-3 w-3" />
+                                Copy
+                              </Button>
+                            </div>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                              {dmByJob[job.id]}
+                            </p>
+                          </div>
+                        )}
+
                         {/* Spacer */}
                         <div className="flex-1" />
 
@@ -392,6 +464,19 @@ export default function TonightPage() {
                           >
                             <FileText className="mr-1.5 h-3.5 w-3.5" />
                             Tailor Resume
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={dmLoading === job.id}
+                            onClick={() => handleToggleDm(job)}
+                          >
+                            {dmLoading === job.id ? (
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <MessageSquareText className="mr-1.5 h-3.5 w-3.5" />
+                            )}
+                            {job.id && dmOpen.has(job.id) ? "Hide DM" : "View DM"}
                           </Button>
                           <Button
                             variant="outline"

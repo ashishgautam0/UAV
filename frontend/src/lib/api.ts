@@ -16,6 +16,7 @@ import type {
   FollowUpHistory,
   FollowUpRequest,
   FullAnalyzeRequest,
+  JobMessage,
   LogFollowUpRequest,
   MessageRequest,
   MessageRequestStatus,
@@ -141,6 +142,15 @@ export async function markScrapedJob(id: number, action: string) {
     method: "PATCH",
     body: JSON.stringify({ action }),
   });
+}
+
+export async function getJobMessage(
+  id: number,
+  type: string = "cold_dm"
+): Promise<JobMessage> {
+  return apiFetch<JobMessage>(
+    `/api/scraped-jobs/${id}/message?type=${encodeURIComponent(type)}`
+  );
 }
 
 // ---- Messages ----
