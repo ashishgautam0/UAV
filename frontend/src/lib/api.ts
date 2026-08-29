@@ -6,6 +6,7 @@ import type {
   Application,
   ATSCheckRequest,
   ATSResult,
+  CachedCompanyIntel,
   ColdDMRequest,
   CompanyIntel,
   CoverLetterRequest,
@@ -143,6 +144,14 @@ export async function markScrapedJob(id: number, action: string) {
     method: "PATCH",
     body: JSON.stringify({ action }),
   });
+}
+
+export async function getCachedCompanyIntel(
+  name: string
+): Promise<CachedCompanyIntel> {
+  return apiFetch<CachedCompanyIntel>(
+    `/api/company-research/cached?name=${encodeURIComponent(name)}`
+  );
 }
 
 export async function getScrapedJob(id: number): Promise<ScrapedJob> {

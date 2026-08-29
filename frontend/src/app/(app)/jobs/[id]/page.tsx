@@ -5,11 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import {
   getScrapedJob,
   getJobMessage,
+  getCachedCompanyIntel,
   deleteScrapedJob,
   createApplication,
   markScrapedJob,
 } from "@/lib/api";
-import type { ScrapedJob } from "@/lib/types";
+import type { CachedCompanyIntel, ScrapedJob } from "@/lib/types";
 
 import {
   Card,
@@ -23,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
   Building2,
+  Landmark,
   Check,
   ClipboardPlus,
   Copy,
@@ -68,6 +70,7 @@ export default function JobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [messages, setMessages] = useState<Record<string, string | null>>({});
+  const [intel, setIntel] = useState<CachedCompanyIntel | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [logged, setLogged] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -87,6 +90,11 @@ export default function JobDetailPage() {
         next[s.type] = results[i]?.content ?? null;
       });
       setMessages(next);
+      if (j.company) {
+        getCachedCompanyIntel(j.company)
+          .then(setIntel)
+          .catch(() => setIntel({ found: false }));
+      }
     } catch {
       setNotFound(true);
     } finally {
@@ -275,6 +283,78 @@ export default function JobDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Company Intel */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Landmark className="h-4 w-4" />
+            Company Intel — {job.company}
+          </CardTitle>
+          <CardDescription>
+            Background and talking points, researched by the hourly routine.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {intel?.found ? (
+            <>
+              {intel.description && (
+                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                  {intel.description}
+                </p>
+              )}
+              {intel.recent_news && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">
+                    Recent direction
+                  </p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                    {intel.recent_news}
+                  </p>
+                </div>
+              )}
+              {(() => {
+                let signals: string[] = [];
+                const raw = intel.tech_signals;
+                if (Array.isArray(raw)) signals = raw;
+                else if (typeof raw === "string") {
+                  try {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) signals = parsed;
+                  } catch {
+                    /* not JSON — ignore */
+                  }
+                }
+                return signals.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {signals.map((s) => (
+                      <Badge key={s} variant="outline" className="text-xs">
+                        {s}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
+              {intel.product_url && (
+                <a
+                  href={intel.product_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-sky-400 hover:underline"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Company website
+                </a>
+              )}
+            </>
+          ) : (
+            <p className="text-sm italic text-muted-foreground">
+              Not researched yet — the hourly routine writes intel for each
+              new job&apos;s company; check back after the next run.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Generated content sections */}
       {SECTIONS.map((s) => (

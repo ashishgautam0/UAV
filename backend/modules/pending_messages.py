@@ -117,6 +117,17 @@ def main():
     p_fail.add_argument("--error", required=True)
     p_fail.set_defaults(func=cmd_fail)
 
+    p_cos = sub.add_parser(
+        "companies",
+        help="recent-job companies with no fresh intel cached",
+    )
+    p_cos.add_argument("--limit", type=int, default=10)
+    p_cos.set_defaults(func=cmd_companies)
+
+    p_sco = sub.add_parser("save-company", help="store company intel (JSON on stdin)")
+    p_sco.add_argument("--name", required=True)
+    p_sco.set_defaults(func=cmd_save_company)
+
     p_not = sub.add_parser("notify", help="in-app notification + web push")
     p_not.add_argument("--title", required=True)
     p_not.add_argument("--body", required=True)
@@ -259,6 +270,70 @@ def cmd_followups(args):
 
     json.dump({"queued": queued, "skipped": skipped}, sys.stdout, indent=2)
     sys.stdout.write("\n")
+    return 0
+
+
+def cmd_companies(args):
+    """List companies from recent scraped jobs that have no fresh intel cached.
+
+    The routine writes a short intel blurb for each (from its own knowledge)
+    and saves it with `save-company`.
+    """
+    from datetime import datetime, timedelta
+
+    from tracker import _get_client, get_cached_research
+
+    since = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
+    db = _get_client()
+    resp = (db.table("scraped_jobs").select("company")
+            .gte("scraped_at", since)
+            .eq("dismissed", 0)
+            .execute())
+    companies = sorted({(r.get("company") or "").strip()
+                        for r in (resp.data or []) if (r.get("company") or "").strip()})
+
+    missing = []
+    for c in companies:
+        if len(missing) >= args.limit:
+            break
+        if get_cached_research(c) is None:
+            missing.append(c)
+
+    json.dump({"companies_needing_intel": missing}, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_save_company(args):
+    """Save company intel from stdin JSON into company_research_cache.
+
+    Expected JSON: {"description": str, "recent_news": str,
+                    "tech_signals": [str, ...], "product_url": str}
+    Unknown/uncertain fields should simply be omitted or empty.
+    """
+    from tracker import save_research_cache
+
+    raw = sys.stdin.read().strip()
+    if not raw:
+        print("Refusing to save empty intel.", file=sys.stderr)
+        return 1
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        print(f"stdin is not valid JSON: {e}", file=sys.stderr)
+        return 1
+    if not (data.get("description") or "").strip():
+        print("Intel needs a non-empty 'description'.", file=sys.stderr)
+        return 1
+
+    save_research_cache(args.name, {
+        "description": data.get("description", ""),
+        "recent_news": data.get("recent_news", ""),
+        "tech_signals": data.get("tech_signals", []) or [],
+        "product_url": data.get("product_url", ""),
+        "hiring_contact": data.get("hiring_contact", {}) or {},
+    })
+    print(f"Saved intel for {args.name}.")
     return 0
 
 

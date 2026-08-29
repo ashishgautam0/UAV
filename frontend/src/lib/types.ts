@@ -287,6 +287,16 @@ export interface CompanyIntel {
   [key: string]: unknown;
 }
 
+export interface CachedCompanyIntel {
+  found: boolean;
+  company_name?: string;
+  description?: string;
+  recent_news?: string;
+  tech_signals?: string[] | string;
+  product_url?: string;
+  researched_at?: string;
+}
+
 // ---- Referrals ----
 export interface Referral {
   id: number;
