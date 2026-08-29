@@ -723,7 +723,7 @@ export default function TrackerPage() {
               <Card key={app.id}>
                 <Collapsible>
                   <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors pb-3 pt-3">
-                    <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                       {/* Inline status dropdown */}
                       <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
                         <Select
@@ -764,17 +764,21 @@ export default function TrackerPage() {
                       </div>
 
                       <CollapsibleTrigger asChild>
-                        <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
-                          <span className="font-bold truncate">{app.company}</span>
-                          <span className="text-muted-foreground truncate">
-                            {app.role}
-                          </span>
-                          <Badge variant="secondary">{app.platform}</Badge>
-                          {(app.follow_up_count ?? 0) > 0 && (
-                            <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-400 border-amber-500/30">
-                              {app.follow_up_count}/3 follow-ups
-                            </Badge>
-                          )}
+                        <div className="order-first w-full min-w-0 cursor-pointer sm:order-none sm:w-auto sm:flex-1">
+                          <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+                            <span className="font-bold truncate">{app.company}</span>
+                            <span className="text-muted-foreground text-sm sm:text-base truncate">
+                              {app.role}
+                            </span>
+                            <span className="flex flex-wrap items-center gap-1.5 shrink-0">
+                              <Badge variant="secondary">{app.platform}</Badge>
+                              {(app.follow_up_count ?? 0) > 0 && (
+                                <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-400 border-amber-500/30">
+                                  {app.follow_up_count}/3 follow-ups
+                                </Badge>
+                              )}
+                            </span>
+                          </div>
                         </div>
                       </CollapsibleTrigger>
 
@@ -918,7 +922,7 @@ export default function TrackerPage() {
                                   Copy
                                 </Button>
                               </div>
-                              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                                 {fuDrafts[app.id]?.content}
                               </p>
                             </div>
@@ -988,7 +992,7 @@ export default function TrackerPage() {
                             </div>
                           </div>
                         ) : app.notes ? (
-                          <p className="font-medium whitespace-pre-wrap">
+                          <p className="font-medium whitespace-pre-wrap break-words">
                             {app.notes}
                           </p>
                         ) : (
