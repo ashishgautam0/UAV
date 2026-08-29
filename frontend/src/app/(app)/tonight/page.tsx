@@ -36,6 +36,7 @@ import {
   MessageSquareText,
   RefreshCw,
   XCircle,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -438,18 +439,19 @@ export default function TonightPage() {
 
                         {/* Badges row */}
                         <div className="flex flex-wrap gap-1.5">
-                          {job.verdict && (
+                          {job.verdict === "EASY_APPLY" && (
+                            <Badge className="text-xs bg-emerald-600/15 text-emerald-400 border-emerald-600/30">
+                              <Zap className="mr-1 h-3 w-3" />
+                              Easy Apply
+                            </Badge>
+                          )}
+                          {job.verdict === "EXTERNAL" && (
                             <Badge
-                              className={cn(
-                                "text-xs",
-                                job.verdict.toUpperCase().includes("APPLY") && !job.verdict.toUpperCase().includes("CAUTION")
-                                  ? "bg-emerald-600/15 text-emerald-400 border-emerald-600/30"
-                                  : job.verdict.toUpperCase().includes("CAUTION")
-                                    ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-                                    : "bg-red-500/15 text-red-400 border-red-500/30"
-                              )}
+                              variant="outline"
+                              className="text-xs text-sky-400 border-sky-500/30"
                             >
-                              {job.verdict}
+                              <ExternalLink className="mr-1 h-3 w-3" />
+                              External apply
                             </Badge>
                           )}
                           {typeof job.ats_score === "number" && job.ats_score > 0 && (

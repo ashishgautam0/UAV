@@ -244,7 +244,6 @@ def main():
             for job in new_jobs[:15]:
                 try:
                     result = full_analyze(job.get("title", ""), job.get("description", ""))
-                    job["verdict"] = result.get("verdict_label", "")
                     job["ats_score"] = quick_ats(job.get("description", ""))
                     job["skill_match"] = result.get("skills", {}).get("match_percentage", 0)
                     job["noc_verdict"] = result.get("noc", {}).get("confidence", "")
@@ -253,6 +252,18 @@ def main():
             print(f"Auto-analysis complete for top {min(15, len(new_jobs))} jobs.")
         except ImportError:
             print("jd_analyzer not available — skipping auto-analysis.")
+
+    # Easy Apply availability, stored in the verdict column. Only the new
+    # jobs are checked (one page fetch each) to stay under LinkedIn's radar.
+    if new_jobs:
+        print("\nChecking Easy Apply availability...")
+        import time as _time
+        from scraper import check_apply_type
+        for job in new_jobs:
+            job["verdict"] = check_apply_type(job.get("url", ""))
+            _time.sleep(1)
+        known = sum(1 for j in new_jobs if j.get("verdict"))
+        print(f"Apply type known for {known}/{len(new_jobs)} new jobs.")
 
     # Save new jobs to database
     print("\nSaving new jobs to database...")
