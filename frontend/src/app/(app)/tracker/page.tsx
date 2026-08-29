@@ -13,6 +13,7 @@ import {
   updateDemo,
   getFollowUpDraft,
   getFollowUpHistory,
+  lookupScrapedJob,
   updateFollowUpOutcome,
 } from "@/lib/api";
 import type { Application, MiniDemo, FollowUpDraft, FollowUpHistory } from "@/lib/types";
@@ -73,6 +74,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   ClipboardList,
+  FileSearch,
   Plus,
   ChevronDown,
   Trash2,
@@ -185,6 +187,25 @@ export default function TrackerPage() {
   const [fuDrafts, setFuDrafts] = useState<Record<number, FollowUpDraft>>({});
   const [fuDraftOpen, setFuDraftOpen] = useState<Set<number>>(new Set());
   const [fuDraftLoading, setFuDraftLoading] = useState<number | null>(null);
+
+  const openJobPage = async (app: Application) => {
+    if (!app.url) {
+      toast.info("No job posting URL saved for this application.");
+      return;
+    }
+    try {
+      const { id } = await lookupScrapedJob(app.url);
+      if (id) {
+        router.push(`/jobs/${id}`);
+      } else {
+        toast.info(
+          "No job page for this application — it wasn't scraped, or was deleted."
+        );
+      }
+    } catch {
+      toast.error("Failed to look up the job page");
+    }
+  };
 
   const toggleFuDraft = async (appId: number) => {
     if (fuDraftOpen.has(appId)) {
@@ -785,6 +806,19 @@ export default function TrackerPage() {
                       {/* Quick action buttons */}
                       <TooltipProvider delayDuration={300}>
                         <div className="ml-auto flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => openJobPage(app)}
+                              >
+                                <FileSearch className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Open Job Page</TooltipContent>
+                          </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button

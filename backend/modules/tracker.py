@@ -257,6 +257,39 @@ def update_scraped_job_analysis(job_id, score, noc_verdict, skill_match,
     db.table("scraped_jobs").update(update_data).eq("id", job_id).execute()
 
 
+def get_scraped_job(job_id):
+    """Fetch one scraped job by id regardless of dismissed/applied flags."""
+    try:
+        db = _get_client()
+        resp = db.table("scraped_jobs").select("*").eq("id", job_id).limit(1).execute()
+        return resp.data[0] if resp.data else None
+    except Exception:
+        return None
+
+
+def find_scraped_job_by_url(url):
+    """Find a scraped job by its exact posting URL (any dismissed/applied state)."""
+    if not url:
+        return None
+    try:
+        db = _get_client()
+        resp = db.table("scraped_jobs").select("id").eq("url", url).limit(1).execute()
+        return resp.data[0] if resp.data else None
+    except Exception:
+        return None
+
+
+def delete_scraped_job(job_id):
+    """Permanently delete a scraped job (its job_messages cascade)."""
+    try:
+        db = _get_client()
+        db.table("scraped_jobs").delete().eq("id", job_id).execute()
+        return True
+    except Exception as e:
+        print(f"Failed to delete scraped job {job_id}: {e}")
+        return False
+
+
 def get_scraped_jobs(source=None):
     db = _get_client()
     query = db.table("scraped_jobs").select("*").eq("dismissed", 0).eq("applied", 0)
