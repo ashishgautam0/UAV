@@ -117,6 +117,13 @@ def main():
     p_fail.add_argument("--error", required=True)
     p_fail.set_defaults(func=cmd_fail)
 
+    p_dem = sub.add_parser(
+        "demos",
+        help="tracker-logged jobs still lacking a live demo",
+    )
+    p_dem.add_argument("--limit", type=int, default=4)
+    p_dem.set_defaults(func=cmd_demos)
+
     p_cos = sub.add_parser(
         "companies",
         help="recent-job companies with no fresh intel cached",
@@ -269,6 +276,58 @@ def cmd_followups(args):
             })
 
     json.dump({"queued": queued, "skipped": skipped}, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_demos(args):
+    """List tracker-logged jobs that still lack a live demo.
+
+    Demos are built ONLY for jobs the user actually logged to the tracker
+    (an application row whose URL matches a scraped job), skipping
+    applications in terminal statuses. Every such job eventually gets a
+    demo; --limit just bounds one firing's batch.
+    """
+    from tracker import TERMINAL_STATUSES, _get_client, get_job_message
+
+    db = _get_client()
+    apps = (db.table("applications")
+            .select("url,status")
+            .execute().data or [])
+    urls = [a["url"] for a in apps
+            if (a.get("url") or "").strip()
+            and a.get("status") not in TERMINAL_STATUSES]
+
+    tracked_jobs = []
+    for i in range(0, len(urls), 100):
+        resp = (db.table("scraped_jobs")
+                .select("id,title,company,description,url")
+                .in_("url", urls[i:i + 100])
+                .execute())
+        tracked_jobs.extend(resp.data or [])
+
+    need = []
+    for r in sorted(tracked_jobs, key=lambda r: r["id"], reverse=True):
+        if len(need) >= args.limit:
+            break
+        if get_job_message(r["id"], message_type="demo_html"):
+            continue
+        need.append({
+            "job_id": r["id"],
+            "title": r.get("title", ""),
+            "company": r.get("company", ""),
+            "description": (r.get("description") or "").strip(),
+        })
+
+    json.dump(
+        {
+            "profile": _profile_text(),
+            "tracked_jobs_total": len(tracked_jobs),
+            "jobs_needing_demos": need,
+        },
+        sys.stdout,
+        indent=2,
+    )
     sys.stdout.write("\n")
     return 0
 
