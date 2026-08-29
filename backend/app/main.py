@@ -35,6 +35,34 @@ for key in ("SUPABASE_URL", "SUPABASE_KEY", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_K
 
 app = FastAPI(title="Job Search HQ API", version="1.0.0")
 
+
+@app.get("/api/demo/{job_id}")
+def live_demo(job_id: int):
+    """Serve the routine-built mini demo for a job as a live HTML page.
+
+    The demo is a self-contained HTML document stored in job_messages
+    (message_type='demo_html') — saving it there IS the production deploy.
+    """
+    from fastapi.responses import HTMLResponse
+    from tracker import get_job_message, get_scraped_job
+
+    row = get_job_message(job_id, message_type="demo_html")
+    if row and row.get("content"):
+        return HTMLResponse(row["content"])
+
+    job = get_scraped_job(job_id)
+    label = f"{job['title']} at {job['company']}" if job else f"job #{job_id}"
+    return HTMLResponse(
+        "<!doctype html><html><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>Demo not built yet</title></head>"
+        "<body style='font-family:system-ui;display:grid;place-items:center;"
+        "min-height:100vh;margin:0;background:#0a0a0a;color:#e5e5e5'>"
+        f"<p>The mini demo for <b>{label}</b> hasn't been built yet — "
+        "the hourly routine creates it on an upcoming run.</p></body></html>",
+        status_code=404,
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.get_cors_origins(),
