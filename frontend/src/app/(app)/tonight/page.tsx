@@ -66,7 +66,6 @@ export default function TonightPage() {
   const [jobs, setJobs] = useState<ScrapedJob[]>([]);
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [loggedJobs, setLoggedJobs] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy] = useState<"score" | "source" | "company">("score");
   const [filterMode, setFilterMode] = useState<"all" | "remote" | "hybrid" | "onsite">("all");
   const [dmByJob, setDmByJob] = useState<Record<number, string | null>>({});
   const [dmOpen, setDmOpen] = useState<Set<number>>(new Set());
@@ -75,21 +74,14 @@ export default function TonightPage() {
   const [fuOpen, setFuOpen] = useState<Set<number>>(new Set());
   const [fuLoading, setFuLoading] = useState<number | null>(null);
 
+  // The API returns jobs newest-first (ordered by scraped_at desc) — keep
+  // that order so the latest job is always on top.
   const filteredJobs = useMemo(() => {
-    let filtered = [...jobs];
-    if (filterMode !== "all") {
-      filtered = filtered.filter(
-        (j) => (j.work_mode || "").toLowerCase() === filterMode
-      );
-    }
-    filtered.sort((a, b) => {
-      if (sortBy === "score") return (b.score || 0) - (a.score || 0);
-      if (sortBy === "company") return (a.company || "").localeCompare(b.company || "");
-      if (sortBy === "source") return (a.source || "").localeCompare(b.source || "");
-      return 0;
-    });
-    return filtered;
-  }, [jobs, sortBy, filterMode]);
+    if (filterMode === "all") return jobs;
+    return jobs.filter(
+      (j) => (j.work_mode || "").toLowerCase() === filterMode
+    );
+  }, [jobs, filterMode]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -367,16 +359,6 @@ export default function TonightPage() {
               </h2>
               {jobs.length > 0 && (
                 <div className="flex gap-2">
-                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-                    <SelectTrigger className="w-[130px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="score">Sort: Score</SelectItem>
-                      <SelectItem value="company">Sort: Company</SelectItem>
-                      <SelectItem value="source">Sort: Source</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <Select value={filterMode} onValueChange={(v) => setFilterMode(v as typeof filterMode)}>
                     <SelectTrigger className="w-[130px]">
                       <SelectValue />
