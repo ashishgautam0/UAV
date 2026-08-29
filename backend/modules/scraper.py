@@ -86,6 +86,45 @@ def _load_blacklist():
         return set()
 
 
+def check_apply_type(job_url, timeout=10):
+    """Best-effort check of how a LinkedIn job accepts applications.
+
+    LinkedIn's public job page embeds <code id="applyUrl"> only when the
+    posting sends applicants to an external site; Easy Apply postings have
+    no such element. Returns "EASY_APPLY", "EXTERNAL", or "" when the page
+    cannot be read (auth wall, rate limit, network error) so callers can
+    treat it as unknown.
+    """
+    import requests
+
+    try:
+        resp = requests.get(
+            job_url,
+            timeout=timeout,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0 Safari/537.36"
+                ),
+                "Accept-Language": "en-US,en;q=0.9",
+            },
+        )
+        if resp.status_code != 200 or not resp.text:
+            return ""
+        html = resp.text
+        applyurl = re.search(r'id="applyUrl"[^>]*>(.*?)</code>', html, re.S)
+        if applyurl and "url=" in applyurl.group(1):
+            return "EXTERNAL"
+        # Only trust "no applyUrl means Easy Apply" when the page actually
+        # rendered job content rather than a login wall.
+        if "topcard" in html or "decorated-job-posting" in html:
+            return "EASY_APPLY"
+        return ""
+    except Exception:
+        return ""
+
+
 def _normalize_for_dedup(text):
     """Lowercase, strip punctuation, strip 'intern'/'internship' for dedup key."""
     text = text.lower()
