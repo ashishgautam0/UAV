@@ -96,6 +96,12 @@ def main():
                         help="message text; omit to read from stdin")
     p_save.set_defaults(func=cmd_save)
 
+    p_fup = sub.add_parser(
+        "followups",
+        help="queue follow-up requests for tracked applications now due",
+    )
+    p_fup.set_defaults(func=cmd_followups)
+
     p_req = sub.add_parser("requests", help="pending UI requests, with prompts")
     p_req.add_argument("--limit", type=int, default=20)
     p_req.set_defaults(func=cmd_requests)
@@ -133,7 +139,10 @@ def _build_prompt(message_type, params):
     if builder is None:
         return {"error": f"unknown message_type {message_type!r}"}
     try:
-        return builder(**(params or {}))
+        # Keys starting with "_" are request metadata (e.g. _application_id
+        # linking an auto-queued follow-up to its tracker row), not builder args.
+        clean = {k: v for k, v in (params or {}).items() if not k.startswith("_")}
+        return builder(**clean)
     except TypeError as e:
         return {"error": f"params do not match {message_type} builder: {e}"}
 
@@ -173,6 +182,83 @@ def cmd_fulfil(args):
     if not complete_message_request(args.request_id, content):
         return 1
     print(f"Request {args.request_id} ({row['message_type']}) ready — {len(content)} chars.")
+    return 0
+
+
+def cmd_followups(args):
+    """Queue a follow-up request for each tracked application whose
+    follow_up_date has arrived.
+
+    One request per application per follow-up round: an application already
+    holding a pending/ready request for its current round is skipped, and
+    rounds stop after the third follow-up (the builder's final-tone cap).
+    The queued requests are then written by the normal `requests`/`fulfil`
+    flow in the same routine run.
+    """
+    from datetime import date, datetime
+
+    from tracker import (
+        create_message_request,
+        get_follow_up_history,
+        get_follow_ups_due,
+    )
+
+    df = get_follow_ups_due()
+    apps = [] if df is None or df.empty else df.to_dict("records")
+
+    existing = get_message_requests(limit=200)
+    already = set()
+    for r in existing:
+        p = r.get("params") or {}
+        if (
+            r.get("message_type") == "follow-up"
+            and r.get("status") in ("pending", "ready")
+            and p.get("_application_id")
+        ):
+            already.add((p["_application_id"], p.get("follow_up_number", 1)))
+
+    queued, skipped = [], 0
+    for app in apps:
+        history = get_follow_up_history("application", app["id"]) or []
+        number = len(history) + 1
+        if number > 3 or (app["id"], number) in already:
+            skipped += 1
+            continue
+
+        days = 7
+        try:
+            applied = datetime.strptime(
+                str(app.get("date_applied", ""))[:10], "%Y-%m-%d"
+            ).date()
+            days = max((date.today() - applied).days, 1)
+        except (ValueError, TypeError):
+            pass
+
+        previous = [
+            h.get("message_content", "")
+            for h in sorted(history, key=lambda h: h.get("sent_at") or "")
+        ][-3:]
+
+        row = create_message_request("follow-up", {
+            "company_name": app.get("company", ""),
+            "role_title": app.get("role", ""),
+            "days_since_applied": days,
+            "original_platform": app.get("platform") or "LinkedIn",
+            "follow_up_number": number,
+            "previous_messages": [m for m in previous if m],
+            "_application_id": app["id"],
+        })
+        if row:
+            queued.append({
+                "request_id": row["id"],
+                "application_id": app["id"],
+                "company": app.get("company", ""),
+                "role": app.get("role", ""),
+                "follow_up_number": number,
+            })
+
+    json.dump({"queued": queued, "skipped": skipped}, sys.stdout, indent=2)
+    sys.stdout.write("\n")
     return 0
 
 

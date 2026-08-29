@@ -11,10 +11,11 @@ import {
   getDemos,
   createDemo,
   updateDemo,
+  getFollowUpDraft,
   getFollowUpHistory,
   updateFollowUpOutcome,
 } from "@/lib/api";
-import type { Application, MiniDemo, FollowUpHistory } from "@/lib/types";
+import type { Application, MiniDemo, FollowUpDraft, FollowUpHistory } from "@/lib/types";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -179,6 +180,42 @@ export default function TrackerPage() {
     {}
   );
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [fuDrafts, setFuDrafts] = useState<Record<number, FollowUpDraft>>({});
+  const [fuDraftOpen, setFuDraftOpen] = useState<Set<number>>(new Set());
+  const [fuDraftLoading, setFuDraftLoading] = useState<number | null>(null);
+
+  const toggleFuDraft = async (appId: number) => {
+    if (fuDraftOpen.has(appId)) {
+      setFuDraftOpen((prev) => {
+        const next = new Set(prev);
+        next.delete(appId);
+        return next;
+      });
+      return;
+    }
+    let draft = fuDrafts[appId];
+    if (!draft) {
+      setFuDraftLoading(appId);
+      try {
+        draft = await getFollowUpDraft(appId);
+        setFuDrafts((prev) => ({ ...prev, [appId]: draft }));
+      } catch {
+        toast.error("Failed to load the follow-up draft");
+        return;
+      } finally {
+        setFuDraftLoading(null);
+      }
+    }
+    if (draft.status === "ready" && draft.content) {
+      setFuDraftOpen((prev) => new Set(prev).add(appId));
+    } else if (draft.status === "pending") {
+      toast.info("Queued — the next hourly run writes this follow-up.");
+    } else {
+      toast.info(
+        "No draft yet — the hourly run queues one once the follow-up date arrives."
+      );
+    }
+  };
 
   // ---- Delete dialog ----
   const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
@@ -824,6 +861,53 @@ export default function TrackerPage() {
                           </div>
                         )}
                       </div>
+
+                      {/* Auto-written follow-up draft */}
+                      {app.follow_up_date && (
+                        <div className="space-y-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={fuDraftLoading === app.id}
+                            onClick={() => toggleFuDraft(app.id)}
+                          >
+                            {fuDraftLoading === app.id ? (
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
+                            )}
+                            {fuDraftOpen.has(app.id)
+                              ? "Hide Follow-up Draft"
+                              : "View Follow-up Draft"}
+                          </Button>
+                          {fuDraftOpen.has(app.id) && fuDrafts[app.id]?.content && (
+                            <div className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-emerald-400">
+                                  Follow-up #{fuDrafts[app.id]?.follow_up_number ?? 1}{" "}
+                                  (auto-written)
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(
+                                      fuDrafts[app.id]?.content || ""
+                                    );
+                                    toast.success("Follow-up copied to clipboard");
+                                  }}
+                                >
+                                  Copy
+                                </Button>
+                              </div>
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                                {fuDrafts[app.id]?.content}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Notes section */}
                       <div className="text-sm">

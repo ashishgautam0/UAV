@@ -49,6 +49,14 @@ export interface FollowUp {
   follow_up_count?: number;
 }
 
+export interface FollowUpDraft {
+  entity_id: number;
+  status: "pending" | "ready" | null;
+  content: string | null;
+  request_id?: number;
+  follow_up_number?: number;
+}
+
 export interface FollowUpHistory {
   id: number;
   entity_type: "application" | "referral";
