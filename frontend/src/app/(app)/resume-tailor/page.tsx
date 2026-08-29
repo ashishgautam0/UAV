@@ -107,7 +107,7 @@ function ResumeTailorContent() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
           <FileText className="h-8 w-8" />
           Resume Tailor
         </h1>
@@ -276,7 +276,7 @@ function ResumeTailorContent() {
 
           {/* Tailored LaTeX */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
               <div>
                 <CardTitle>Tailored Resume</CardTitle>
                 <CardDescription>

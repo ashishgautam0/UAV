@@ -441,7 +441,7 @@ export default function TrackerPage() {
     <div className="space-y-8">
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-3">
           <ClipboardList className="h-8 w-8" />
           Application Tracker
         </h1>
@@ -469,7 +469,7 @@ export default function TrackerPage() {
                 Fill in the details of your job application.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="grid grid-cols-1 gap-4 py-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="app-company">Company *</Label>
                 <Input

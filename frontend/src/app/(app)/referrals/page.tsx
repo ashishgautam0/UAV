@@ -337,7 +337,7 @@ export default function ReferralsPage() {
     <div className="space-y-8">
       {/* ---- Page Header ---- */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
           <Users className="h-8 w-8" />
           Referrals
         </h1>
@@ -769,7 +769,7 @@ export default function ReferralsPage() {
 
                               {generatedMessages[referral.id] && (
                                 <Card>
-                                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                  <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
                                     <CardTitle className="text-sm">
                                       Generated Message
                                     </CardTitle>

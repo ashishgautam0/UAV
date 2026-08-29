@@ -183,7 +183,7 @@ export default function TonightPage() {
       {/* ---- Page Header ---- */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             Today Todo
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -309,7 +309,7 @@ export default function TonightPage() {
             {jobs.length === 0 ? (
               <p className="text-muted-foreground text-sm">
                 No scraped jobs yet. Jobs are fetched automatically every hour
-                via GitHub Actions.
+                by the scheduled Claude routine.
               </p>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

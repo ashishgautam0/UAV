@@ -161,7 +161,7 @@ export function NotificationBell() {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
 
           {/* Dropdown */}
-          <div className="absolute left-0 top-full z-50 mt-2 w-80 rounded-lg border border-border bg-card shadow-lg">
+          <div className="fixed inset-x-2 top-16 z-50 rounded-lg border border-border bg-card shadow-lg sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:w-80">
             <div className="flex items-center justify-between p-3">
               <span className="text-sm font-semibold">Notifications</span>
               {unreadCount > 0 && (
