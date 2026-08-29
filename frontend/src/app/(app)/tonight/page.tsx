@@ -454,21 +454,6 @@ export default function TonightPage() {
                               External apply
                             </Badge>
                           )}
-                          {typeof job.ats_score === "number" && job.ats_score > 0 && (
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "text-xs",
-                                job.ats_score >= 75
-                                  ? "text-emerald-400 border-emerald-600/30"
-                                  : job.ats_score >= 50
-                                    ? "text-yellow-400 border-yellow-500/30"
-                                    : "text-red-400 border-red-500/30"
-                              )}
-                            >
-                              ATS {job.ats_score}%
-                            </Badge>
-                          )}
                           {job.work_mode && (
                             <Badge
                               variant="outline"
