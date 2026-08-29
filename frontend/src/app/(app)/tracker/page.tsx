@@ -8,15 +8,12 @@ import {
   updateApplicationStatus,
   updateApplicationNotes,
   deleteApplication,
-  getDemos,
-  createDemo,
-  updateDemo,
   getFollowUpDraft,
   getFollowUpHistory,
   lookupScrapedJob,
   updateFollowUpOutcome,
 } from "@/lib/api";
-import type { Application, MiniDemo, FollowUpDraft, FollowUpHistory } from "@/lib/types";
+import type { Application, FollowUpDraft, FollowUpHistory } from "@/lib/types";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -130,7 +127,6 @@ const STATUS_COLORS: Record<string, string> = {
   "Not Interested": "bg-orange-500/15 text-orange-400 border-orange-500/30",
 };
 
-const DEMO_STATUSES = ["Idea", "Building", "Deployed", "Shipped"] as const;
 
 // ---------------------------------------------------------------------------
 // Helper: status badge
@@ -287,34 +283,6 @@ export default function TrackerPage() {
     }
   }
 
-  // ---- Mini Demos state ----
-  const [demos, setDemos] = useState<MiniDemo[]>([]);
-  const [allDemos, setAllDemos] = useState<MiniDemo[]>([]);
-  const [demosLoading, setDemosLoading] = useState(true);
-
-  // ---- Add demo form ----
-  const [demoForm, setDemoForm] = useState({
-    company: "",
-    role: "",
-    demo_idea: "",
-  });
-  const [demoAddLoading, setDemoAddLoading] = useState(false);
-
-  // ---- Demo update forms (keyed by id) ----
-  const [demoUpdates, setDemoUpdates] = useState<
-    Record<
-      number,
-      {
-        status: string;
-        github_url: string;
-        demo_url: string;
-        hours_spent: string;
-        result: string;
-      }
-    >
-  >({});
-  const [demoUpdatingId, setDemoUpdatingId] = useState<number | null>(null);
-
   // ---- Fetch helpers ----
   const fetchApplications = useCallback(async () => {
     setAppsLoading(true);
@@ -333,37 +301,6 @@ export default function TrackerPage() {
       setAppsLoading(false);
     }
   }, [filterStatus, filterType, filterPlatform]);
-
-  const fetchDemos = useCallback(async () => {
-    setDemosLoading(true);
-    try {
-      const [active, all] = await Promise.all([
-        getDemos(true),
-        getDemos(false),
-      ]);
-      setDemos(active);
-      setAllDemos(all);
-
-      // Initialise update forms for active demos
-      const updates: typeof demoUpdates = {};
-      for (const d of active) {
-        updates[d.id] = {
-          status: d.status || "Idea",
-          github_url: d.github_url || "",
-          demo_url: d.demo_url || "",
-          hours_spent: d.hours_spent != null ? String(d.hours_spent) : "",
-          result: d.result || "",
-        };
-      }
-      setDemoUpdates(updates);
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to load demos"
-      );
-    } finally {
-      setDemosLoading(false);
-    }
-  }, []);
 
   // ---- Load on mount + filter change ----
   useEffect(() => {
@@ -384,10 +321,6 @@ export default function TrackerPage() {
     (appSafePage - 1) * APPS_PER_PAGE,
     appSafePage * APPS_PER_PAGE
   );
-
-  useEffect(() => {
-    fetchDemos();
-  }, [fetchDemos]);
 
   // ---- Handlers: Applications ----
   async function handleAddApplication() {
@@ -461,56 +394,6 @@ export default function TrackerPage() {
     }
   }
 
-  // ---- Handlers: Demos ----
-  async function handleAddDemo() {
-    if (
-      !demoForm.company.trim() ||
-      !demoForm.role.trim() ||
-      !demoForm.demo_idea.trim()
-    )
-      return;
-    setDemoAddLoading(true);
-    try {
-      await createDemo({
-        company: demoForm.company.trim(),
-        role: demoForm.role.trim(),
-        demo_idea: demoForm.demo_idea.trim(),
-      });
-      toast.success("Demo added");
-      setDemoForm({ company: "", role: "", demo_idea: "" });
-      await fetchDemos();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to add demo"
-      );
-    } finally {
-      setDemoAddLoading(false);
-    }
-  }
-
-  async function handleUpdateDemo(id: number) {
-    const form = demoUpdates[id];
-    if (!form) return;
-    setDemoUpdatingId(id);
-    try {
-      await updateDemo(id, {
-        status: form.status,
-        github_url: form.github_url.trim() || undefined,
-        demo_url: form.demo_url.trim() || undefined,
-        hours_spent: form.hours_spent ? Number(form.hours_spent) : undefined,
-        result: form.result.trim() || undefined,
-      });
-      toast.success("Demo updated");
-      await fetchDemos();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to update demo"
-      );
-    } finally {
-      setDemoUpdatingId(null);
-    }
-  }
-
   // ---- Render ----
   return (
     <div className="space-y-8">
@@ -521,7 +404,7 @@ export default function TrackerPage() {
           Application Tracker
         </h1>
         <p className="text-muted-foreground mt-1">
-          Track your job applications and mini demos in one place.
+          Track your job applications in one place.
         </p>
       </div>
 
@@ -1204,315 +1087,6 @@ export default function TrackerPage() {
             )}
           </div>
         )}
-      </div>
-
-      {/* ================================================================== */}
-      {/* Section 4: Mini Demos                                              */}
-      {/* ================================================================== */}
-      <Separator />
-
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Mini Demos</h2>
-
-        <Tabs defaultValue="active">
-          <TabsList>
-            <TabsTrigger value="active">Active</TabsTrigger>
-            <TabsTrigger value="add">Add New</TabsTrigger>
-            <TabsTrigger value="results">Results</TabsTrigger>
-          </TabsList>
-
-          {/* -------------------------------------------------------------- */}
-          {/* Active Demos                                                    */}
-          {/* -------------------------------------------------------------- */}
-          <TabsContent value="active" className="space-y-4">
-            {demosLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : demos.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  No active demos. Switch to the &quot;Add New&quot; tab to
-                  create one.
-                </CardContent>
-              </Card>
-            ) : (
-              demos.map((demo) => {
-                const form = demoUpdates[demo.id];
-                if (!form) return null;
-                return (
-                  <Card key={demo.id}>
-                    <CardHeader>
-                      <CardTitle className="text-base">
-                        {demo.company} &mdash; {demo.role}
-                      </CardTitle>
-                      <CardDescription>{demo.demo_idea}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* Status */}
-                        <div className="space-y-2">
-                          <Label>Status</Label>
-                          <Select
-                            value={form.status}
-                            onValueChange={(v) =>
-                              setDemoUpdates((prev) => ({
-                                ...prev,
-                                [demo.id]: { ...prev[demo.id], status: v },
-                              }))
-                            }
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {DEMO_STATUSES.map((s) => (
-                                <SelectItem key={s} value={s}>
-                                  {s}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* Hours Spent */}
-                        <div className="space-y-2">
-                          <Label htmlFor={`demo-hours-${demo.id}`}>
-                            Hours Spent
-                          </Label>
-                          <Input
-                            id={`demo-hours-${demo.id}`}
-                            type="number"
-                            min="0"
-                            step="0.5"
-                            placeholder="0"
-                            value={form.hours_spent}
-                            onChange={(e) =>
-                              setDemoUpdates((prev) => ({
-                                ...prev,
-                                [demo.id]: {
-                                  ...prev[demo.id],
-                                  hours_spent: e.target.value,
-                                },
-                              }))
-                            }
-                          />
-                        </div>
-
-                        {/* GitHub URL */}
-                        <div className="space-y-2">
-                          <Label htmlFor={`demo-github-${demo.id}`}>
-                            GitHub URL
-                          </Label>
-                          <Input
-                            id={`demo-github-${demo.id}`}
-                            placeholder="https://github.com/..."
-                            value={form.github_url}
-                            onChange={(e) =>
-                              setDemoUpdates((prev) => ({
-                                ...prev,
-                                [demo.id]: {
-                                  ...prev[demo.id],
-                                  github_url: e.target.value,
-                                },
-                              }))
-                            }
-                          />
-                        </div>
-
-                        {/* Demo URL */}
-                        <div className="space-y-2">
-                          <Label htmlFor={`demo-url-${demo.id}`}>
-                            Demo URL
-                          </Label>
-                          <Input
-                            id={`demo-url-${demo.id}`}
-                            placeholder="https://..."
-                            value={form.demo_url}
-                            onChange={(e) =>
-                              setDemoUpdates((prev) => ({
-                                ...prev,
-                                [demo.id]: {
-                                  ...prev[demo.id],
-                                  demo_url: e.target.value,
-                                },
-                              }))
-                            }
-                          />
-                        </div>
-
-                        {/* Result */}
-                        <div className="space-y-2 sm:col-span-2">
-                          <Label htmlFor={`demo-result-${demo.id}`}>
-                            Result
-                          </Label>
-                          <Textarea
-                            id={`demo-result-${demo.id}`}
-                            placeholder="Outcome / feedback..."
-                            value={form.result}
-                            onChange={(e) =>
-                              setDemoUpdates((prev) => ({
-                                ...prev,
-                                [demo.id]: {
-                                  ...prev[demo.id],
-                                  result: e.target.value,
-                                },
-                              }))
-                            }
-                          />
-                        </div>
-                      </div>
-
-                      <Button
-                        onClick={() => handleUpdateDemo(demo.id)}
-                        disabled={demoUpdatingId === demo.id}
-                      >
-                        {demoUpdatingId === demo.id ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Pencil className="mr-2 h-4 w-4" />
-                        )}
-                        {demoUpdatingId === demo.id
-                          ? "Updating..."
-                          : "Update"}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })
-            )}
-          </TabsContent>
-
-          {/* -------------------------------------------------------------- */}
-          {/* Add New Demo                                                    */}
-          {/* -------------------------------------------------------------- */}
-          <TabsContent value="add" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Add Mini Demo</CardTitle>
-                <CardDescription>
-                  Track a mini demo you&apos;re building for a company.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="demo-company">Company *</Label>
-                    <Input
-                      id="demo-company"
-                      placeholder="e.g. Stripe"
-                      value={demoForm.company}
-                      onChange={(e) =>
-                        setDemoForm((p) => ({
-                          ...p,
-                          company: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="demo-role">Role *</Label>
-                    <Input
-                      id="demo-role"
-                      placeholder="e.g. Frontend Engineer"
-                      value={demoForm.role}
-                      onChange={(e) =>
-                        setDemoForm((p) => ({ ...p, role: e.target.value }))
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="demo-idea">Demo Idea *</Label>
-                  <Textarea
-                    id="demo-idea"
-                    placeholder="Describe the mini demo you plan to build..."
-                    value={demoForm.demo_idea}
-                    onChange={(e) =>
-                      setDemoForm((p) => ({
-                        ...p,
-                        demo_idea: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <Button
-                  onClick={handleAddDemo}
-                  disabled={
-                    demoAddLoading ||
-                    !demoForm.company.trim() ||
-                    !demoForm.role.trim() ||
-                    !demoForm.demo_idea.trim()
-                  }
-                  className="w-full"
-                >
-                  {demoAddLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="mr-2 h-4 w-4" />
-                  )}
-                  {demoAddLoading ? "Adding..." : "Add Demo"}
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* -------------------------------------------------------------- */}
-          {/* Results                                                         */}
-          {/* -------------------------------------------------------------- */}
-          <TabsContent value="results" className="space-y-4">
-            {demosLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : allDemos.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  No demos yet.
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent className="pt-6">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Company</TableHead>
-                        <TableHead>Demo Idea</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Hours</TableHead>
-                        <TableHead>Result</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {allDemos.map((demo) => (
-                        <TableRow key={demo.id}>
-                          <TableCell className="font-medium">
-                            {demo.company}
-                          </TableCell>
-                          <TableCell className="max-w-[200px] truncate">
-                            {demo.demo_idea}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{demo.status}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            {demo.hours_spent != null
-                              ? demo.hours_spent
-                              : "-"}
-                          </TableCell>
-                          <TableCell className="max-w-[200px] truncate">
-                            {demo.result || "-"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-        </Tabs>
       </div>
     </div>
   );

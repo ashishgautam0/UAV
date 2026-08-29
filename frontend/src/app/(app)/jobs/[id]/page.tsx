@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
+  API_URL,
   getScrapedJob,
   getJobMessage,
   getCachedCompanyIntel,
@@ -71,6 +72,7 @@ export default function JobDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [messages, setMessages] = useState<Record<string, string | null>>({});
   const [intel, setIntel] = useState<CachedCompanyIntel | null>(null);
+  const [demoReady, setDemoReady] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [logged, setLogged] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -95,6 +97,9 @@ export default function JobDetailPage() {
           .then(setIntel)
           .catch(() => setIntel({ found: false }));
       }
+      getJobMessage(jobId, "demo_html")
+        .then((r) => setDemoReady(Boolean(r.content)))
+        .catch(() => setDemoReady(false));
     } catch {
       setNotFound(true);
     } finally {
@@ -396,6 +401,61 @@ export default function JobDetailPage() {
           </CardContent>
         </Card>
       ))}
+
+      {/* Mini Demo */}
+      <Card>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Zap className="h-4 w-4" />
+              Mini Demo
+            </CardTitle>
+            <CardDescription>
+              A small live demo built for this job&apos;s requirements —
+              link it in your DM or email.
+            </CardDescription>
+          </div>
+          {demoReady && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${API_URL}/api/demo/${jobId}`);
+                  toast.success("Demo link copied");
+                }}
+              >
+                <Copy className="mr-1.5 h-3.5 w-3.5" />
+                Copy link
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <a
+                  href={`${API_URL}/api/demo/${jobId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                  Open live
+                </a>
+              </Button>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          {demoReady ? (
+            <iframe
+              src={`${API_URL}/api/demo/${jobId}`}
+              title="Mini demo preview"
+              className="h-96 w-full rounded-md border bg-black"
+            />
+          ) : (
+            <p className="text-sm italic text-muted-foreground">
+              Not built yet — the hourly routine creates a job-specific live
+              demo for each new posting; check back after an upcoming run.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Recipient links */}
       <Card>
