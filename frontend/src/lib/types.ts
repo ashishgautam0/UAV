@@ -374,7 +374,6 @@ export interface UserProfile {
   location_preference: string;
   target_roles: string[];
   resume_text: string;
-  blocked_companies: string[];
   scoring_weights: Record<string, unknown>;
   updated_at?: string;
 }
@@ -389,7 +388,6 @@ export interface UserProfileUpdate {
   location_preference?: string;
   target_roles?: string[];
   resume_text?: string;
-  blocked_companies?: string[];
   scoring_weights?: Record<string, unknown>;
 }
 

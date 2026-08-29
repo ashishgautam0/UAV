@@ -7,62 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { X, Save, Loader2 } from "lucide-react";
-
-// ---------------------------------------------------------------------------
-// Tag Input – reusable for blocked companies
-// ---------------------------------------------------------------------------
-function TagInput({
-  tags,
-  onAdd,
-  onRemove,
-  placeholder,
-}: {
-  tags: string[];
-  onAdd: (tag: string) => void;
-  onRemove: (index: number) => void;
-  placeholder?: string;
-}) {
-  const [value, setValue] = useState("");
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const trimmed = value.trim();
-      if (trimmed && !tags.includes(trimmed)) {
-        onAdd(trimmed);
-      }
-      setValue("");
-    }
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        {tags.map((tag, i) => (
-          <Badge key={i} variant="secondary" className="gap-1 pr-1">
-            {tag}
-            <button
-              type="button"
-              onClick={() => onRemove(i)}
-              className="ml-1 rounded-full hover:bg-muted-foreground/20 p-0.5"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </Badge>
-        ))}
-      </div>
-      <Input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder ?? "Type and press Enter to add"}
-      />
-    </div>
-  );
-}
+import { Save, Loader2 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Settings Page
@@ -72,7 +18,6 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
 
   const [resumeText, setResumeText] = useState("");
-  const [blockedCompanies, setBlockedCompanies] = useState<string[]>([]);
 
   // ------ Load profile on mount ------
   useEffect(() => {
@@ -80,7 +25,6 @@ export default function SettingsPage() {
       try {
         const profile: UserProfile = await getProfile();
         setResumeText(profile.resume_text ?? "");
-        setBlockedCompanies(profile.blocked_companies ?? []);
       } catch {
         toast.error("Failed to load profile");
       } finally {
@@ -96,7 +40,6 @@ export default function SettingsPage() {
     try {
       const data: UserProfileUpdate = {
         resume_text: resumeText,
-        blocked_companies: blockedCompanies,
       };
       await updateProfile(data);
       toast.success("Profile saved successfully");
@@ -146,23 +89,6 @@ export default function SettingsPage() {
             placeholder="Paste your LaTeX resume here..."
             rows={20}
             className="font-mono text-sm"
-          />
-        </CardContent>
-      </Card>
-
-      {/* ---- Blocked Companies ---- */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Blocked Companies</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TagInput
-            tags={blockedCompanies}
-            onAdd={(tag) => setBlockedCompanies((prev) => [...prev, tag])}
-            onRemove={(i) =>
-              setBlockedCompanies((prev) => prev.filter((_, idx) => idx !== i))
-            }
-            placeholder="Add a company to block and press Enter"
           />
         </CardContent>
       </Card>
