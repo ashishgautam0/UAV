@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getScrapedJobs, getFollowUps, createApplication, markScrapedJob, getJobMessage, getFollowUpDraft } from "@/lib/api";
+import { getScrapedJobs, getFollowUps, createApplication, markScrapedJob, getJobMessage, getFollowUpDraft, deleteScrapedJob } from "@/lib/api";
 import type { ScrapedJob, FollowUp, FollowUpDraft } from "@/lib/types";
 
 import {
@@ -201,14 +201,14 @@ export default function TonightPage() {
     [fuOpen, fuDrafts]
   );
 
-  // ------- Dismiss handler -------
+  // ------- Dismiss handler (permanently deletes the job) -------
   const handleDismiss = useCallback(async (job: ScrapedJob) => {
     try {
-      if (job.id) await markScrapedJob(job.id, "dismissed");
+      if (job.id) await deleteScrapedJob(job.id);
       setJobs((prev) => prev.filter((j) => j.id !== job.id));
-      toast.success(`Dismissed ${job.company} - ${job.title}`);
+      toast.success(`Deleted ${job.company} - ${job.title}`);
     } catch {
-      toast.error("Failed to dismiss job");
+      toast.error("Failed to delete job");
     }
   }, []);
 
@@ -385,7 +385,11 @@ export default function TonightPage() {
                   const isLogged = loggedJobs.has(key);
 
                   return (
-                    <Card key={job.id ?? idx} className="flex flex-col">
+                    <Card
+                      key={job.id ?? idx}
+                      className="flex flex-col cursor-pointer transition-colors hover:border-primary/40"
+                      onClick={() => job.id && router.push(`/jobs/${job.id}`)}
+                    >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
@@ -461,7 +465,10 @@ export default function TonightPage() {
 
                         {/* Pre-written cold DM (from the hourly Claude routine) */}
                         {job.id && dmOpen.has(job.id) && dmByJob[job.id] && (
-                          <div className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 space-y-2">
+                          <div
+                            className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 space-y-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-medium text-emerald-400">
                                 Cold DM (auto-written)
@@ -510,7 +517,10 @@ export default function TonightPage() {
                         <div className="flex-1" />
 
                         {/* Action buttons */}
-                        <div className="flex flex-wrap items-center gap-2 pt-2">
+                        <div
+                          className="flex flex-wrap items-center gap-2 pt-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <Button
                             variant="outline"
                             size="sm"

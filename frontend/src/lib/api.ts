@@ -145,6 +145,22 @@ export async function markScrapedJob(id: number, action: string) {
   });
 }
 
+export async function getScrapedJob(id: number): Promise<ScrapedJob> {
+  return apiFetch<ScrapedJob>(`/api/scraped-jobs/${id}`);
+}
+
+export async function lookupScrapedJob(url: string): Promise<{ id: number | null }> {
+  return apiFetch<{ id: number | null }>(
+    `/api/scraped-jobs/lookup?url=${encodeURIComponent(url)}`
+  );
+}
+
+export async function deleteScrapedJob(id: number) {
+  return apiFetch<{ success: boolean }>(`/api/scraped-jobs/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function getFollowUpDraft(entityId: number): Promise<FollowUpDraft> {
   return apiFetch<FollowUpDraft>(`/api/follow-ups/draft?entity_id=${entityId}`);
 }
