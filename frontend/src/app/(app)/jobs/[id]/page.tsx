@@ -448,10 +448,16 @@ export default function JobDetailPage() {
               title="Mini demo preview"
               className="h-96 w-full rounded-md border bg-black"
             />
+          ) : job.applied ? (
+            <p className="text-sm italic text-muted-foreground">
+              Not built yet — this job is in your tracker, so the hourly
+              routine will build its demo on an upcoming run.
+            </p>
           ) : (
             <p className="text-sm italic text-muted-foreground">
-              Not built yet — the hourly routine creates a job-specific live
-              demo for each new posting; check back after an upcoming run.
+              Demos are built only for jobs you&apos;ve logged to the
+              tracker — hit &quot;Log to Tracker&quot; above and the next
+              hourly run will build one for this job.
             </p>
           )}
         </CardContent>

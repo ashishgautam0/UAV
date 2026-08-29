@@ -123,6 +123,7 @@ export interface ScrapedJob {
   ats_score?: number;
   skill_match?: number;
   noc_verdict?: string;
+  applied?: number;
 }
 
 export interface JobMessage {
