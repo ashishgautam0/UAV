@@ -38,6 +38,9 @@ app = FastAPI(title="Job Search HQ API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.get_cors_origins(),
+    # Also accept this project's Vercel preview/branch deployments
+    # (uav-<hash>-....vercel.app, uav-git-<branch>-....vercel.app)
+    allow_origin_regex=r"^https://uav-[a-z0-9-]+\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
