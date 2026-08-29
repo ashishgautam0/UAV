@@ -183,16 +183,6 @@ def get_skills(username="subidh"):
     return skills if skills else None
 
 
-def get_blocked_companies(username="subidh"):
-    """Get set of blocked company names (lowercased). Returns None if not found."""
-    profile = get_profile(username)
-    if not profile:
-        return None
-
-    blocked = profile.get("blocked_companies") or []
-    return {c.strip().lower() for c in blocked} if blocked else None
-
-
 def get_scoring_weights(username="subidh"):
     """Get custom scoring weights. Returns None if not found."""
     profile = get_profile(username)

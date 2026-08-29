@@ -15,24 +15,6 @@ from tracker import (
 from scraper import run_all_scrapers
 from digest import build_email_content, get_alert_number
 
-# Default fallback blocked list
-_DEFAULT_BLOCKED = {"turing"}
-
-
-def _get_blocked_companies():
-    """Try to load blocked companies from DB, fall back to hardcoded default."""
-    try:
-        from profile import get_blocked_companies
-        blocked = get_blocked_companies()
-        if blocked is not None:
-            return blocked
-    except Exception:
-        pass
-    return _DEFAULT_BLOCKED
-
-
-# Backward-compatible reference
-BLOCKED_COMPANIES = _DEFAULT_BLOCKED
 
 # Curated list of desired AI/ML job titles for fuzzy matching
 DESIRED_TITLES = [
@@ -214,9 +196,6 @@ def main():
     existing_urls = get_existing_job_urls()
     new_jobs = [j for j in jobs if j.get("url", "") not in existing_urls]
     print(f"New jobs: {len(new_jobs)} (filtered out {len(jobs) - len(new_jobs)} duplicates)")
-
-    # Filter blocked companies
-    new_jobs = [j for j in new_jobs if j.get("company", "").strip().lower() not in _get_blocked_companies()]
 
     # Only keep jobs whose title matches or is similar to the desired titles list
     new_jobs = [j for j in new_jobs if _matches_desired_title(j.get("title", ""))]

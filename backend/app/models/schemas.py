@@ -27,7 +27,6 @@ class UserProfileRequest(BaseModel):
     location_preference: Optional[str] = None
     target_roles: Optional[list[str]] = None
     resume_text: Optional[str] = None
-    blocked_companies: Optional[list[str]] = None
     scoring_weights: Optional[dict] = None
 
 
@@ -43,7 +42,6 @@ class UserProfileResponse(BaseModel):
     location_preference: str = ""
     target_roles: list[str] = []
     resume_text: str = ""
-    blocked_companies: list[str] = []
     scoring_weights: dict = {}
     updated_at: Optional[str] = None
 
