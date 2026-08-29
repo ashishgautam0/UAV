@@ -254,7 +254,7 @@ function AnalyzerPageInner() {
     <div className="space-y-8">
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">JD Analyzer</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">JD Analyzer</h1>
         <p className="text-muted-foreground mt-1">
           Analyze job descriptions for ATS compatibility, NOC codes, skills
           match, and red flags.

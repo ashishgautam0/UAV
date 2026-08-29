@@ -271,7 +271,7 @@ export default function QuickLinksPage() {
     <div className="space-y-8">
       {/* ---- Page Header ---- */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Quick Links</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Quick Links</h1>
         <p className="text-muted-foreground mt-1">
           Curated job boards, communities, and resources — organized by
           priority.

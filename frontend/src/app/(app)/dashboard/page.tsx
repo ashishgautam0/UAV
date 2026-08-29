@@ -154,7 +154,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       {/* ---- Page Header ---- */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground mt-1">
           Your job search at a glance — stats, trends, and follow-ups.
         </p>
