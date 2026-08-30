@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   getDashboard,
   getFollowUps,
+  getFollowUpDraft,
   getWeeklyTrend,
   getPlatformEffectiveness,
   getStatusFunnel,
@@ -14,6 +16,7 @@ import {
 import type {
   DashboardStats,
   FollowUp,
+  FollowUpDraft,
   FollowUpEffectiveness,
   WeeklyTrend,
   PlatformEffectiveness,
@@ -43,6 +46,11 @@ import { Button } from "@/components/ui/button";
 import {
   Briefcase,
   Clock,
+  Copy,
+  GraduationCap,
+  Loader2,
+  MessageSquare,
+  MessageSquareText,
   ThumbsUp,
   Trophy,
   XCircle,
@@ -52,13 +60,102 @@ import {
   BarChart3,
 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
+
+// Tasks per day in public/prep28.html, as [blockA, blockB, recall] — used to
+// read that page's localStorage progress ("prep28") for the widget below.
+const PREP_COUNTS: [number, number, number][] = [
+  [2,2,3],[2,2,3],[2,2,3],[2,3,3],[1,1,3],[2,2,3],[2,3,2],
+  [1,2,3],[2,2,3],[2,2,3],[1,3,3],[2,3,3],[2,3,3],[2,3,3],
+  [1,2,3],[1,2,3],[1,2,3],[1,2,3],[2,2,3],[2,2,3],[2,3,2],
+  [1,2,3],[2,2,2],[1,2,2],[1,2,2],[1,2,2],[2,2,2],[1,2,2],
+];
+const PREP_TOTAL = PREP_COUNTS.reduce((s, [a, b, r]) => s + a + b + r, 0);
+
+interface PrepState {
+  started: boolean;
+  day: number;
+  planDone: number;
+  todayDone: number;
+  todayTotal: number;
+}
+
+function readPrepState(): PrepState | null {
+  try {
+    const raw = localStorage.getItem("prep28");
+    if (!raw) return { started: false, day: 1, planDone: 0, todayDone: 0, todayTotal: 0 };
+    const s = JSON.parse(raw);
+    let day = 1;
+    if (s.dayOverride) day = s.dayOverride;
+    else if (s.start) {
+      const t = new Date();
+      t.setHours(0, 0, 0, 0);
+      day = Math.min(28, Math.max(1, Math.floor((t.getTime() - new Date(s.start).getTime()) / 86400000) + 1));
+    }
+    const done = s.done || {};
+    let planDone = 0;
+    let todayDone = 0;
+    for (const k of Object.keys(done)) {
+      if (!done[k]) continue;
+      planDone++;
+      if (k.startsWith(day + "-")) todayDone++;
+    }
+    const [a, b, r] = PREP_COUNTS[day - 1];
+    return { started: Boolean(s.start), day, planDone, todayDone, todayTotal: a + b + r };
+  } catch {
+    return null;
+  }
+}
 
 const WEEKLY_TARGET = 50;
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const router = useRouter();
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [prep, setPrep] = useState<PrepState | null>(null);
+  const [fuDrafts, setFuDrafts] = useState<Record<number, FollowUpDraft>>({});
+  const [fuOpen, setFuOpen] = useState<Set<number>>(new Set());
+  const [fuLoading, setFuLoading] = useState<number | null>(null);
+
+  useEffect(() => {
+    setPrep(readPrepState());
+  }, []);
+
+  const toggleFuDraft = async (fu: FollowUp) => {
+    const id = fu.id;
+    if (fuOpen.has(id)) {
+      setFuOpen((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      return;
+    }
+    let draft = fuDrafts[id];
+    if (!draft) {
+      setFuLoading(id);
+      try {
+        draft = await getFollowUpDraft(id);
+        setFuDrafts((prev) => ({ ...prev, [id]: draft }));
+      } catch {
+        toast.error("Failed to load the follow-up draft");
+        return;
+      } finally {
+        setFuLoading(null);
+      }
+    }
+    if (draft.status === "ready" && draft.content) {
+      setFuOpen((prev) => new Set(prev).add(id));
+    } else if (draft.status === "pending") {
+      toast.info("Queued — the next hourly run writes this follow-up.");
+    } else {
+      toast.info(
+        "Not queued yet — the hourly run queues it now that the follow-up date is due."
+      );
+    }
+  };
   const [weeklyTrend, setWeeklyTrend] = useState<WeeklyTrend[]>([]);
   const [platformData, setPlatformData] = useState<PlatformEffectiveness[]>([]);
   const [statusFunnel, setStatusFunnel] = useState<StatusFunnel | null>(null);
@@ -159,6 +256,45 @@ export default function DashboardPage() {
           Your job search at a glance — stats, trends, and follow-ups.
         </p>
       </div>
+
+      {/* ---- 28-Day Interview Prep ---- */}
+      <Card>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <GraduationCap className="h-5 w-5 text-sky-400" />
+              28-Day Interview Prep
+            </CardTitle>
+            <CardDescription>
+              {prep?.started
+                ? `Day ${prep.day} of 28 — coding patterns, ML/GenAI depth, night recall`
+                : "Your daily prep plan — pick a Day 1 to start the clock"}
+            </CardDescription>
+          </div>
+          <Button size="sm" asChild>
+            <a href="/prep28.html">
+              {prep?.started ? "Open today's plan" : "Start the 28 days"}
+            </a>
+          </Button>
+        </CardHeader>
+        {prep?.started && (
+          <CardContent className="space-y-2">
+            <Progress
+              value={Math.round((100 * prep.planDone) / PREP_TOTAL)}
+              className="h-3"
+            />
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>
+                today {prep.todayDone}/{prep.todayTotal}
+              </span>
+              <span>
+                plan {prep.planDone}/{PREP_TOTAL} ·{" "}
+                {Math.round((100 * prep.planDone) / PREP_TOTAL)}%
+              </span>
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
       {/* ---- Empty State CTA ---- */}
       {stats?.total === 0 && (
@@ -297,6 +433,65 @@ export default function DashboardPage() {
                           {fu.status}
                         </span>
                       </div>
+                    </div>
+                    {fuOpen.has(fu.id) && fuDrafts[fu.id]?.content && (
+                      <div className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 space-y-2 mt-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-emerald-400">
+                            Follow-up #{fuDrafts[fu.id]?.follow_up_number ?? 1}{" "}
+                            (auto-written)
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => {
+                              navigator.clipboard.writeText(
+                                fuDrafts[fu.id]?.content || ""
+                              );
+                              toast.success("Follow-up copied to clipboard");
+                            }}
+                          >
+                            <Copy className="mr-1 h-3 w-3" />
+                            Copy
+                          </Button>
+                        </div>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                          {fuDrafts[fu.id]?.content}
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        disabled={fuLoading === fu.id}
+                        onClick={() => toggleFuDraft(fu)}
+                      >
+                        {fuLoading === fu.id ? (
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <MessageSquareText className="mr-1.5 h-3.5 w-3.5" />
+                        )}
+                        {fuOpen.has(fu.id) ? "Hide Draft" : "View Draft"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => {
+                          const params = new URLSearchParams({
+                            company: fu.company,
+                            role: fu.role,
+                            type: "follow-up",
+                          });
+                          router.push(`/messages?${params.toString()}`);
+                        }}
+                      >
+                        <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
+                        Write
+                      </Button>
                     </div>
                   </div>
                 );
