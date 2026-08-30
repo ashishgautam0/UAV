@@ -424,8 +424,16 @@ def scrape_amazon_jobs():
                 continue
             path = row.get("job_path") or ""
             url = f"https://www.amazon.jobs{path}" if path else ""
-            desc = re.sub(r"<[^>]+>", " ",
-                          (row.get("description_short") or row.get("basic_qualifications") or ""))[:500]
+            # Prefer the full description over the short teaser so downstream
+            # resume-screening / drafting agents (and the resume pre-net) have
+            # real JD content to judge, not a 200-char snippet.
+            raw_desc = " ".join(filter(None, [
+                row.get("description") or "",
+                row.get("basic_qualifications") or "",
+                row.get("preferred_qualifications") or "",
+            ])) or (row.get("description_short") or "")
+            desc = re.sub(r"<[^>]+>", " ", raw_desc)
+            desc = re.sub(r"\s+", " ", desc)[:2000]
             key = _normalize_for_dedup(title) + "||amazon"
             if key not in dedup_map:
                 dedup_map[key] = {
