@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getScrapedJobs, getFollowUps, createApplication, markScrapedJob, getJobMessage, getFollowUpDraft, deleteScrapedJob } from "@/lib/api";
-import type { ScrapedJob, FollowUp, FollowUpDraft } from "@/lib/types";
+import { getScrapedJobs, createApplication, markScrapedJob, getJobMessage, deleteScrapedJob } from "@/lib/api";
+import type { ScrapedJob } from "@/lib/types";
 
 import {
   Card,
@@ -28,7 +28,6 @@ import {
   ClipboardPlus,
   Building2,
   MapPin,
-  AlertTriangle,
   Check,
   Copy,
   FileText,
@@ -64,15 +63,11 @@ export default function TonightPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<ScrapedJob[]>([]);
-  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [loggedJobs, setLoggedJobs] = useState<Set<string>>(new Set());
   const [filterMode, setFilterMode] = useState<"all" | "remote" | "hybrid" | "onsite">("all");
   const [dmByJob, setDmByJob] = useState<Record<number, string | null>>({});
   const [dmOpen, setDmOpen] = useState<Set<number>>(new Set());
   const [dmLoading, setDmLoading] = useState<number | null>(null);
-  const [fuDrafts, setFuDrafts] = useState<Record<number, FollowUpDraft>>({});
-  const [fuOpen, setFuOpen] = useState<Set<number>>(new Set());
-  const [fuLoading, setFuLoading] = useState<number | null>(null);
 
   // The API returns jobs newest-first (ordered by scraped_at desc) — keep
   // that order so the latest job is always on top.
@@ -86,12 +81,7 @@ export default function TonightPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [jobsData, followUpsData] = await Promise.all([
-        getScrapedJobs(),
-        getFollowUps(),
-      ]);
-      setJobs(jobsData);
-      setFollowUps(followUpsData);
+      setJobs(await getScrapedJobs());
     } catch {
       toast.error("Failed to load data");
     } finally {
@@ -163,44 +153,6 @@ export default function TonightPage() {
     [dmOpen, dmByJob]
   );
 
-  // ------- View pre-written follow-up draft handler -------
-  const handleToggleFuDraft = useCallback(
-    async (fu: FollowUp) => {
-      const id = fu.id;
-      if (fuOpen.has(id)) {
-        setFuOpen((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        return;
-      }
-      let draft = fuDrafts[id];
-      if (!draft) {
-        setFuLoading(id);
-        try {
-          draft = await getFollowUpDraft(id);
-          setFuDrafts((prev) => ({ ...prev, [id]: draft }));
-        } catch {
-          toast.error("Failed to load the follow-up draft");
-          return;
-        } finally {
-          setFuLoading(null);
-        }
-      }
-      if (draft.status === "ready" && draft.content) {
-        setFuOpen((prev) => new Set(prev).add(id));
-      } else if (draft.status === "pending") {
-        toast.info("Queued — the next hourly run writes this follow-up.");
-      } else {
-        toast.info(
-          "Not queued yet — the hourly run queues it now that the follow-up date is due."
-        );
-      }
-    },
-    [fuOpen, fuDrafts]
-  );
-
   // ------- Dismiss handler (permanently deletes the job) -------
   const handleDismiss = useCallback(async (job: ScrapedJob) => {
     try {
@@ -221,7 +173,7 @@ export default function TonightPage() {
             Today Todo
           </h1>
           <p className="text-muted-foreground mt-1">
-            Latest scraped jobs and follow-ups for your application list.
+            Latest scraped jobs for your application list — follow-ups now live on the Dashboard.
           </p>
         </div>
         <Button variant="outline" onClick={loadData} disabled={loading}>
@@ -243,110 +195,7 @@ export default function TonightPage() {
 
       {!loading && (
         <>
-          {/* ---- Section 1: Follow-ups Due ---- */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-400" />
-                Follow-ups Due
-              </CardTitle>
-              <CardDescription>
-                Applications that need a follow-up soon.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {followUps.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  No follow-ups due. You&apos;re all caught up!
-                </p>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {followUps.map((fu) => (
-                    <div
-                      key={fu.id}
-                      className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 space-y-2"
-                    >
-                      <p className="font-semibold">{fu.company}</p>
-                      <p className="text-muted-foreground text-sm">
-                        {fu.role}
-                      </p>
-                      <div className="flex items-center justify-between pt-1">
-                        <span className="text-xs text-amber-400">
-                          {fu.follow_up_date}
-                        </span>
-                        <span className="text-muted-foreground text-xs capitalize">
-                          {fu.status}
-                        </span>
-                      </div>
-                      {fuOpen.has(fu.id) && fuDrafts[fu.id]?.content && (
-                        <div className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-emerald-400">
-                              Follow-up #{fuDrafts[fu.id]?.follow_up_number ?? 1}{" "}
-                              (auto-written)
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-xs"
-                              onClick={() => {
-                                navigator.clipboard.writeText(
-                                  fuDrafts[fu.id]?.content || ""
-                                );
-                                toast.success("Follow-up copied to clipboard");
-                              }}
-                            >
-                              <Copy className="mr-1 h-3 w-3" />
-                              Copy
-                            </Button>
-                          </div>
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                            {fuDrafts[fu.id]?.content}
-                          </p>
-                        </div>
-                      )}
-                      <div className="flex gap-2 mt-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          disabled={fuLoading === fu.id}
-                          onClick={() => handleToggleFuDraft(fu)}
-                        >
-                          {fuLoading === fu.id ? (
-                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <MessageSquareText className="mr-1.5 h-3.5 w-3.5" />
-                          )}
-                          {fuOpen.has(fu.id) ? "Hide Draft" : "View Draft"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => {
-                            const params = new URLSearchParams({
-                              company: fu.company,
-                              role: fu.role,
-                              type: "follow-up",
-                            });
-                            router.push(`/messages?${params.toString()}`);
-                          }}
-                        >
-                          <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
-                          Write
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Separator />
-
-          {/* ---- Section 2: Scraped Jobs ---- */}
+          {/* ---- Scraped Jobs ---- */}
           <div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
               <h2 className="text-2xl font-semibold tracking-tight">
