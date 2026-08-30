@@ -41,6 +41,7 @@ import {
   MapPin,
   MessageSquareText,
   Mail,
+  Rocket,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -328,6 +329,83 @@ export default function JobDetailPage() {
           </Button>
         </div>
       </div>
+
+      {/* Apply Kit — everything needed to apply, in one place */}
+      {(() => {
+        const kit = [
+          { key: "cold_dm", label: "Cold DM", ready: Boolean(messages["cold_dm"]) },
+          { key: "hr_email", label: "Email + recipient", ready: Boolean(messages["hr_email"]) },
+          { key: "resume_points", label: "Tailored resume notes", ready: Boolean(messages["resume_points"]) },
+          { key: "demo", label: "Live demo", ready: demoReady },
+        ];
+        const readyCount = kit.filter((k) => k.ready).length;
+        return (
+          <Card className="border-primary/30">
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Rocket className="h-4 w-4 text-primary" />
+                  Apply Kit
+                </CardTitle>
+                <CardDescription>
+                  Apply in ~30 seconds — grab each piece, then hit apply.
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className="tabular-nums">
+                {readyCount}/{kit.length} ready
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" asChild>
+                  <a href={job.url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                    Apply on {job.source || "LinkedIn"}
+                  </a>
+                </Button>
+                {messages["cold_dm"] && (
+                  <Button variant="outline" size="sm" onClick={() => handleCopy("cold_dm")}>
+                    {copied === "cold_dm" ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <MessageSquareText className="mr-1.5 h-3.5 w-3.5" />}
+                    Copy DM
+                  </Button>
+                )}
+                {messages["hr_email"] && (
+                  <Button variant="outline" size="sm" onClick={() => handleCopy("hr_email")}>
+                    {copied === "hr_email" ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Mail className="mr-1.5 h-3.5 w-3.5" />}
+                    Copy email
+                  </Button>
+                )}
+                {messages["resume_points"] && (
+                  <Button variant="outline" size="sm" onClick={() => handleCopy("resume_points")}>
+                    {copied === "resume_points" ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <FileText className="mr-1.5 h-3.5 w-3.5" />}
+                    Copy resume notes
+                  </Button>
+                )}
+                {demoReady && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${API_URL}/api/demo/${jobId}`);
+                      toast.success("Demo link copied");
+                    }}
+                  >
+                    <Copy className="mr-1.5 h-3.5 w-3.5" />
+                    Copy demo link
+                  </Button>
+                )}
+              </div>
+              {readyCount < kit.length && (
+                <p className="text-xs text-muted-foreground">
+                  {job.applied
+                    ? "Remaining pieces are written by the hourly routine — check back shortly."
+                    : "Log this job to the tracker and the next hourly run writes the rest."}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Description */}
       {job.description && (

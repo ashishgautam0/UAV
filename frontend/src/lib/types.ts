@@ -124,6 +124,14 @@ export interface ScrapedJob {
   skill_match?: number;
   noc_verdict?: string;
   applied?: number;
+  bestscore?: number;
+  bestscore_breakdown?: {
+    fit: number;
+    fit_source: string;
+    freshness: number;
+    ease: number;
+    score: number;
+  };
 }
 
 export interface JobMessage {

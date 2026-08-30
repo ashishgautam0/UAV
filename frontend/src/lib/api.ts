@@ -139,6 +139,12 @@ export async function getScrapedJobs(source?: string): Promise<ScrapedJob[]> {
   return apiFetch<ScrapedJob[]>(`/api/scraped-jobs${qs}`);
 }
 
+export async function getRankedScrapedJobs(
+  limit = 200
+): Promise<ScrapedJob[]> {
+  return apiFetch<ScrapedJob[]>(`/api/scraped-jobs/ranked?limit=${limit}`);
+}
+
 export async function markScrapedJob(id: number, action: string) {
   return apiFetch<{ success: boolean }>(`/api/scraped-jobs/${id}`, {
     method: "PATCH",

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getScrapedJobs, createApplication, markScrapedJob, deleteScrapedJob } from "@/lib/api";
+import { getRankedScrapedJobs, createApplication, markScrapedJob, deleteScrapedJob } from "@/lib/api";
 import type { ScrapedJob } from "@/lib/types";
 
 import {
@@ -36,10 +36,10 @@ import { cn } from "@/lib/utils";
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function scoreBadgeColor(score: number) {
-  if (score >= 60) return "bg-emerald-600 text-white";
-  if (score >= 30) return "bg-yellow-500 text-black";
-  return "bg-red-600 text-white";
+function bestScoreColor(score: number) {
+  if (score >= 70) return "bg-emerald-600 text-white";
+  if (score >= 50) return "bg-yellow-500 text-black";
+  return "bg-muted text-muted-foreground";
 }
 
 function workModeBadgeColor(mode: string | undefined) {
@@ -236,7 +236,8 @@ export default function TonightPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      setJobs(await getScrapedJobs());
+      // Ranked best-first by BestScore (fit × freshness × ease).
+      setJobs(await getRankedScrapedJobs());
     } catch {
       toast.error("Failed to load data");
     } finally {
@@ -295,7 +296,7 @@ export default function TonightPage() {
             Today Todo
           </h1>
           <p className="text-muted-foreground mt-1">
-            Tap a card to apply · swipe right to log it · swipe left to remove it.
+            Ranked best-first by match, freshness &amp; ease. Tap to apply · swipe right to log · swipe left to remove.
           </p>
         </div>
         <Button variant="outline" onClick={loadData} disabled={loading}>
@@ -321,7 +322,7 @@ export default function TonightPage() {
           <div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
               <h2 className="text-2xl font-semibold tracking-tight">
-                Latest Scraped Jobs
+                Best Matches
                 {jobs.length > 0 && (
                   <span className="text-muted-foreground text-base font-normal ml-2">
                     ({filteredJobs.length}{filterMode !== "all" ? ` of ${jobs.length}` : ""})
@@ -371,14 +372,19 @@ export default function TonightPage() {
                                 {job.company}
                               </div>
                             </div>
-                            {job.score > 0 && (
+                            {typeof job.bestscore === "number" && (
                               <Badge
+                                title={
+                                  job.bestscore_breakdown
+                                    ? `fit ${Math.round(job.bestscore_breakdown.fit * 100)}% (${job.bestscore_breakdown.fit_source}) · freshness ${Math.round(job.bestscore_breakdown.freshness * 100)}%`
+                                    : "BestScore"
+                                }
                                 className={cn(
                                   "shrink-0 tabular-nums",
-                                  scoreBadgeColor(job.score)
+                                  bestScoreColor(job.bestscore)
                                 )}
                               >
-                                {job.score}
+                                {Math.round(job.bestscore)}
                               </Badge>
                             )}
                           </div>
