@@ -53,7 +53,7 @@ A · Role snapshot: what the role really is, seniority, must-have stack, locatio
 B · Fit vs. profile: how Subidh's REAL experience maps to the requirements — strengths, then honest gaps.
 C · Seniority positioning: is this below / at / above his level, and how he should frame himself.
 D · Compensation & market: the likely salary band for this role + location (from research), and whether it fits.
-E · Personalization angles: 2–3 specific hooks (from company research + JD) the outreach should use.
+E · Personalization angles: 2–3 specific hooks (from company research + JD) the outreach should use. If the profile shows an AWS certification and the JD touches AWS/cloud, make the certification the lead angle — it's a rare differentiator.
 F · Interview prep: 2–3 likely focus areas, each with a STAR story from his profile to prepare.
 G · Legitimacy check: ghost-job / scam signals (stale repost, vague JD, no company footprint, upfront fees, generic domain) — or "looks legitimate". THIS NEVER AFFECTS THE SCORE.
 H · Verdict: the recommendation, and whether full application materials (DM/email/demo) are worth the effort for this one.

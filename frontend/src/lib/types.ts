@@ -130,6 +130,7 @@ export interface ScrapedJob {
     fit_source: string;
     freshness: number;
     ease: number;
+    aws?: number;
     score: number;
   };
 }

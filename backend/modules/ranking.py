@@ -20,9 +20,36 @@ import re
 from datetime import datetime, timezone
 
 # Weights sum to 1.0; FIT dominates because "best" is about match, not speed.
-W_FIT = 0.62
-W_FRESH = 0.26
-W_EASE = 0.12
+# AWS gets its own weight: Subidh holds an AWS certification that few
+# candidates have, so a job that wants AWS/cloud (especially a certification)
+# is a rare-advantage role and should rank higher.
+W_FIT = 0.56
+W_FRESH = 0.24
+W_EASE = 0.10
+W_AWS = 0.10
+
+# Detect AWS / cloud-certification relevance in a JD.
+_AWS_CERT_RE = re.compile(
+    r"aws\s+certif|certified\s+.*aws|cloud\s+certif|"
+    r"solutions?\s+architect\s+cert",
+    re.IGNORECASE,
+)
+_AWS_RE = re.compile(
+    r"\b(aws|amazon web services|sagemaker|bedrock|ec2|s3|lambda|"
+    r"cloudformation|eks|ecs)\b",
+    re.IGNORECASE,
+)
+
+
+def _aws_signal(job):
+    """1.0 when the JD wants an AWS/cloud certification, 0.6 when it just uses
+    AWS, 0 otherwise — so cert-required roles rank highest."""
+    text = f"{job.get('title', '')} {job.get('description', '')}"
+    if _AWS_CERT_RE.search(text):
+        return 1.0
+    if _AWS_RE.search(text):
+        return 0.6
+    return 0.0
 
 _STOP = {
     "the", "and", "for", "with", "you", "our", "are", "will", "your", "that",
@@ -99,13 +126,15 @@ def compute_bestscore(job, profile_tokens, eval_score=None):
 
     fresh = _freshness(job.get("scraped_at"))
     ease = 1.0 if (job.get("verdict") == "EASY_APPLY") else 0.55
+    aws = _aws_signal(job)
 
-    score = 100.0 * (W_FIT * fit + W_FRESH * fresh + W_EASE * ease)
+    score = 100.0 * (W_FIT * fit + W_FRESH * fresh + W_EASE * ease + W_AWS * aws)
     breakdown = {
         "fit": round(fit, 3),
         "fit_source": fit_src,
         "freshness": round(fresh, 3),
         "ease": round(ease, 3),
+        "aws": round(aws, 3),
         "score": round(score, 1),
     }
     return round(score, 1), breakdown

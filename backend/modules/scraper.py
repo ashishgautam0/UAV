@@ -41,6 +41,14 @@ _LINKEDIN_SEARCH_QUERIES = [
     "full stack ai",
     "ai ml engineer",
     "artificial intelligence engineer",
+    # AWS-focused — Subidh is AWS certified (rare), so surface roles that
+    # want AWS/cloud skills where that certification is a real differentiator.
+    "aws machine learning engineer",
+    "aws ai engineer",
+    "aws generative ai engineer",
+    "mlops engineer aws",
+    "sagemaker engineer",
+    "aws ml engineer",
 ]
 
 _LINKEDIN_LOCATIONS = ["India", "Remote"]
