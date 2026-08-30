@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getRankedScrapedJobs, createApplication, markScrapedJob, deleteScrapedJob } from "@/lib/api";
+import { getRankedScrapedJobs, createApplication, markScrapedJob } from "@/lib/api";
 import type { ScrapedJob } from "@/lib/types";
 
 import {
@@ -273,16 +273,19 @@ export default function TonightPage() {
     }
   }, [loadData]);
 
-  // ------- Remove handler (permanently deletes the job) -------
+  // ------- Remove handler -------
+  // Marks the job dismissed rather than deleting it: the row stays so the
+  // scraper's URL dedup keeps recognising it and never re-adds it, while the
+  // ranked/list views (which filter dismissed=0) hide it.
   const handleDismiss = useCallback(async (job: ScrapedJob) => {
     // Drop it from the list immediately so the swipe feels instant.
     setJobs((prev) => prev.filter((j) => j.id !== job.id));
     try {
-      if (job.id) await deleteScrapedJob(job.id);
+      if (job.id) await markScrapedJob(job.id, "dismissed");
       toast.success(`Removed ${job.company} - ${job.title}`);
     } catch {
       toast.error("Failed to remove job");
-      // Re-fetch to restore anything that failed to delete server-side.
+      // Re-fetch to restore anything that failed server-side.
       loadData();
     }
   }, [loadData]);

@@ -8,7 +8,6 @@ import {
   getJobMessage,
   getCachedCompanyIntel,
   findRecruiterEmails,
-  deleteScrapedJob,
   createApplication,
   markScrapedJob,
 } from "@/lib/api";
@@ -197,11 +196,13 @@ export default function JobDetailPage() {
   async function handleDismiss() {
     setBusy(true);
     try {
-      await deleteScrapedJob(jobId);
-      toast.success("Job deleted");
+      // Mark dismissed (not delete) so the scraper's URL dedup keeps the row
+      // and never re-adds this job on a later run.
+      await markScrapedJob(jobId, "dismissed");
+      toast.success("Job dismissed");
       router.push("/tonight");
     } catch {
-      toast.error("Failed to delete job");
+      toast.error("Failed to dismiss job");
       setBusy(false);
     }
   }
@@ -325,7 +326,7 @@ export default function JobDetailPage() {
             onClick={handleDismiss}
           >
             <XCircle className="mr-1.5 h-3.5 w-3.5" />
-            Dismiss &amp; Delete
+            Dismiss
           </Button>
         </div>
       </div>
