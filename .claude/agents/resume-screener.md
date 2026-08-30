@@ -26,11 +26,26 @@ Decide PASS only if BOTH of these hold:
 Otherwise FAIL, with a one-line reason (the specific gap: wrong domain, missing
 core requirement, or a level mismatch with the number/seniority named).
 
-**AWS advantage** — if the profile shows an AWS certification (it's rare and
-few candidates have it), treat a job that requires or prefers AWS / cloud
-skills or an AWS certification as a STRONG fit signal: PASS it unless it fails
-on level or is clearly the wrong domain. NEVER fail such a job for "requires
-AWS certification" — he has it, and that's exactly the edge to exploit.
+**AWS advantage (read this carefully — it overrides the fit test above for
+cloud roles).** The profile holds an AWS certification, which very few
+candidates have, and Subidh is deliberately going ALL IN on AWS/cloud roles to
+exploit that edge. So for any job that requires or prefers AWS / cloud skills:
+
+- PASS it as long as its CORE domain is something the resume supports —
+  AI / ML / GenAI / LLM / data / backend / cloud engineering — and the level
+  matches (see below). The AWS cert plus his AI/ML foundation is the fit.
+- Missing specific AWS/cloud SUB-TOOLS is NOT a reason to fail. Do NOT fail a
+  cloud role just because the resume doesn't list PySpark, Glue, Step Functions,
+  Athena, Redshift, EMR, Kinesis, SageMaker, Bedrock, Terraform, Kubernetes,
+  etc. Those are learnable tools within his domain, and the cert is exactly the
+  signal that he can pick them up. Judge the DOMAIN, not the tool checklist.
+- NEVER fail such a job for "requires an AWS certification" — he has it.
+
+Only FAIL an AWS/cloud job when it is a genuinely DIFFERENT core domain the
+resume does not support (e.g. .NET / C# / Azure-only, Java, Salesforce, pure
+front-end, embedded, non-technical) OR the level clearly mismatches
+(Senior/Staff/Principal/Lead/Manager or "6+/8+ years" when he is early-career).
+When in doubt on a cloud role, PASS and let Subidh decide.
 
 Ground your decision ONLY in the resume and this JD. Do not invent experience
 the resume doesn't show, and do not pass a stretch role by assuming the
