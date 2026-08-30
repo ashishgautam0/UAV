@@ -229,9 +229,15 @@ def main():
     if sources_errors:
         print(f"\nFailed scrapers: {', '.join(sources_errors.keys())}")
 
-    # Filter out already-seen jobs (deduplication across hourly runs)
+    # Filter out already-seen jobs (deduplication across hourly runs). Bounded
+    # to a recent window so the all-time table (thousands of old/dismissed rows)
+    # doesn't block genuinely re-listed roles. Tunable via DEDUP_WINDOW_DAYS.
     print("\nChecking for duplicates...")
-    existing_urls = get_existing_job_urls()
+    try:
+        dedup_days = int(os.environ.get("DEDUP_WINDOW_DAYS", "14"))
+    except ValueError:
+        dedup_days = 14
+    existing_urls = get_existing_job_urls(since_days=dedup_days)
     new_jobs = [j for j in jobs if j.get("url", "") not in existing_urls]
     print(f"New jobs: {len(new_jobs)} (filtered out {len(jobs) - len(new_jobs)} duplicates)")
 
