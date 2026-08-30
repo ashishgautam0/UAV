@@ -47,80 +47,87 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
-:root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
+/*
+ * The app is dark-only: :root and .dark carry the same palette so there is
+ * never a light flash, whatever class next-themes applies.
+ * Blue-tinted charcoal surfaces + indigo accent.
+ */
+:root,
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
+  --radius: 0.75rem;
+  --background: oklch(0.145 0.015 265);
+  --foreground: oklch(0.96 0.008 265);
+  --card: oklch(0.185 0.018 265);
+  --card-foreground: oklch(0.96 0.008 265);
+  --popover: oklch(0.19 0.018 265);
+  --popover-foreground: oklch(0.96 0.008 265);
+  --primary: oklch(0.585 0.2 277);
+  --primary-foreground: oklch(0.97 0.014 277);
+  --secondary: oklch(0.24 0.02 265);
+  --secondary-foreground: oklch(0.96 0.008 265);
+  --muted: oklch(0.23 0.018 265);
+  --muted-foreground: oklch(0.68 0.02 265);
+  --accent: oklch(0.26 0.03 273);
+  --accent-foreground: oklch(0.96 0.008 265);
+  --destructive: oklch(0.66 0.2 22);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.585 0.2 277);
+  --chart-1: oklch(0.585 0.2 277);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: oklch(0.165 0.016 265);
+  --sidebar-foreground: oklch(0.96 0.008 265);
+  --sidebar-primary: oklch(0.585 0.2 277);
+  --sidebar-primary-foreground: oklch(0.97 0.014 277);
+  --sidebar-accent: oklch(0.24 0.025 270);
+  --sidebar-accent-foreground: oklch(0.96 0.008 265);
+  --sidebar-border: oklch(1 0 0 / 7%);
+  --sidebar-ring: oklch(0.585 0.2 277);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    color-scheme: dark;
+  }
   body {
     @apply bg-background text-foreground;
+    /* Ambient glow so large empty areas don't read as a flat void. */
+    background-image:
+      radial-gradient(1100px 520px at 85% -10%, oklch(0.5 0.17 285 / 0.09), transparent 60%),
+      radial-gradient(900px 480px at -15% 108%, oklch(0.55 0.14 200 / 0.05), transparent 60%);
+    background-attachment: fixed;
   }
+  ::selection {
+    background: oklch(0.585 0.2 277 / 0.35);
+  }
+  /* Subtle top sheen on every card for depth on the dark surfaces. */
+  [data-slot="card"] {
+    background-image: linear-gradient(to bottom, oklch(1 0 0 / 2.5%), transparent 55%);
+  }
+}
+
+/* Slim dark scrollbars (WebKit + Firefox). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.35 0.02 265) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(0.35 0.02 265);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.45 0.03 270);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }

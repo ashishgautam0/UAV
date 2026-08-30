@@ -83,7 +83,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           <div className="flex items-center gap-2">
             <ClipboardList className="h-5 w-5 shrink-0 text-sidebar-primary" />
             {!collapsed && (
-              <span className="text-lg font-semibold text-sidebar-foreground truncate">
+              <span className="truncate bg-gradient-to-r from-sidebar-foreground to-sidebar-primary bg-clip-text text-lg font-semibold text-transparent">
                 Job Search HQ
               </span>
             )}
@@ -99,7 +99,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
               collapsed && "justify-center px-0",
               active
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                ? "bg-sidebar-primary/15 text-sidebar-foreground shadow-[inset_2px_0_0_0_var(--sidebar-primary)]"
                 : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
             );
             // Static pages in /public (e.g. the 28-day prep tracker) need a

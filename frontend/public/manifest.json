@@ -4,8 +4,8 @@
   "description": "AI-powered job search assistant",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0a0a0a",
+  "background_color": "#101218",
+  "theme_color": "#101218",
   "orientation": "portrait-primary",
   "icons": [
     {
