@@ -1,7 +1,7 @@
 """BestScore — rank scraped jobs so the best India roles float to the top.
 
 "Best" here is a composite that answers one question: which jobs should
-Ashish apply to first, right now? It blends
+Subidh apply to first, right now? It blends
 
   * FIT        how well the JD matches his profile — the A–H evaluation's
                1–5 fit score when the research agent has scored the job,
