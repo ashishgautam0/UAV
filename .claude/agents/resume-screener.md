@@ -26,6 +26,12 @@ Decide PASS only if BOTH of these hold:
 Otherwise FAIL, with a one-line reason (the specific gap: wrong domain, missing
 core requirement, or a level mismatch with the number/seniority named).
 
+**AWS advantage** — if the profile shows an AWS certification (it's rare and
+few candidates have it), treat a job that requires or prefers AWS / cloud
+skills or an AWS certification as a STRONG fit signal: PASS it unless it fails
+on level or is clearly the wrong domain. NEVER fail such a job for "requires
+AWS certification" — he has it, and that's exactly the edge to exploit.
+
 Ground your decision ONLY in the resume and this JD. Do not invent experience
 the resume doesn't show, and do not pass a stretch role by assuming the
 candidate can learn it.

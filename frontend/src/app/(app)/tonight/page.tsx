@@ -379,7 +379,7 @@ export default function TonightPage() {
                               <Badge
                                 title={
                                   job.bestscore_breakdown
-                                    ? `fit ${Math.round(job.bestscore_breakdown.fit * 100)}% (${job.bestscore_breakdown.fit_source}) · freshness ${Math.round(job.bestscore_breakdown.freshness * 100)}%`
+                                    ? `fit ${Math.round(job.bestscore_breakdown.fit * 100)}% (${job.bestscore_breakdown.fit_source}) · freshness ${Math.round(job.bestscore_breakdown.freshness * 100)}%${job.bestscore_breakdown.aws ? ` · AWS ${Math.round(job.bestscore_breakdown.aws * 100)}%` : ""}`
                                     : "BestScore"
                                 }
                                 className={cn(
