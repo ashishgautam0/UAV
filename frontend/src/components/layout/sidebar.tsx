@@ -38,7 +38,7 @@ const NAV_ITEMS = [
   { href: "/tracker", label: "Tracker", icon: ClipboardList },
   { href: "/referrals", label: "Referrals", icon: Users },
   { href: "/links", label: "Quick Links", icon: ExternalLink },
-  { href: "/prep28.html", label: "28-Day Prep", icon: GraduationCap },
+  { href: "/prep28", label: "28-Day Prep", icon: GraduationCap },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -102,19 +102,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 ? "bg-sidebar-primary/15 text-sidebar-foreground shadow-[inset_2px_0_0_0_var(--sidebar-primary)]"
                 : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
             );
-            // Static pages in /public (e.g. the 28-day prep tracker) need a
-            // plain anchor — next/link would try to route them client-side.
-            const link = item.href.endsWith(".html") ? (
-              <a
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={linkClass}
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                {!collapsed && item.label}
-              </a>
-            ) : (
+            const link = (
               <Link
                 key={item.href}
                 href={item.href}
