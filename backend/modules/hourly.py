@@ -173,6 +173,43 @@ def _matches_desired_title(job_title, threshold=65):
     return best >= threshold
 
 
+def _resume_fit_filter(jobs):
+    """Keep only jobs that meet the requirements of the uploaded resume.
+
+    A job passes when its title+description share at least RESUME_MIN_SKILL_HITS
+    distinct skill tokens with the resume (lexical overlap against the profile's
+    resume_text). If no real resume is stored yet, the gate is skipped so the
+    app doesn't go empty. Threshold is env-tunable (RESUME_MIN_SKILL_HITS).
+    """
+    try:
+        from ranking import _tokens
+        from message_generator import _get_profile_text
+    except Exception:
+        return jobs, "skipped (ranking/profile unavailable)"
+
+    resume = (_get_profile_text() or "").strip()
+    if len(resume) < 120:
+        return jobs, "skipped (no resume uploaded yet)"
+
+    resume_tokens = _tokens(resume)
+    if len(resume_tokens) < 8:
+        return jobs, "skipped (resume too thin to match on)"
+
+    try:
+        min_hits = int(os.environ.get("RESUME_MIN_SKILL_HITS", "4"))
+    except ValueError:
+        min_hits = 4
+
+    kept = []
+    for j in jobs:
+        jd = _tokens(f"{j.get('title', '')} {j.get('description', '')}")
+        hits = len(resume_tokens & jd)
+        if hits >= min_hits:
+            j["resume_hits"] = hits
+            kept.append(j)
+    return kept, f"kept {len(kept)}/{len(jobs)} (>= {min_hits} resume-skill hits)"
+
+
 def main():
     print("=== Hourly Job Search Automation ===")
     print(f"Running at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -200,6 +237,10 @@ def main():
     # Only keep jobs whose title matches or is similar to the desired titles list
     new_jobs = [j for j in new_jobs if _matches_desired_title(j.get("title", ""))]
     print(f"After title filter (desired titles match): {len(new_jobs)}")
+
+    # Resume-fit gate: only keep jobs that meet the uploaded resume's requirements
+    new_jobs, resume_note = _resume_fit_filter(new_jobs)
+    print(f"After resume-fit filter: {resume_note}")
 
     # Health check: if LinkedIn scraper returned 0 results, flag it
     linkedin_count = sources_status.get("LinkedIn AI/ML", 0)
