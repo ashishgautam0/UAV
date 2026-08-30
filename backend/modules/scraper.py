@@ -79,9 +79,11 @@ _TITLE_INCLUDE = [
     "aws", "mlops", "cloud ai", "cloud ml", "sagemaker",
 ]
 
-# "cloud" removed from rejects: AWS/cloud AI roles are now a priority target.
+# "cloud" and "devops" removed from rejects: AWS/cloud roles (incl. AWS DevOps)
+# are now a priority target. A title still needs an _TITLE_INCLUDE keyword to
+# pass, so a bare "DevOps Engineer" (no aws/ml signal) is still dropped.
 _TITLE_REJECT = [
-    "frontend", "react", "angular", "ui/ux", "devops", "data analyst",
+    "frontend", "react", "angular", "ui/ux", "data analyst",
     "content", "marketing", "sales", "hr", "finance", "blockchain",
 ]
 
@@ -424,8 +426,16 @@ def scrape_amazon_jobs():
                 continue
             path = row.get("job_path") or ""
             url = f"https://www.amazon.jobs{path}" if path else ""
-            desc = re.sub(r"<[^>]+>", " ",
-                          (row.get("description_short") or row.get("basic_qualifications") or ""))[:500]
+            # Prefer the full description over the short teaser so downstream
+            # resume-screening / drafting agents (and the resume pre-net) have
+            # real JD content to judge, not a 200-char snippet.
+            raw_desc = " ".join(filter(None, [
+                row.get("description") or "",
+                row.get("basic_qualifications") or "",
+                row.get("preferred_qualifications") or "",
+            ])) or (row.get("description_short") or "")
+            desc = re.sub(r"<[^>]+>", " ", raw_desc)
+            desc = re.sub(r"\s+", " ", desc)[:2000]
             key = _normalize_for_dedup(title) + "||amazon"
             if key not in dedup_map:
                 dedup_map[key] = {

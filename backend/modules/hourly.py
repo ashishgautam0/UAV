@@ -241,13 +241,24 @@ def _resume_fit_filter(jobs):
         min_hits = 2
 
     kept = []
+    thin_kept = 0
     for j in jobs:
-        jd = _tokens(f"{j.get('title', '')} {j.get('description', '')}")
+        desc = j.get("description", "") or ""
+        jd = _tokens(f"{j.get('title', '')} {desc}")
         hits = len(resume_tokens & jd)
-        if hits >= min_hits:
+        # A short JD snippet (e.g. amazon.jobs' ~200-char teaser) can't be judged
+        # fairly on token overlap — keep it and let Claude's resume-screener read
+        # the full posting. The job already cleared the desired-title gate, so it
+        # is on-domain. Only rich descriptions face the >= min_hits bar.
+        if hits >= min_hits or len(desc) < 400:
             j["resume_hits"] = hits
             kept.append(j)
-    return kept, f"kept {len(kept)}/{len(jobs)} (>= {min_hits} resume-skill hits)"
+            if hits < min_hits:
+                thin_kept += 1
+    note = f"kept {len(kept)}/{len(jobs)} (>= {min_hits} hits)"
+    if thin_kept:
+        note += f", {thin_kept} thin-JD kept for Claude"
+    return kept, note
 
 
 def main():
