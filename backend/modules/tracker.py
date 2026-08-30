@@ -191,24 +191,31 @@ def snooze_follow_up(app_id, new_date):
 
 # ===================== SCRAPED JOBS FUNCTIONS =====================
 
-def get_existing_job_urls():
-    """Get all URLs already in scraped_jobs table for deduplication.
+def get_existing_job_urls(since_days=None):
+    """URLs already in scraped_jobs, for deduplication.
 
     Paginates because Supabase caps a single select at 1000 rows; without this
-    the dedup set is incomplete and already-seen jobs get re-emailed every run.
+    the dedup set is incomplete and already-seen jobs get re-added every run.
+
+    `since_days` bounds the window: only URLs scraped within the last N days are
+    treated as "already seen". This stops the all-time table (thousands of old,
+    mostly dismissed rows) from blocking genuinely re-listed roles, and keeps
+    the dedup set from growing without bound. None = all-time (legacy).
     """
     try:
         db = _get_client()
+        cutoff = None
+        if since_days:
+            from datetime import datetime, timedelta, timezone
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=since_days)).isoformat()
         urls = set()
         page_size = 1000
         offset = 0
         while True:
-            resp = (
-                db.table("scraped_jobs")
-                .select("url")
-                .range(offset, offset + page_size - 1)
-                .execute()
-            )
+            query = db.table("scraped_jobs").select("url")
+            if cutoff:
+                query = query.gte("scraped_at", cutoff)
+            resp = query.range(offset, offset + page_size - 1).execute()
             batch = resp.data or []
             urls.update(row["url"] for row in batch if row.get("url"))
             if len(batch) < page_size:
