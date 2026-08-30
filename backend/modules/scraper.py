@@ -79,9 +79,11 @@ _TITLE_INCLUDE = [
     "aws", "mlops", "cloud ai", "cloud ml", "sagemaker",
 ]
 
-# "cloud" removed from rejects: AWS/cloud AI roles are now a priority target.
+# "cloud" and "devops" removed from rejects: AWS/cloud roles (incl. AWS DevOps)
+# are now a priority target. A title still needs an _TITLE_INCLUDE keyword to
+# pass, so a bare "DevOps Engineer" (no aws/ml signal) is still dropped.
 _TITLE_REJECT = [
-    "frontend", "react", "angular", "ui/ux", "devops", "data analyst",
+    "frontend", "react", "angular", "ui/ux", "data analyst",
     "content", "marketing", "sales", "hr", "finance", "blockchain",
 ]
 
