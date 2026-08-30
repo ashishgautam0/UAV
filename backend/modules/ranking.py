@@ -23,10 +23,10 @@ from datetime import datetime, timezone
 # AWS gets its own weight: Subidh holds an AWS certification that few
 # candidates have, so a job that wants AWS/cloud (especially a certification)
 # is a rare-advantage role and should rank higher.
-W_FIT = 0.56
-W_FRESH = 0.24
-W_EASE = 0.10
-W_AWS = 0.10
+W_FIT = 0.50
+W_FRESH = 0.18
+W_EASE = 0.07
+W_AWS = 0.25
 
 # Detect AWS / cloud-certification relevance in a JD.
 _AWS_CERT_RE = re.compile(

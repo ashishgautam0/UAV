@@ -41,7 +41,7 @@ _LINKEDIN_SEARCH_QUERIES = [
     "full stack ai",
     "ai ml engineer",
     "artificial intelligence engineer",
-    # AWS-focused — Subidh is AWS certified (rare), so surface roles that
+    # AWS-focused — Subidh is AWS certified (rare), so prioritise roles that
     # want AWS/cloud skills where that certification is a real differentiator.
     "aws machine learning engineer",
     "aws ai engineer",
@@ -49,6 +49,23 @@ _LINKEDIN_SEARCH_QUERIES = [
     "mlops engineer aws",
     "sagemaker engineer",
     "aws ml engineer",
+    "cloud machine learning engineer",
+    "cloud ai engineer",
+    "machine learning engineer aws certified",
+    "ai engineer cloud",
+]
+
+# Focused query set for the additional boards (Naukri / Indeed / Google Jobs):
+# AWS-first, then the core field, to keep per-board runtime bounded.
+_BOARD_SEARCH_QUERIES = [
+    "aws machine learning engineer",
+    "aws ai engineer",
+    "mlops engineer aws",
+    "aws generative ai",
+    "cloud ai engineer",
+    "machine learning engineer",
+    "ai engineer",
+    "generative ai engineer",
 ]
 
 _LINKEDIN_LOCATIONS = ["India", "Remote"]
@@ -59,10 +76,12 @@ _TITLE_INCLUDE = [
     "ai automation", "prompt engineer", "ai research", "research intern",
     "large language model", "langchain", "rag", "agentic ai",
     "ai trainee", "deep learning", "computer vision", "data science",
+    "aws", "mlops", "cloud ai", "cloud ml", "sagemaker",
 ]
 
+# "cloud" removed from rejects: AWS/cloud AI roles are now a priority target.
 _TITLE_REJECT = [
-    "frontend", "react", "angular", "ui/ux", "devops", "cloud", "data analyst",
+    "frontend", "react", "angular", "ui/ux", "devops", "data analyst",
     "content", "marketing", "sales", "hr", "finance", "blockchain",
 ]
 
@@ -287,14 +306,213 @@ def scrape_linkedin():
 
 
 
+# ---------------------------------------------------------------------------
+# Additional boards — all-in on AWS/cloud roles that fit the field.
+# ---------------------------------------------------------------------------
+
+def _scrape_jobspy_board(site, label, country_indeed=None):
+    """Generic JobSpy scraper for an extra board (Naukri / Indeed / Google).
+
+    AWS-first query set, India + Remote, recent postings, with the same title/
+    location/blacklist filters and in-memory dedup as LinkedIn.
+    """
+    try:
+        from jobspy import scrape_jobs
+    except ImportError:
+        return []
+
+    blacklist = _load_blacklist()
+    dedup_map = {}
+    combos = [(q, loc) for q in _BOARD_SEARCH_QUERIES for loc in _LINKEDIN_LOCATIONS]
+    random.shuffle(combos)
+
+    for query, location in combos:
+        try:
+            kwargs = dict(
+                site_name=[site],
+                search_term=query,
+                location=location,
+                results_wanted=40,
+                hours_old=48,
+            )
+            if country_indeed:
+                kwargs["country_indeed"] = country_indeed
+            if site == "google":
+                kwargs["google_search_term"] = f"{query} jobs in India since yesterday"
+            results = scrape_jobs(**kwargs)
+
+            for _, row in results.iterrows():
+                title = str(row.get("title", "")).strip()
+                if not title or is_internship(title):
+                    continue
+                if not _title_passes_filter(title):
+                    continue
+                loc_str = str(row.get("location", "")).strip()
+                if site == "google" and not _is_india_or_remote(loc_str):
+                    continue
+                company = str(row.get("company", "Unknown")).strip() or "Unknown"
+                if _is_blacklisted(company, blacklist):
+                    continue
+                url = str(row.get("job_url", "")).strip()
+                desc = str(row.get("description", "") or "")[:500]
+                key = _normalize_for_dedup(title) + "||" + _normalize_for_dedup(company)
+                if key in dedup_map:
+                    dedup_map[key]["match_count"] += 1
+                    if url and not dedup_map[key]["url"]:
+                        dedup_map[key]["url"] = url
+                else:
+                    dedup_map[key] = {
+                        "title": title[:150],
+                        "company": company[:80],
+                        "location": (loc_str or location)[:80],
+                        "source": label,
+                        "url": url,
+                        "description": desc,
+                        "posted_date": str(row.get("date_posted", "") or "") or None,
+                        "source_query": query,
+                        "match_count": 1,
+                        "score": 0,
+                        "scraped_at": datetime.now().isoformat(),
+                    }
+            time.sleep(3)
+        except Exception as e:
+            print(f"  {label} query '{query}' ({location}) error: {e}")
+
+    jobs = list(dedup_map.values())
+    print(f"--- {label}: {len(jobs)} jobs after filter+dedup ---")
+    return jobs
+
+
+def scrape_naukri():
+    """Naukri — India's largest board; JDs name AWS/cloud/certs explicitly."""
+    return _scrape_jobspy_board("naukri", "Naukri")
+
+
+def scrape_indeed_india():
+    """Indeed India — high volume, cert/skill-rich JDs, scrape-friendly."""
+    return _scrape_jobspy_board("indeed", "Indeed", country_indeed="India")
+
+
+def scrape_google_jobs():
+    """Google Jobs aggregator — pulls cert-mentioning postings web-wide."""
+    return _scrape_jobspy_board("google", "Google Jobs")
+
+
+def scrape_amazon_jobs():
+    """AWS's own careers (amazon.jobs) via its public search.json — the source
+    most likely to want AWS. India + AWS/ML/AI queries."""
+    import requests
+
+    queries = ["machine learning", "generative ai", "applied scientist",
+               "ai engineer", "mlops"]
+    dedup_map = {}
+    for q in queries:
+        try:
+            resp = requests.get(
+                "https://www.amazon.jobs/en/search.json",
+                params={"result_limit": 50, "offset": 0, "base_query": q,
+                        "loc_query": "India", "country": "IND", "sort": "recent"},
+                headers={"User-Agent": "Mozilla/5.0"}, timeout=15,
+            )
+            data = resp.json()
+        except Exception as e:
+            print(f"  amazon.jobs query '{q}' error: {e}")
+            continue
+        for row in data.get("jobs", []) or []:
+            title = (row.get("title") or "").strip()
+            if not title or is_internship(title) or not _title_passes_filter(title):
+                continue
+            path = row.get("job_path") or ""
+            url = f"https://www.amazon.jobs{path}" if path else ""
+            desc = re.sub(r"<[^>]+>", " ",
+                          (row.get("description_short") or row.get("basic_qualifications") or ""))[:500]
+            key = _normalize_for_dedup(title) + "||amazon"
+            if key not in dedup_map:
+                dedup_map[key] = {
+                    "title": title[:150], "company": "Amazon (AWS)",
+                    "location": (row.get("normalized_location") or "India")[:80],
+                    "source": "amazon.jobs", "url": url, "description": desc.strip(),
+                    "posted_date": row.get("posted_date"), "source_query": q,
+                    "match_count": 1, "score": 0,
+                    "scraped_at": datetime.now().isoformat(),
+                }
+        time.sleep(1)
+    jobs = list(dedup_map.values())
+    print(f"--- amazon.jobs: {len(jobs)} jobs after filter+dedup ---")
+    return jobs
+
+
+# AWS-partner / cloud-heavy employers with public ATS feeds (verified reachable).
+_GREENHOUSE_BOARDS = ["databricks", "mongodb", "elastic", "fivetran", "druva", "groww", "postman"]
+_LEVER_BOARDS = ["cred", "meesho", "mindtickle"]
+
+
+def scrape_partner_ats():
+    """AWS-partner / cloud-heavy companies via public Greenhouse + Lever APIs.
+    India-located field roles only. Official JSON feeds, not scraping."""
+    import requests
+
+    dedup_map = {}
+
+    def _add(title, company, url, desc, loc):
+        if not title or is_internship(title) or not _title_passes_filter(title):
+            return
+        if not _is_india_or_remote(loc):
+            return
+        key = _normalize_for_dedup(title) + "||" + _normalize_for_dedup(company)
+        if key not in dedup_map:
+            dedup_map[key] = {
+                "title": title[:150], "company": company[:80],
+                "location": (loc or "India")[:80], "source": "Partner ATS",
+                "url": url, "description": re.sub(r"<[^>]+>", " ", desc or "")[:500].strip(),
+                "posted_date": None, "source_query": "partner-ats",
+                "match_count": 1, "score": 0,
+                "scraped_at": datetime.now().isoformat(),
+            }
+
+    for board in _GREENHOUSE_BOARDS:
+        try:
+            r = requests.get(
+                f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs",
+                params={"content": "true"}, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+            for j in (r.json().get("jobs", []) or []):
+                _add(j.get("title", ""), board.capitalize(),
+                     j.get("absolute_url", ""), j.get("content", ""),
+                     (j.get("location") or {}).get("name", ""))
+        except Exception as e:
+            print(f"  greenhouse '{board}' error: {e}")
+        time.sleep(0.5)
+
+    for board in _LEVER_BOARDS:
+        try:
+            r = requests.get(f"https://api.lever.co/v0/postings/{board}",
+                             params={"mode": "json"}, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+            for j in (r.json() or []):
+                cats = j.get("categories") or {}
+                _add(j.get("text", ""), board.capitalize(), j.get("hostedUrl", ""),
+                     j.get("descriptionPlain", ""), cats.get("location", ""))
+        except Exception as e:
+            print(f"  lever '{board}' error: {e}")
+        time.sleep(0.5)
+
+    jobs = list(dedup_map.values())
+    print(f"--- Partner ATS: {len(jobs)} jobs after filter+dedup ---")
+    return jobs
+
+
 def run_all_scrapers():
-    """Run the LinkedIn scraper and return results with error tracking."""
+    """Run all scrapers (LinkedIn + AWS-focused boards) with error tracking."""
     all_jobs = []
     sources_status = {}
     sources_errors = {}
 
     scrapers = [
         ("LinkedIn AI/ML", scrape_linkedin),
+        ("Naukri", scrape_naukri),
+        ("Indeed India", scrape_indeed_india),
+        ("Google Jobs", scrape_google_jobs),
+        ("amazon.jobs", scrape_amazon_jobs),
+        ("Partner ATS", scrape_partner_ats),
     ]
 
     for name, scraper_fn in scrapers:
