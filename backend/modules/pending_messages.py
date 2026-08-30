@@ -170,6 +170,10 @@ def main():
     p_sco.add_argument("--name", required=True)
     p_sco.set_defaults(func=cmd_save_company)
 
+    p_int = sub.add_parser("intel", help="print cached company intel as JSON")
+    p_int.add_argument("--name", required=True)
+    p_int.set_defaults(func=cmd_intel)
+
     p_not = sub.add_parser("notify", help="in-app notification + web push")
     p_not.add_argument("--title", required=True)
     p_not.add_argument("--body", required=True)
@@ -178,10 +182,6 @@ def main():
 
     args = parser.parse_args()
     sys.exit(args.func(args))
-
-
-if __name__ == "__main__":
-    main()
 
 
 def _build_prompt(message_type, params):
@@ -373,6 +373,20 @@ def cmd_companies(args):
     return 0
 
 
+def cmd_intel(args):
+    """Print cached company intel as JSON so agents can self-serve the email
+    domain (from product_url) and hiring contact without threading state
+    through the orchestrator. Prints {"found": false} when nothing is cached."""
+    from tracker import get_cached_research
+
+    row = get_cached_research(args.name)
+    if not row:
+        print(json.dumps({"found": False}))
+        return 0
+    print(json.dumps({"found": True, **row}, default=str))
+    return 0
+
+
 def cmd_save_company(args):
     """Save company intel from stdin JSON into company_research_cache.
 
@@ -438,3 +452,7 @@ def cmd_notify(args):
         print(f"Could not send push: {e}", file=sys.stderr)
         return 1
     return 0
+
+
+if __name__ == "__main__":
+    main()
