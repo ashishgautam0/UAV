@@ -26,10 +26,8 @@ import {
   ClipboardPlus,
   Building2,
   MapPin,
-  Check,
   RefreshCw,
   Trash2,
-  XCircle,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -224,7 +222,6 @@ export default function TonightPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<ScrapedJob[]>([]);
-  const [loggedJobs, setLoggedJobs] = useState<Set<string>>(new Set());
   const [filterMode, setFilterMode] = useState<"all" | "remote" | "hybrid" | "onsite">("all");
 
   // The API returns jobs newest-first (ordered by scraped_at desc) — keep
@@ -258,7 +255,8 @@ export default function TonightPage() {
 
   // ------- Log to tracker handler -------
   const handleLog = useCallback(async (job: ScrapedJob) => {
-    const key = `${job.company}::${job.title}`;
+    // Drop it from the list immediately so the swipe feels instant.
+    setJobs((prev) => prev.filter((j) => j.id !== job.id));
     try {
       await createApplication({
         company: job.company,
@@ -267,13 +265,12 @@ export default function TonightPage() {
         url: job.url,
       });
       if (job.id) await markScrapedJob(job.id, "applied");
-      setLoggedJobs((prev) => new Set(prev).add(key));
-      setJobs((prev) => prev.filter((j) => j.id !== job.id));
       toast.success(`Logged ${job.company} - ${job.title} to tracker`);
     } catch {
       toast.error("Failed to log application");
+      loadData(); // restore the card if the log failed server-side
     }
-  }, []);
+  }, [loadData]);
 
   // ------- Remove handler (permanently deletes the job) -------
   const handleDismiss = useCallback(async (job: ScrapedJob) => {
@@ -355,9 +352,6 @@ export default function TonightPage() {
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {filteredJobs.map((job, idx) => {
-                  const key = `${job.company}::${job.title}`;
-                  const isLogged = loggedJobs.has(key);
-
                   return (
                     <SwipeableCard
                       key={job.id ?? idx}
@@ -441,46 +435,6 @@ export default function TonightPage() {
 
                           {/* Spacer */}
                           <div className="flex-1" />
-
-                          {/* Action buttons */}
-                          <div className="flex flex-wrap items-center gap-2 pt-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              asChild
-                            >
-                              <a
-                                href={job.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                                Apply
-                              </a>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={isLogged}
-                              onClick={() => handleLog(job)}
-                            >
-                              {isLogged ? (
-                                <Check className="mr-1.5 h-3.5 w-3.5" />
-                              ) : (
-                                <ClipboardPlus className="mr-1.5 h-3.5 w-3.5" />
-                              )}
-                              {isLogged ? "Logged" : "Log"}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-muted-foreground hover:text-red-400"
-                              onClick={() => handleDismiss(job)}
-                            >
-                              <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                              Remove
-                            </Button>
-                          </div>
                         </CardContent>
                       </Card>
                     </SwipeableCard>
