@@ -385,11 +385,7 @@ export default function TonightPage() {
                   const isLogged = loggedJobs.has(key);
 
                   return (
-                    <Card
-                      key={job.id ?? idx}
-                      className="flex flex-col cursor-pointer transition-colors hover:border-primary/40"
-                      onClick={() => job.id && router.push(`/jobs/${job.id}`)}
-                    >
+                    <Card key={job.id ?? idx} className="flex flex-col">
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
@@ -465,10 +461,7 @@ export default function TonightPage() {
 
                         {/* Pre-written cold DM (from the hourly Claude routine) */}
                         {job.id && dmOpen.has(job.id) && dmByJob[job.id] && (
-                          <div
-                            className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 space-y-2"
-                            onClick={(e) => e.stopPropagation()}
-                          >
+                          <div className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-medium text-emerald-400">
                                 Cold DM (auto-written)
@@ -517,10 +510,7 @@ export default function TonightPage() {
                         <div className="flex-1" />
 
                         {/* Action buttons */}
-                        <div
-                          className="flex flex-wrap items-center gap-2 pt-2"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <div className="flex flex-wrap items-center gap-2 pt-2">
                           <Button
                             variant="outline"
                             size="sm"
