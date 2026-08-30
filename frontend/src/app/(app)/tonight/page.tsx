@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getScrapedJobs, createApplication, markScrapedJob, getJobMessage, deleteScrapedJob } from "@/lib/api";
+import { getScrapedJobs, createApplication, markScrapedJob, deleteScrapedJob } from "@/lib/api";
 import type { ScrapedJob } from "@/lib/types";
 
 import {
@@ -10,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-  CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +20,6 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import {
   Loader2,
   ExternalLink,
@@ -29,11 +27,8 @@ import {
   Building2,
   MapPin,
   Check,
-  Copy,
-  FileText,
-  MessageSquare,
-  MessageSquareText,
   RefreshCw,
+  Trash2,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -57,6 +52,116 @@ function workModeBadgeColor(mode: string | undefined) {
 }
 
 // ---------------------------------------------------------------------------
+// SwipeableCard — swipe left (touch or mouse drag) past a threshold to remove.
+// Reveals a red "Remove" backdrop as the card slides; snaps back if released
+// before the threshold.
+// ---------------------------------------------------------------------------
+const SWIPE_THRESHOLD = 96; // px of left-drag needed to trigger removal
+
+function SwipeableCard({
+  onRemove,
+  children,
+}: {
+  onRemove: () => void;
+  children: React.ReactNode;
+}) {
+  const [dx, setDx] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const startX = useRef<number | null>(null);
+  const startY = useRef<number | null>(null);
+  const horizontal = useRef(false);
+
+  const begin = (x: number, y: number) => {
+    startX.current = x;
+    startY.current = y;
+    horizontal.current = false;
+    setDragging(true);
+  };
+
+  const move = (x: number, y: number) => {
+    if (startX.current === null || startY.current === null) return;
+    const deltaX = x - startX.current;
+    const deltaY = y - startY.current;
+    // Lock to a horizontal gesture only once it clearly beats vertical scroll.
+    if (!horizontal.current) {
+      if (Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY)) {
+        horizontal.current = true;
+      } else if (Math.abs(deltaY) > 10) {
+        // vertical scroll — abandon this gesture
+        startX.current = null;
+        setDragging(false);
+        setDx(0);
+        return;
+      }
+    }
+    if (horizontal.current) {
+      // Only allow leftward travel (and a little rubber-band to the right).
+      setDx(Math.min(deltaX, 12));
+    }
+  };
+
+  const end = () => {
+    setDragging(false);
+    if (dx <= -SWIPE_THRESHOLD) {
+      setRemoving(true);
+      setDx(-window.innerWidth);
+      // Let the slide-out animation play before the row actually drops.
+      setTimeout(onRemove, 180);
+    } else {
+      setDx(0);
+    }
+    startX.current = null;
+    startY.current = null;
+  };
+
+  const progress = Math.min(Math.abs(Math.min(dx, 0)) / SWIPE_THRESHOLD, 1);
+
+  return (
+    <div className="relative select-none overflow-hidden rounded-xl">
+      {/* Red remove backdrop, revealed as the card slides left */}
+      <div
+        className="absolute inset-0 flex items-center justify-end rounded-xl bg-red-600/90 pr-6 text-white"
+        style={{ opacity: progress }}
+        aria-hidden
+      >
+        <span className="flex items-center gap-2 text-sm font-medium">
+          <Trash2 className="h-4 w-4" />
+          Remove
+        </span>
+      </div>
+
+      <div
+        style={{
+          transform: `translateX(${dx}px)`,
+          transition: dragging ? "none" : "transform 0.18s ease-out",
+        }}
+        onTouchStart={(e) => begin(e.touches[0].clientX, e.touches[0].clientY)}
+        onTouchMove={(e) => move(e.touches[0].clientX, e.touches[0].clientY)}
+        onTouchEnd={end}
+        onMouseDown={(e) => begin(e.clientX, e.clientY)}
+        onMouseMove={(e) => {
+          if (dragging) move(e.clientX, e.clientY);
+        }}
+        onMouseUp={end}
+        onMouseLeave={() => {
+          if (dragging) end();
+        }}
+      >
+        <div
+          className={cn(
+            "transition-opacity",
+            removing && "opacity-0"
+          )}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page Component
 // ---------------------------------------------------------------------------
 export default function TonightPage() {
@@ -65,9 +170,6 @@ export default function TonightPage() {
   const [jobs, setJobs] = useState<ScrapedJob[]>([]);
   const [loggedJobs, setLoggedJobs] = useState<Set<string>>(new Set());
   const [filterMode, setFilterMode] = useState<"all" | "remote" | "hybrid" | "onsite">("all");
-  const [dmByJob, setDmByJob] = useState<Record<number, string | null>>({});
-  const [dmOpen, setDmOpen] = useState<Set<number>>(new Set());
-  const [dmLoading, setDmLoading] = useState<number | null>(null);
 
   // The API returns jobs newest-first (ordered by scraped_at desc) — keep
   // that order so the latest job is always on top.
@@ -112,57 +214,19 @@ export default function TonightPage() {
     }
   }, []);
 
-  // ------- View pre-written cold DM handler -------
-  const handleToggleDm = useCallback(
-    async (job: ScrapedJob) => {
-      if (!job.id) return;
-      const id = job.id;
-      if (dmOpen.has(id)) {
-        setDmOpen((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        return;
-      }
-      if (!(id in dmByJob)) {
-        setDmLoading(id);
-        try {
-          const res = await getJobMessage(id);
-          setDmByJob((prev) => ({ ...prev, [id]: res.content }));
-          if (res.content === null) {
-            toast.info(
-              "No DM yet — DMs are written for jobs you log to the tracker."
-            );
-            return;
-          }
-        } catch {
-          toast.error("Failed to load the DM");
-          return;
-        } finally {
-          setDmLoading(null);
-        }
-      } else if (dmByJob[id] === null) {
-        toast.info(
-          "No DM yet — DMs are written for jobs you log to the tracker."
-        );
-        return;
-      }
-      setDmOpen((prev) => new Set(prev).add(id));
-    },
-    [dmOpen, dmByJob]
-  );
-
-  // ------- Dismiss handler (permanently deletes the job) -------
+  // ------- Remove handler (permanently deletes the job) -------
   const handleDismiss = useCallback(async (job: ScrapedJob) => {
+    // Drop it from the list immediately so the swipe feels instant.
+    setJobs((prev) => prev.filter((j) => j.id !== job.id));
     try {
       if (job.id) await deleteScrapedJob(job.id);
-      setJobs((prev) => prev.filter((j) => j.id !== job.id));
-      toast.success(`Deleted ${job.company} - ${job.title}`);
+      toast.success(`Removed ${job.company} - ${job.title}`);
     } catch {
-      toast.error("Failed to delete job");
+      toast.error("Failed to remove job");
+      // Re-fetch to restore anything that failed to delete server-side.
+      loadData();
     }
-  }, []);
+  }, [loadData]);
 
   return (
     <div className="space-y-8">
@@ -173,7 +237,7 @@ export default function TonightPage() {
             Today Todo
           </h1>
           <p className="text-muted-foreground mt-1">
-            Latest scraped jobs for your application list — follow-ups now live on the Dashboard.
+            Latest scraped jobs for your application list — swipe a card left to remove it.
           </p>
         </div>
         <Button variant="outline" onClick={loadData} disabled={loading}>
@@ -234,213 +298,129 @@ export default function TonightPage() {
                   const isLogged = loggedJobs.has(key);
 
                   return (
-                    <Card key={job.id ?? idx} className="flex flex-col">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <CardTitle className="text-base leading-snug">
-                              {job.title}
-                            </CardTitle>
-                            <div className="mt-1 flex items-center gap-1.5 text-sm font-semibold">
-                              <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                              {job.company}
+                    <SwipeableCard
+                      key={job.id ?? idx}
+                      onRemove={() => handleDismiss(job)}
+                    >
+                      <Card className="flex h-full flex-col">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <CardTitle className="text-base leading-snug">
+                                {job.title}
+                              </CardTitle>
+                              <div className="mt-1 flex items-center gap-1.5 text-sm font-semibold">
+                                <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                {job.company}
+                              </div>
                             </div>
-                          </div>
-                          {job.score > 0 && (
-                            <Badge
-                              className={cn(
-                                "shrink-0 tabular-nums",
-                                scoreBadgeColor(job.score)
-                              )}
-                            >
-                              {job.score}
-                            </Badge>
-                          )}
-                        </div>
-                      </CardHeader>
-
-                      <CardContent className="flex flex-1 flex-col gap-3 pt-0">
-                        {/* Location */}
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <MapPin className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">
-                            {job.location || "Not specified"}
-                          </span>
-                        </div>
-
-                        {/* Badges row */}
-                        <div className="flex flex-wrap gap-1.5">
-                          {job.verdict === "EASY_APPLY" && (
-                            <Badge className="text-xs bg-emerald-600/15 text-emerald-400 border-emerald-600/30">
-                              <Zap className="mr-1 h-3 w-3" />
-                              Easy Apply
-                            </Badge>
-                          )}
-                          {job.verdict === "EXTERNAL" && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs text-sky-400 border-sky-500/30"
-                            >
-                              <ExternalLink className="mr-1 h-3 w-3" />
-                              External apply
-                            </Badge>
-                          )}
-                          {job.work_mode && (
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "text-xs",
-                                workModeBadgeColor(job.work_mode)
-                              )}
-                            >
-                              {job.work_mode}
-                            </Badge>
-                          )}
-                          <Badge variant="secondary" className="text-xs">
-                            {job.source}
-                          </Badge>
-                        </div>
-
-                        {/* LLM Reason */}
-                        {job.llm_reason && (
-                          <p className="text-muted-foreground text-xs italic leading-relaxed">
-                            {job.llm_reason}
-                          </p>
-                        )}
-
-                        {/* Pre-written cold DM (from the hourly Claude routine) */}
-                        {job.id && dmOpen.has(job.id) && dmByJob[job.id] && (
-                          <div className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium text-emerald-400">
-                                Cold DM (auto-written)
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 text-xs"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(dmByJob[job.id!] || "");
-                                  toast.success("DM copied to clipboard");
-                                }}
+                            {job.score > 0 && (
+                              <Badge
+                                className={cn(
+                                  "shrink-0 tabular-nums",
+                                  scoreBadgeColor(job.score)
+                                )}
                               >
-                                <Copy className="mr-1 h-3 w-3" />
-                                Copy
-                              </Button>
-                            </div>
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                              {dmByJob[job.id]}
+                                {job.score}
+                              </Badge>
+                            )}
+                          </div>
+                        </CardHeader>
+
+                        <CardContent className="flex flex-1 flex-col gap-3 pt-0">
+                          {/* Location */}
+                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <MapPin className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">
+                              {job.location || "Not specified"}
+                            </span>
+                          </div>
+
+                          {/* Badges row */}
+                          <div className="flex flex-wrap gap-1.5">
+                            {job.verdict === "EASY_APPLY" && (
+                              <Badge className="text-xs bg-emerald-600/15 text-emerald-400 border-emerald-600/30">
+                                <Zap className="mr-1 h-3 w-3" />
+                                Easy Apply
+                              </Badge>
+                            )}
+                            {job.verdict === "EXTERNAL" && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs text-sky-400 border-sky-500/30"
+                              >
+                                <ExternalLink className="mr-1 h-3 w-3" />
+                                External apply
+                              </Badge>
+                            )}
+                            {job.work_mode && (
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-xs",
+                                  workModeBadgeColor(job.work_mode)
+                                )}
+                              >
+                                {job.work_mode}
+                              </Badge>
+                            )}
+                            <Badge variant="secondary" className="text-xs">
+                              {job.source}
+                            </Badge>
+                          </div>
+
+                          {/* LLM Reason */}
+                          {job.llm_reason && (
+                            <p className="text-muted-foreground text-xs italic leading-relaxed">
+                              {job.llm_reason}
                             </p>
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-emerald-600/20 pt-2 text-xs">
-                              <span className="text-muted-foreground">Send to:</span>
-                              <a
-                                href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${job.company} recruiter`)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-sky-400 hover:underline"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                                Recruiters at {job.company}
-                              </a>
-                              <a
-                                href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${job.company} hiring manager`)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-sky-400 hover:underline"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                                Hiring managers
-                              </a>
-                            </div>
-                          </div>
-                        )}
+                          )}
 
-                        {/* Spacer */}
-                        <div className="flex-1" />
+                          {/* Spacer */}
+                          <div className="flex-1" />
 
-                        {/* Action buttons */}
-                        <div className="flex flex-wrap items-center gap-2 pt-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            asChild
-                          >
-                            <a
-                              href={job.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                          {/* Action buttons */}
+                          <div className="flex flex-wrap items-center gap-2 pt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              asChild
                             >
-                              <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                              Apply
-                            </a>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const params = new URLSearchParams({
-                                title: job.title,
-                                jd_text: (job.description || "").slice(0, 2000),
-                              });
-                              router.push(`/resume-tailor?${params.toString()}`);
-                            }}
-                          >
-                            <FileText className="mr-1.5 h-3.5 w-3.5" />
-                            Tailor Resume
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={dmLoading === job.id}
-                            onClick={() => handleToggleDm(job)}
-                          >
-                            {dmLoading === job.id ? (
-                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <MessageSquareText className="mr-1.5 h-3.5 w-3.5" />
-                            )}
-                            {job.id && dmOpen.has(job.id) ? "Hide DM" : "View DM"}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const params = new URLSearchParams({
-                                company: job.company,
-                                role: job.title,
-                                type: "cold-dm",
-                              });
-                              router.push(`/messages?${params.toString()}`);
-                            }}
-                          >
-                            <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
-                            Message
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={isLogged}
-                            onClick={() => handleLog(job)}
-                          >
-                            {isLogged ? (
-                              <Check className="mr-1.5 h-3.5 w-3.5" />
-                            ) : (
-                              <ClipboardPlus className="mr-1.5 h-3.5 w-3.5" />
-                            )}
-                            {isLogged ? "Logged" : "Log"}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-muted-foreground hover:text-red-400"
-                            onClick={() => handleDismiss(job)}
-                          >
-                            <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                            Dismiss
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                              <a
+                                href={job.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                                Apply
+                              </a>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={isLogged}
+                              onClick={() => handleLog(job)}
+                            >
+                              {isLogged ? (
+                                <Check className="mr-1.5 h-3.5 w-3.5" />
+                              ) : (
+                                <ClipboardPlus className="mr-1.5 h-3.5 w-3.5" />
+                              )}
+                              {isLogged ? "Logged" : "Log"}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground hover:text-red-400"
+                              onClick={() => handleDismiss(job)}
+                            >
+                              <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                              Remove
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </SwipeableCard>
                   );
                 })}
               </div>
