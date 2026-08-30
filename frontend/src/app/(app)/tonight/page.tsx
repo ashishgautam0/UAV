@@ -52,37 +52,59 @@ function workModeBadgeColor(mode: string | undefined) {
 }
 
 // ---------------------------------------------------------------------------
-// SwipeableCard — swipe left (touch or mouse drag) past a threshold to remove.
-// Reveals a red "Remove" backdrop as the card slides; snaps back if released
-// before the threshold.
+// SwipeableCard — gestures over a scraped-job card:
+//   • tap / click            → onTap   (apply)
+//   • swipe LEFT past thresh → onRemove (delete)
+//   • swipe RIGHT past thresh→ onLog    (log to tracker)
+// A "Remove" (red, right side) or "Log" (green, left side) backdrop is
+// revealed as the card slides; it snaps back if released before the
+// threshold. Gestures that start on a button/link are ignored so those
+// controls keep working normally.
 // ---------------------------------------------------------------------------
-const SWIPE_THRESHOLD = 96; // px of left-drag needed to trigger removal
+const SWIPE_THRESHOLD = 96; // px of horizontal drag needed to trigger an action
+const TAP_SLOP = 8; // px of movement under which a gesture counts as a tap
 
 function SwipeableCard({
+  onTap,
+  onLog,
   onRemove,
   children,
 }: {
+  onTap: () => void;
+  onLog: () => void;
   onRemove: () => void;
   children: React.ReactNode;
 }) {
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const [removing, setRemoving] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
   const horizontal = useRef(false);
+  const moved = useRef(false);
+  const ignore = useRef(false);
 
-  const begin = (x: number, y: number) => {
+  const begin = (x: number, y: number, target: EventTarget | null) => {
+    // Let buttons/links handle their own taps — don't hijack them.
+    if (target instanceof Element && target.closest("button, a")) {
+      ignore.current = true;
+      return;
+    }
+    ignore.current = false;
     startX.current = x;
     startY.current = y;
     horizontal.current = false;
+    moved.current = false;
     setDragging(true);
   };
 
   const move = (x: number, y: number) => {
-    if (startX.current === null || startY.current === null) return;
+    if (ignore.current || startX.current === null || startY.current === null) return;
     const deltaX = x - startX.current;
     const deltaY = y - startY.current;
+    if (Math.abs(deltaX) > TAP_SLOP || Math.abs(deltaY) > TAP_SLOP) {
+      moved.current = true;
+    }
     // Lock to a horizontal gesture only once it clearly beats vertical scroll.
     if (!horizontal.current) {
       if (Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY)) {
@@ -96,33 +118,61 @@ function SwipeableCard({
       }
     }
     if (horizontal.current) {
-      // Only allow leftward travel (and a little rubber-band to the right).
-      setDx(Math.min(deltaX, 12));
+      setDx(deltaX); // travel both directions
     }
   };
 
   const end = () => {
+    if (ignore.current) {
+      ignore.current = false;
+      return;
+    }
     setDragging(false);
+    const started = startX.current !== null;
+    startX.current = null;
+    startY.current = null;
+    if (!started) {
+      setDx(0);
+      return;
+    }
     if (dx <= -SWIPE_THRESHOLD) {
-      setRemoving(true);
+      setLeaving(true);
       setDx(-window.innerWidth);
-      // Let the slide-out animation play before the row actually drops.
-      setTimeout(onRemove, 180);
+      setTimeout(onRemove, 180); // let the slide-out play, then drop the row
+    } else if (dx >= SWIPE_THRESHOLD) {
+      setLeaving(true);
+      setDx(window.innerWidth);
+      setTimeout(onLog, 180);
+    } else if (!moved.current) {
+      // A clean tap — treat as apply.
+      setDx(0);
+      onTap();
     } else {
       setDx(0);
     }
-    startX.current = null;
-    startY.current = null;
   };
 
-  const progress = Math.min(Math.abs(Math.min(dx, 0)) / SWIPE_THRESHOLD, 1);
+  const removeProgress = Math.min(Math.abs(Math.min(dx, 0)) / SWIPE_THRESHOLD, 1);
+  const logProgress = Math.min(Math.max(dx, 0) / SWIPE_THRESHOLD, 1);
 
   return (
     <div className="relative select-none overflow-hidden rounded-xl">
-      {/* Red remove backdrop, revealed as the card slides left */}
+      {/* Green "Log" backdrop, revealed as the card slides right */}
+      <div
+        className="absolute inset-0 flex items-center justify-start rounded-xl bg-emerald-600/90 pl-6 text-white"
+        style={{ opacity: logProgress }}
+        aria-hidden
+      >
+        <span className="flex items-center gap-2 text-sm font-medium">
+          <ClipboardPlus className="h-4 w-4" />
+          Log to tracker
+        </span>
+      </div>
+
+      {/* Red "Remove" backdrop, revealed as the card slides left */}
       <div
         className="absolute inset-0 flex items-center justify-end rounded-xl bg-red-600/90 pr-6 text-white"
-        style={{ opacity: progress }}
+        style={{ opacity: removeProgress }}
         aria-hidden
       >
         <span className="flex items-center gap-2 text-sm font-medium">
@@ -132,14 +182,25 @@ function SwipeableCard({
       </div>
 
       <div
+        className="cursor-pointer"
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onTap();
+          }
+        }}
         style={{
           transform: `translateX(${dx}px)`,
           transition: dragging ? "none" : "transform 0.18s ease-out",
         }}
-        onTouchStart={(e) => begin(e.touches[0].clientX, e.touches[0].clientY)}
+        onTouchStart={(e) =>
+          begin(e.touches[0].clientX, e.touches[0].clientY, e.target)
+        }
         onTouchMove={(e) => move(e.touches[0].clientX, e.touches[0].clientY)}
         onTouchEnd={end}
-        onMouseDown={(e) => begin(e.clientX, e.clientY)}
+        onMouseDown={(e) => begin(e.clientX, e.clientY, e.target)}
         onMouseMove={(e) => {
           if (dragging) move(e.clientX, e.clientY);
         }}
@@ -148,12 +209,7 @@ function SwipeableCard({
           if (dragging) end();
         }}
       >
-        <div
-          className={cn(
-            "transition-opacity",
-            removing && "opacity-0"
-          )}
-        >
+        <div className={cn("transition-opacity", leaving && "opacity-0")}>
           {children}
         </div>
       </div>
@@ -194,6 +250,11 @@ export default function TonightPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // ------- Apply handler (open the posting) -------
+  const handleApply = useCallback((job: ScrapedJob) => {
+    if (job.url) window.open(job.url, "_blank", "noopener,noreferrer");
+  }, []);
 
   // ------- Log to tracker handler -------
   const handleLog = useCallback(async (job: ScrapedJob) => {
@@ -237,7 +298,7 @@ export default function TonightPage() {
             Today Todo
           </h1>
           <p className="text-muted-foreground mt-1">
-            Latest scraped jobs for your application list — swipe a card left to remove it.
+            Tap a card to apply · swipe right to log it · swipe left to remove it.
           </p>
         </div>
         <Button variant="outline" onClick={loadData} disabled={loading}>
@@ -300,6 +361,8 @@ export default function TonightPage() {
                   return (
                     <SwipeableCard
                       key={job.id ?? idx}
+                      onTap={() => handleApply(job)}
+                      onLog={() => handleLog(job)}
                       onRemove={() => handleDismiss(job)}
                     >
                       <Card className="flex h-full flex-col">
