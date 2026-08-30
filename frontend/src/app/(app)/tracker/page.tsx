@@ -10,6 +10,7 @@ import {
   deleteApplication,
   getFollowUpDraft,
   getFollowUpHistory,
+  getJobMessage,
   lookupScrapedJob,
   updateFollowUpOutcome,
 } from "@/lib/api";
@@ -71,7 +72,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   ClipboardList,
-  FileSearch,
+  MessageSquareText,
   Plus,
   ChevronDown,
   Trash2,
@@ -183,6 +184,48 @@ export default function TrackerPage() {
   const [fuDrafts, setFuDrafts] = useState<Record<number, FollowUpDraft>>({});
   const [fuDraftOpen, setFuDraftOpen] = useState<Set<number>>(new Set());
   const [fuDraftLoading, setFuDraftLoading] = useState<number | null>(null);
+  const [dmByApp, setDmByApp] = useState<Record<number, string | null>>({});
+  const [dmOpen, setDmOpen] = useState<Set<number>>(new Set());
+  const [dmLoading, setDmLoading] = useState<number | null>(null);
+
+  const toggleColdDm = async (app: Application) => {
+    const id = app.id;
+    if (dmOpen.has(id)) {
+      setDmOpen((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      return;
+    }
+    if (!(id in dmByApp)) {
+      if (!app.url) {
+        toast.info("No job posting URL saved for this application.");
+        return;
+      }
+      setDmLoading(id);
+      try {
+        const { id: jobId } = await lookupScrapedJob(app.url);
+        const content = jobId
+          ? (await getJobMessage(jobId)).content
+          : null;
+        setDmByApp((prev) => ({ ...prev, [id]: content }));
+        if (!content) {
+          toast.info("No cold DM stored for this application's job.");
+          return;
+        }
+      } catch {
+        toast.error("Failed to load the cold DM");
+        return;
+      } finally {
+        setDmLoading(null);
+      }
+    } else if (!dmByApp[id]) {
+      toast.info("No cold DM stored for this application's job.");
+      return;
+    }
+    setDmOpen((prev) => new Set(prev).add(id));
+  };
 
   const openJobPage = async (app: Application) => {
     if (!app.url) {
@@ -667,10 +710,12 @@ export default function TrackerPage() {
                         </Select>
                       </div>
 
-                      <CollapsibleTrigger asChild>
-                        <div className="order-first w-full min-w-0 cursor-pointer sm:order-none sm:w-auto sm:flex-1">
+                      <div
+                        className="order-first w-full min-w-0 cursor-pointer sm:order-none sm:w-auto sm:flex-1"
+                        onClick={() => openJobPage(app)}
+                      >
                           <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-                            <span className="font-bold truncate">{app.company}</span>
+                            <span className="font-bold truncate hover:underline">{app.company}</span>
                             <span className="text-muted-foreground text-sm sm:text-base truncate">
                               {app.role}
                             </span>
@@ -683,25 +728,11 @@ export default function TrackerPage() {
                               )}
                             </span>
                           </div>
-                        </div>
-                      </CollapsibleTrigger>
+                      </div>
 
                       {/* Quick action buttons */}
                       <TooltipProvider delayDuration={300}>
                         <div className="ml-auto flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => openJobPage(app)}
-                              >
-                                <FileSearch className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Open Job Page</TooltipContent>
-                          </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
@@ -799,6 +830,48 @@ export default function TrackerPage() {
                           </div>
                         )}
                       </div>
+
+                      {/* Cold DM for this application's job */}
+                      {app.url && (
+                        <div className="space-y-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={dmLoading === app.id}
+                            onClick={() => toggleColdDm(app)}
+                          >
+                            {dmLoading === app.id ? (
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <MessageSquareText className="mr-1.5 h-3.5 w-3.5" />
+                            )}
+                            {dmOpen.has(app.id) ? "Hide Cold DM" : "View Cold DM"}
+                          </Button>
+                          {dmOpen.has(app.id) && dmByApp[app.id] && (
+                            <div className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-emerald-400">
+                                  Cold DM (auto-written)
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(dmByApp[app.id] || "");
+                                    toast.success("DM copied to clipboard");
+                                  }}
+                                >
+                                  Copy
+                                </Button>
+                              </div>
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                                {dmByApp[app.id]}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Auto-written follow-up draft */}
                       {app.follow_up_date && (
