@@ -19,6 +19,7 @@ import {
   ClipboardList,
   Users,
   ExternalLink,
+  GraduationCap,
   Settings,
   Menu,
   X,
@@ -37,6 +38,7 @@ const NAV_ITEMS = [
   { href: "/tracker", label: "Tracker", icon: ClipboardList },
   { href: "/referrals", label: "Referrals", icon: Users },
   { href: "/links", label: "Quick Links", icon: ExternalLink },
+  { href: "/prep28.html", label: "28-Day Prep", icon: GraduationCap },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -93,18 +95,31 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const active = pathname === item.href;
-            const link = (
+            const linkClass = cn(
+              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              collapsed && "justify-center px-0",
+              active
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+            );
+            // Static pages in /public (e.g. the 28-day prep tracker) need a
+            // plain anchor — next/link would try to route them client-side.
+            const link = item.href.endsWith(".html") ? (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={linkClass}
+              >
+                <item.icon className="h-4 w-4 shrink-0" />
+                {!collapsed && item.label}
+              </a>
+            ) : (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  collapsed && "justify-center px-0",
-                  active
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                )}
+                className={linkClass}
               >
                 <item.icon className="h-4 w-4 shrink-0" />
                 {!collapsed && item.label}
