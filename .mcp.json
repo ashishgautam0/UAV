@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "tracker": {
+      "command": "python3",
+      "args": ["backend/mcp_server/tracker_mcp.py"],
+      "env": {
+        "SUPABASE_URL": "${SUPABASE_URL}",
+        "SUPABASE_KEY": "${SUPABASE_KEY}"
+      }
+    }
+  }
+}
