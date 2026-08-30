@@ -392,10 +392,16 @@ export default function JobDetailPage() {
               <p className="rounded-md border bg-muted/40 p-3 text-sm leading-relaxed whitespace-pre-wrap break-words">
                 {messages[s.type]}
               </p>
+            ) : job.applied ? (
+              <p className="text-sm italic text-muted-foreground">
+                Not written yet — this job is in your tracker, so the hourly
+                routine will write it on an upcoming run.
+              </p>
             ) : (
               <p className="text-sm italic text-muted-foreground">
-                Not written yet — the hourly Claude routine generates this for
-                each new job; check back after the next run.
+                Written only for jobs you&apos;ve logged to the tracker — hit
+                &quot;Log to Tracker&quot; above and the next hourly run will
+                write it.
               </p>
             )}
           </CardContent>

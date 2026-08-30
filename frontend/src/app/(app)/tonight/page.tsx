@@ -142,7 +142,7 @@ export default function TonightPage() {
           setDmByJob((prev) => ({ ...prev, [id]: res.content }));
           if (res.content === null) {
             toast.info(
-              "No DM written for this job yet — the hourly run will pick it up."
+              "No DM yet — DMs are written for jobs you log to the tracker."
             );
             return;
           }
@@ -154,7 +154,7 @@ export default function TonightPage() {
         }
       } else if (dmByJob[id] === null) {
         toast.info(
-          "No DM written for this job yet — the hourly run will pick it up."
+          "No DM yet — DMs are written for jobs you log to the tracker."
         );
         return;
       }

@@ -30,7 +30,6 @@ from tracker import (
     complete_message_request,
     fail_message_request,
     get_job_message,
-    get_jobs_needing_messages,
     get_message_request,
     get_message_requests,
     save_job_message,
@@ -47,13 +46,49 @@ def _profile_text():
         return ""
 
 
+def _tracked_jobs_missing(message_type, limit):
+    """Tracker-logged scraped jobs lacking a stored message of this type.
+
+    Content is generated ONLY for jobs the user logged to the tracker (an
+    application row whose URL matches a scraped job, terminal statuses
+    excluded), newest first. Returns (jobs, tracked_total).
+    """
+    from tracker import TERMINAL_STATUSES, _get_client, get_job_message
+
+    db = _get_client()
+    apps = db.table("applications").select("url,status").execute().data or []
+    urls = [a["url"] for a in apps
+            if (a.get("url") or "").strip()
+            and a.get("status") not in TERMINAL_STATUSES]
+
+    tracked = []
+    for i in range(0, len(urls), 100):
+        resp = (db.table("scraped_jobs")
+                .select("id, title, company, location, url, description")
+                .in_("url", urls[i:i + 100])
+                .execute())
+        tracked.extend(resp.data or [])
+
+    need = []
+    for r in sorted(tracked, key=lambda r: r["id"], reverse=True):
+        if len(need) >= limit:
+            break
+        if get_job_message(r["id"], message_type=message_type):
+            continue
+        r["description"] = (r.get("description") or "").strip()
+        need.append(r)
+    return need, len(tracked)
+
+
 def cmd_list(args):
-    jobs = get_jobs_needing_messages(limit=args.limit, message_type=args.type)
-    for j in jobs:
-        # Descriptions are capped at 500 chars upstream; keep them whole here.
-        j["description"] = (j.get("description") or "").strip()
+    jobs, tracked_total = _tracked_jobs_missing(args.type, args.limit)
     json.dump(
-        {"message_type": args.type, "profile": _profile_text(), "jobs": jobs},
+        {
+            "message_type": args.type,
+            "tracked_jobs_total": tracked_total,
+            "profile": _profile_text(),
+            "jobs": jobs,
+        },
         sys.stdout,
         indent=2,
     )
@@ -283,46 +318,21 @@ def cmd_followups(args):
 def cmd_demos(args):
     """List tracker-logged jobs that still lack a live demo.
 
-    Demos are built ONLY for jobs the user actually logged to the tracker
-    (an application row whose URL matches a scraped job), skipping
-    applications in terminal statuses. Every such job eventually gets a
-    demo; --limit just bounds one firing's batch.
+    Every tracked job eventually gets a demo; --limit just bounds one
+    firing's batch.
     """
-    from tracker import TERMINAL_STATUSES, _get_client, get_job_message
-
-    db = _get_client()
-    apps = (db.table("applications")
-            .select("url,status")
-            .execute().data or [])
-    urls = [a["url"] for a in apps
-            if (a.get("url") or "").strip()
-            and a.get("status") not in TERMINAL_STATUSES]
-
-    tracked_jobs = []
-    for i in range(0, len(urls), 100):
-        resp = (db.table("scraped_jobs")
-                .select("id,title,company,description,url")
-                .in_("url", urls[i:i + 100])
-                .execute())
-        tracked_jobs.extend(resp.data or [])
-
-    need = []
-    for r in sorted(tracked_jobs, key=lambda r: r["id"], reverse=True):
-        if len(need) >= args.limit:
-            break
-        if get_job_message(r["id"], message_type="demo_html"):
-            continue
-        need.append({
-            "job_id": r["id"],
-            "title": r.get("title", ""),
-            "company": r.get("company", ""),
-            "description": (r.get("description") or "").strip(),
-        })
+    jobs, tracked_total = _tracked_jobs_missing("demo_html", args.limit)
+    need = [{
+        "job_id": r["id"],
+        "title": r.get("title", ""),
+        "company": r.get("company", ""),
+        "description": r.get("description", ""),
+    } for r in jobs]
 
     json.dump(
         {
             "profile": _profile_text(),
-            "tracked_jobs_total": len(tracked_jobs),
+            "tracked_jobs_total": tracked_total,
             "jobs_needing_demos": need,
         },
         sys.stdout,
