@@ -174,6 +174,16 @@ def main():
     p_int.add_argument("--name", required=True)
     p_int.set_defaults(func=cmd_intel)
 
+    p_scrl = sub.add_parser("screen-list", help="scraped jobs not yet resume-screened")
+    p_scrl.add_argument("--limit", type=int, default=100)
+    p_scrl.set_defaults(func=cmd_screen_list)
+
+    p_scr = sub.add_parser("screen", help="record a resume-screening decision")
+    p_scr.add_argument("--job-id", type=int, required=True)
+    p_scr.add_argument("--decision", choices=["pass", "fail"], required=True)
+    p_scr.add_argument("--reason", default="")
+    p_scr.set_defaults(func=cmd_screen)
+
     p_not = sub.add_parser("notify", help="in-app notification + web push")
     p_not.add_argument("--title", required=True)
     p_not.add_argument("--body", required=True)
@@ -384,6 +394,47 @@ def cmd_intel(args):
         print(json.dumps({"found": False}))
         return 0
     print(json.dumps({"found": True, **row}, default=str))
+    return 0
+
+
+def cmd_screen_list(args):
+    """Visible scraped jobs not yet screened against the resume, newest first,
+    with the candidate's profile. Claude reads each and decides fit + level."""
+    from tracker import get_scraped_jobs, get_job_message
+
+    df = get_scraped_jobs()
+    rows = df.to_dict("records") if not df.empty else []
+    need = []
+    for r in rows:
+        if len(need) >= args.limit:
+            break
+        if get_job_message(r["id"], message_type="screen"):
+            continue
+        need.append({
+            "id": r["id"],
+            "title": r.get("title", ""),
+            "company": r.get("company", ""),
+            "location": r.get("location", ""),
+            "url": r.get("url", ""),
+            "description": (r.get("description") or "").strip(),
+        })
+    json.dump({"profile": _profile_text(), "jobs": need}, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_screen(args):
+    """Record a resume-screening decision for one scraped job. A 'fail'
+    dismisses the job (hidden everywhere, kept for URL dedup); either way the
+    decision is stored as a 'screen' message so it is not re-screened."""
+    from tracker import save_job_message, mark_scraped_job
+
+    decision = args.decision
+    tag = ("PASS: " if decision == "pass" else "FAIL: ") + (args.reason or "")
+    save_job_message(args.job_id, tag.strip(), message_type="screen")
+    if decision == "fail":
+        mark_scraped_job(args.job_id, "dismissed")
+    print(f"Screened job {args.job_id}: {decision}. {args.reason or ''}".strip())
     return 0
 
 

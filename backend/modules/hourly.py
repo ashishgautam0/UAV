@@ -174,12 +174,13 @@ def _matches_desired_title(job_title, threshold=65):
 
 
 def _resume_fit_filter(jobs):
-    """Keep only jobs that meet the requirements of the uploaded resume.
+    """Coarse resume pre-net — NOT the real decision.
 
-    A job passes when its title+description share at least RESUME_MIN_SKILL_HITS
-    distinct skill tokens with the resume (lexical overlap against the profile's
-    resume_text). If no real resume is stored yet, the gate is skipped so the
-    app doesn't go empty. Threshold is env-tunable (RESUME_MIN_SKILL_HITS).
+    This only drops jobs that share almost nothing with the resume, purely to
+    cap volume before the routine's resume-screener agent (Claude) makes the
+    real fit + experience-level decision on each survivor. Keep the bar low
+    (RESUME_MIN_SKILL_HITS, default 2) so Claude — not keywords — decides.
+    If no real resume is stored yet, the net is skipped so nothing is lost.
     """
     try:
         from ranking import _tokens
@@ -196,9 +197,9 @@ def _resume_fit_filter(jobs):
         return jobs, "skipped (resume too thin to match on)"
 
     try:
-        min_hits = int(os.environ.get("RESUME_MIN_SKILL_HITS", "4"))
+        min_hits = int(os.environ.get("RESUME_MIN_SKILL_HITS", "2"))
     except ValueError:
-        min_hits = 4
+        min_hits = 2
 
     kept = []
     for j in jobs:
@@ -238,9 +239,10 @@ def main():
     new_jobs = [j for j in new_jobs if _matches_desired_title(j.get("title", ""))]
     print(f"After title filter (desired titles match): {len(new_jobs)}")
 
-    # Resume-fit gate: only keep jobs that meet the uploaded resume's requirements
+    # Coarse resume pre-net (the routine's resume-screener agent is the real
+    # fit + experience-level decision — Claude, not keywords).
     new_jobs, resume_note = _resume_fit_filter(new_jobs)
-    print(f"After resume-fit filter: {resume_note}")
+    print(f"After resume pre-net: {resume_note}")
 
     # Health check: if LinkedIn scraper returned 0 results, flag it
     linkedin_count = sources_status.get("LinkedIn AI/ML", 0)
