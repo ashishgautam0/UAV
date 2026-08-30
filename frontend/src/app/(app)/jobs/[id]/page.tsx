@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
   Building2,
+  Gauge,
   Landmark,
   Check,
   ClipboardPlus,
@@ -44,6 +45,7 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const SECTIONS = [
   {
@@ -67,6 +69,21 @@ const SECTIONS = [
   },
 ] as const;
 
+// Pull "FIT SCORE: 4.2 / 5 — ..." out of the evaluation's first line.
+function parseFitScore(text: string | null): number | null {
+  if (!text) return null;
+  const m = text.match(/fit\s*score:\s*([\d.]+)/i);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+function scoreColor(score: number) {
+  if (score >= 4) return "bg-emerald-600 text-white";
+  if (score >= 3) return "bg-yellow-500 text-black";
+  return "bg-red-600 text-white";
+}
+
 export default function JobDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -77,6 +94,7 @@ export default function JobDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [messages, setMessages] = useState<Record<string, string | null>>({});
   const [intel, setIntel] = useState<CachedCompanyIntel | null>(null);
+  const [evaluation, setEvaluation] = useState<string | null>(null);
   const [demoReady, setDemoReady] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [logged, setLogged] = useState(false);
@@ -107,6 +125,9 @@ export default function JobDetailPage() {
           .then(setIntel)
           .catch(() => setIntel({ found: false }));
       }
+      getJobMessage(jobId, "evaluation")
+        .then((r) => setEvaluation(r.content))
+        .catch(() => setEvaluation(null));
       getJobMessage(jobId, "demo_html")
         .then((r) => setDemoReady(Boolean(r.content)))
         .catch(() => setDemoReady(false));
@@ -389,6 +410,64 @@ export default function JobDetailPage() {
             <p className="text-sm italic text-muted-foreground">
               Not researched yet — the hourly routine writes intel for each
               new job&apos;s company; check back after the next run.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* A–H Fit Evaluation */}
+      <Card>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Gauge className="h-4 w-4" />
+              A–H Fit Evaluation
+            </CardTitle>
+            <CardDescription>
+              Structured scoring of this role against your profile, by the
+              research agent.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            {(() => {
+              const score = parseFitScore(evaluation);
+              return score !== null ? (
+                <Badge className={cn("tabular-nums", scoreColor(score))}>
+                  {score.toFixed(1)} / 5
+                </Badge>
+              ) : null;
+            })()}
+            {evaluation && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleCopyText(evaluation, "evaluation")}
+              >
+                {copied === "evaluation" ? (
+                  <Check className="mr-1.5 h-3.5 w-3.5" />
+                ) : (
+                  <Copy className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                {copied === "evaluation" ? "Copied" : "Copy"}
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {evaluation ? (
+            <p className="rounded-md border bg-muted/40 p-3 text-sm leading-relaxed whitespace-pre-wrap break-words">
+              {evaluation}
+            </p>
+          ) : job.applied ? (
+            <p className="text-sm italic text-muted-foreground">
+              Not evaluated yet — this job is in your tracker, so the research
+              agent will score it (A–H) on an upcoming run.
+            </p>
+          ) : (
+            <p className="text-sm italic text-muted-foreground">
+              Scored only for jobs you&apos;ve logged to the tracker — hit
+              &quot;Log to Tracker&quot; above and the next hourly run will
+              evaluate it.
             </p>
           )}
         </CardContent>
