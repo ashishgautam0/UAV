@@ -12,5 +12,7 @@ job_applications.db
 .env
 *.env
 
-# IDE / local
-.claude/
+# IDE / local — ignore everything under .claude EXCEPT the committed
+# multi-agent definitions the hourly routine relies on.
+.claude/*
+!.claude/agents/
