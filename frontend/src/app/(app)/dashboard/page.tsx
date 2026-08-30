@@ -62,8 +62,8 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 
-// Tasks per day in public/prep28.html, as [blockA, blockB, recall] — used to
-// read that page's localStorage progress ("prep28") for the widget below.
+// Tasks per day on the /prep28 page, as [blockA, blockB, recall] — used to
+// read its localStorage progress ("prep28") for the widget below.
 const PREP_COUNTS: [number, number, number][] = [
   [2,2,3],[2,2,3],[2,2,3],[2,3,3],[1,1,3],[2,2,3],[2,3,2],
   [1,2,3],[2,2,3],[2,2,3],[1,3,3],[2,3,3],[2,3,3],[2,3,3],
@@ -272,9 +272,9 @@ export default function DashboardPage() {
             </CardDescription>
           </div>
           <Button size="sm" asChild>
-            <a href="/prep28.html">
+            <Link href="/prep28">
               {prep?.started ? "Open today's plan" : "Start the 28 days"}
-            </a>
+            </Link>
           </Button>
         </CardHeader>
         {prep?.started && (
