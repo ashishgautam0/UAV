@@ -88,6 +88,33 @@ DESIRED_TITLES = [
     "AI/ML Research and Development Engineer",
     "AI Engineer",
     "Artificial Intelligence (AI) Engineer",
+    # AWS / cloud roles — Subidh holds an AWS certification (rare edge), so
+    # these are first-class targets, not afterthoughts.
+    "AWS Machine Learning Engineer",
+    "AWS AI Engineer",
+    "AWS Data Engineer",
+    "Cloud Engineer",
+    "AWS Cloud Engineer",
+    "Cloud Data Engineer",
+    "Cloud AI Engineer",
+    "Cloud ML Engineer",
+    "Cloud Machine Learning Engineer",
+    "MLOps Engineer",
+    "AWS MLOps Engineer",
+    "Machine Learning Platform Engineer",
+    "AI Platform Engineer",
+    "ML Platform Engineer",
+    "Platform Engineer",
+    "AWS Solutions Architect",
+    "Cloud Solutions Architect",
+    "AI Solutions Architect",
+    "Machine Learning Infrastructure Engineer",
+    "DevOps Engineer",
+    "AWS DevOps Engineer",
+    "SageMaker Engineer",
+    "AWS SageMaker Engineer",
+    "Data Engineer",
+    "AWS Data and AI Engineer",
 ]
 
 # Pre-compute normalized titles for faster matching
@@ -104,6 +131,13 @@ _DOMAIN_KEYWORDS = {
     "iot", "robotics", "uav", "digital twin", "edge computing", "simulation",
     "ocr", "document ai", "speech recognition", "predictive modeling",
     "optimization algorithm", "multimodal",
+    # AWS / cloud vocabulary — Subidh's AWS certification is the edge we're
+    # leaning into, so cloud roles must clear the coarse title gate and reach
+    # Claude's resume-screener rather than being pre-rejected here.
+    "aws", "amazon web services", "cloud", "sagemaker", "bedrock",
+    "solutions architect", "cloud architect", "data engineer",
+    "platform engineer", "devops", "mlops", "sre", "site reliability",
+    "kubernetes", "terraform", "infrastructure",
 }
 
 
@@ -125,7 +159,7 @@ _TITLE_REJECT_RE = re.compile(
 )
 
 
-def _matches_desired_title(job_title, threshold=65):
+def _matches_desired_title(job_title, threshold=60):
     """Check if a job title matches any desired title.
 
     Filter pipeline (jobs-only, junior/entry only):
@@ -165,9 +199,14 @@ def _matches_desired_title(job_title, threshold=65):
     if not has_domain_keyword:
         return False
 
-    # Step 5: fuzzy match using token_sort_ratio (penalizes extra/missing words)
+    # Step 5: fuzzy match using token_set_ratio. Unlike token_sort_ratio it
+    # ignores trailing/extra qualifier words, so real roles like "Machine
+    # Learning Engineer, Amazon Music - Catalog Quality" or "AI Engineer - FDE
+    # (Forward Deployed Engineer)" match their base title instead of being
+    # penalized to death by the extra words. The domain-keyword gate above still
+    # blocks off-domain noise, and Claude's resume-screener is the real filter.
     best = max(
-        fuzz.token_sort_ratio(normalized, desired)
+        fuzz.token_set_ratio(normalized, desired)
         for desired in _DESIRED_TITLES_LOWER
     )
     return best >= threshold
