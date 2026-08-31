@@ -221,6 +221,10 @@ def scrape_linkedin():
                 location=location,
                 hours_old=24,
                 results_wanted=50,
+                # Fetch each posting's full JD text. Without this JobSpy returns
+                # empty descriptions, so the experience (0-1 years) filter and
+                # Claude's resume-screener have nothing to read.
+                linkedin_fetch_description=True,
             )
 
             for _, row in results.iterrows():
@@ -248,7 +252,7 @@ def scrape_linkedin():
                 after_blacklist += 1
 
                 job_location = str(row.get("location", "")).strip() or location
-                desc = str(row.get("description", "") or "")[:500]
+                desc = str(row.get("description", "") or "")[:2500]
                 posted_date = str(row.get("date_posted", "") or "") or None
 
                 # In-memory dedup by normalized title + company
@@ -356,7 +360,7 @@ def _scrape_jobspy_board(site, label, country_indeed=None):
                 if _is_blacklisted(company, blacklist):
                     continue
                 url = str(row.get("job_url", "")).strip()
-                desc = str(row.get("description", "") or "")[:500]
+                desc = str(row.get("description", "") or "")[:2500]
                 key = _normalize_for_dedup(title) + "||" + _normalize_for_dedup(company)
                 if key in dedup_map:
                     dedup_map[key]["match_count"] += 1
