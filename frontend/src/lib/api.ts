@@ -1,6 +1,5 @@
 import type {
   AddApplicationRequest,
-  AddDemoRequest,
   AddReferralRequest,
   AnalysisResult,
   Application,
@@ -8,7 +7,6 @@ import type {
   ATSResult,
   CachedCompanyIntel,
   ColdDMRequest,
-  CompanyIntel,
   CoverLetterRequest,
   DashboardStats,
   DemoOutreachRequest,
@@ -21,9 +19,7 @@ import type {
   JobMessage,
   LogFollowUpRequest,
   MessageRequest,
-  MessageRequestStatus,
   MessageResponse,
-  MiniDemo,
   PlatformEffectiveness,
   Referral,
   ReferralRequestBody,
@@ -32,7 +28,6 @@ import type {
   ScrapedJob,
   StatusFunnel,
   ThankYouRequest,
-  UpdateDemoRequest,
   UserProfile,
   UserProfileUpdate,
   WeeklyTrend,
@@ -132,11 +127,6 @@ export async function getRoleAnalysis(): Promise<RoleAnalysis[]> {
 }
 
 // ---- Scraper ----
-export async function getScrapedJobs(source?: string): Promise<ScrapedJob[]> {
-  const qs = source ? `?source=${encodeURIComponent(source)}` : "";
-  return apiFetch<ScrapedJob[]>(`/api/scraped-jobs${qs}`);
-}
-
 export async function getRankedScrapedJobs(
   limit = 200
 ): Promise<ScrapedJob[]> {
@@ -177,12 +167,6 @@ export async function lookupScrapedJob(url: string): Promise<{ id: number | null
   return apiFetch<{ id: number | null }>(
     `/api/scraped-jobs/lookup?url=${encodeURIComponent(url)}`
   );
-}
-
-export async function deleteScrapedJob(id: number) {
-  return apiFetch<{ success: boolean }>(`/api/scraped-jobs/${id}`, {
-    method: "DELETE",
-  });
 }
 
 export async function getFollowUpDraft(entityId: number): Promise<FollowUpDraft> {
@@ -241,13 +225,6 @@ export async function generateDemoOutreach(data: DemoOutreachRequest): Promise<M
   });
 }
 
-export async function listMessageRequests(
-  status?: MessageRequestStatus
-): Promise<MessageRequest[]> {
-  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-  return apiFetch<MessageRequest[]>(`/api/messages/requests${qs}`);
-}
-
 export async function getMessageRequest(id: number): Promise<MessageRequest> {
   return apiFetch<MessageRequest>(`/api/messages/requests/${id}`);
 }
@@ -264,14 +241,6 @@ export async function checkATS(data: ATSCheckRequest): Promise<ATSResult> {
   return apiFetch<ATSResult>("/api/analyze/ats", {
     method: "POST",
     body: JSON.stringify(data),
-  });
-}
-
-// ---- Company Research ----
-export async function researchCompany(companyName: string): Promise<CompanyIntel> {
-  return apiFetch<CompanyIntel>("/api/company-research/", {
-    method: "POST",
-    body: JSON.stringify({ company_name: companyName }),
   });
 }
 
@@ -329,25 +298,6 @@ export async function updateFollowUpOutcome(historyId: number, outcome: string) 
 
 export async function getFollowUpEffectiveness(): Promise<FollowUpEffectiveness> {
   return apiFetch<FollowUpEffectiveness>("/api/follow-ups/effectiveness");
-}
-
-// ---- Mini Demos ----
-export async function getDemos(activeOnly = true): Promise<MiniDemo[]> {
-  return apiFetch<MiniDemo[]>(`/api/demos?active_only=${activeOnly}`);
-}
-
-export async function createDemo(data: AddDemoRequest) {
-  return apiFetch<{ success: boolean }>("/api/demos", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function updateDemo(id: number, data: UpdateDemoRequest) {
-  return apiFetch<{ success: boolean }>(`/api/demos/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(data),
-  });
 }
 
 // ---- Profile ----

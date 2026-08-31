@@ -17,13 +17,7 @@ import {
 import type { Application, FollowUpDraft, FollowUpHistory } from "@/lib/types";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -35,12 +29,6 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/components/ui/tabs";
 import {
   Table,
   TableHeader,
@@ -133,17 +121,6 @@ const STATUS_COLORS: Record<string, string> = {
 // Helper: status badge
 // ---------------------------------------------------------------------------
 
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <Badge
-      variant="outline"
-      className={cn(STATUS_COLORS[status] || "border-border")}
-    >
-      {status}
-    </Badge>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
@@ -177,9 +154,6 @@ export default function TrackerPage() {
   const [filterPlatform, setFilterPlatform] = useState("All");
 
   // ---- Application status update ----
-  const [statusUpdates, setStatusUpdates] = useState<Record<number, string>>(
-    {}
-  );
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [fuDrafts, setFuDrafts] = useState<Record<number, FollowUpDraft>>({});
   const [fuDraftOpen, setFuDraftOpen] = useState<Set<number>>(new Set());
@@ -399,23 +373,6 @@ export default function TrackerPage() {
       );
     } finally {
       setAddLoading(false);
-    }
-  }
-
-  async function handleUpdateStatus(id: number) {
-    const newStatus = statusUpdates[id];
-    if (!newStatus) return;
-    setUpdatingId(id);
-    try {
-      await updateApplicationStatus(id, newStatus);
-      toast.success("Status updated");
-      await fetchApplications();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to update status"
-      );
-    } finally {
-      setUpdatingId(null);
     }
   }
 
