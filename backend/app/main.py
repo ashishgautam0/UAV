@@ -20,7 +20,6 @@ from .routers import (
     notifications,
     profile,
     referrals,
-    resume_tailor,
     scraper,
     stats,
     tonight,
@@ -80,7 +79,6 @@ app.include_router(scraper.router, prefix="/api/scraped-jobs", tags=["Scraped Jo
 app.include_router(tonight.router, prefix="/api/tonight", tags=["Tonight"])
 app.include_router(messages.router, prefix="/api/messages", tags=["Messages"])
 app.include_router(jd_analyzer.router, prefix="/api/analyze", tags=["JD Analyzer"])
-app.include_router(resume_tailor.router, prefix="/api/resume-tailor", tags=["Resume Tailor"])
 app.include_router(company_research.router, prefix="/api/company-research", tags=["Company Research"])
 app.include_router(referrals.router, prefix="/api/referrals", tags=["Referrals"])
 app.include_router(mini_demos.router, prefix="/api/demos", tags=["Mini Demos"])

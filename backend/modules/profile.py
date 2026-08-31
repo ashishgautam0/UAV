@@ -149,7 +149,7 @@ def get_resume_text(username="subidh"):
 
 
 def get_projects(username="subidh"):
-    """Get projects dict in the same shape as resume_tailor.PROJECTS.
+    """Get the user's projects as a {name: {keywords, one_liner}} dict.
     Returns None if not found (caller should use hardcoded default).
     """
     profile = get_profile(username)
@@ -172,7 +172,7 @@ def get_projects(username="subidh"):
 
 
 def get_skills(username="subidh"):
-    """Get skills list in the same shape as resume_tailor.RESUME_SKILLS.
+    """Get the user's skills list from their profile.
     Returns None if not found.
     """
     profile = get_profile(username)

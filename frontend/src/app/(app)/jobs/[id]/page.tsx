@@ -294,20 +294,6 @@ export default function JobDetailPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              const p = new URLSearchParams({
-                title: job.title,
-                jd_text: (job.description || "").slice(0, 2000),
-              });
-              router.push(`/resume-tailor?${p.toString()}`);
-            }}
-          >
-            <FileText className="mr-1.5 h-3.5 w-3.5" />
-            Full Resume Tailor
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
             disabled={busy || logged}
             onClick={handleLog}
           >
