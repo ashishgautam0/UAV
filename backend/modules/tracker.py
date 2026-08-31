@@ -487,6 +487,10 @@ def mark_scraped_job(job_id, action):
         db.table("scraped_jobs").update({"applied": 1}).eq("id", job_id).execute()
     elif action == 'dismissed':
         db.table("scraped_jobs").update({"dismissed": 1}).eq("id", job_id).execute()
+    elif action == 'keep':
+        # Un-dismiss: make the job visible again. Used when the screener PASSes a
+        # job that a prior FAIL had hidden, so a PASS always restores visibility.
+        db.table("scraped_jobs").update({"dismissed": 0}).eq("id", job_id).execute()
 
 
 # ===================== ANALYTICS FUNCTIONS =====================
