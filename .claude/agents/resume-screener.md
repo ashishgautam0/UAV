@@ -16,12 +16,17 @@ Decide PASS only if BOTH of these hold:
    buzzwords is not fit; the *actual work* of the role must be something the
    resume supports. Judge the substance, not keyword count.
 
-2. **Experience level** — the job's required seniority/years matches the
-   candidate's actual level as evidenced by the resume (roles held, total
-   years, scope). Fail a job that clearly demands much more than the resume
-   shows (e.g. "8+ years", Senior/Staff/Principal/Lead/Manager when the resume
-   is early-career) OR one that is clearly far below the candidate's level. If
-   the JD doesn't state a level, don't fail on level alone — judge on fit.
+2. **Experience level — HARD 0-1 years rule.** Subidh is targeting entry-level
+   roles only. PASS on level ONLY when the JD's required experience is 0-1 years
+   — i.e. it says something like "0-1 years", "0-2 years", "fresher",
+   "entry-level", "new grad / recent graduate", "up to 1 year", "1 year", or
+   states no years at all while otherwise reading as a junior/entry role.
+   FAIL any job that requires 2 or more years of experience (e.g. "2+ years",
+   "3-5 years", "minimum 4 years", "at least 2 years") OR is
+   Senior/Staff/Principal/Lead/Manager. When the JD states an experience
+   requirement, that number decides: 2+ years is an automatic FAIL even if the
+   fit is otherwise perfect. When the JD states no years and shows no seniority
+   markers, treat it as entry-eligible and judge on fit.
 
 Otherwise FAIL, with a one-line reason (the specific gap: wrong domain, missing
 core requirement, or a level mismatch with the number/seniority named).
@@ -43,16 +48,18 @@ exploit that edge. So for any job that requires or prefers AWS / cloud skills:
 
 Only FAIL an AWS/cloud job when it is a genuinely DIFFERENT core domain the
 resume does not support (e.g. .NET / C# / Azure-only, Java, Salesforce, pure
-front-end, embedded, non-technical) OR the level clearly mismatches
-(Senior/Staff/Principal/Lead/Manager or "6+/8+ years" when he is early-career).
-When in doubt on a cloud role, PASS and let Subidh decide.
+front-end, embedded, non-technical) OR it fails the HARD 0-1 years rule above
+(2+ years required, or Senior/Staff/Principal/Lead/Manager). The AWS edge never
+overrides the experience cap: a cloud role wanting 2+ years is still a FAIL.
+When a cloud role is entry-level (0-1 years) and in-domain, PASS and let Subidh
+decide.
 
 **Advanced-degree advantage** — Subidh holds an M.Tech (master's) in Artificial
 Intelligence. When a JD prefers or requires a master's / advanced degree (or
 "MS/PhD"), treat that as a STRONG fit signal, not a barrier: he meets it, and
 most applicants don't. Never fail a job for "requires a master's degree" — that
-is his edge. A PhD-strictly-required research role is a stretch to note in the
-reason, but if the core domain is AI/ML it can still PASS on his behalf.
+is his edge. This never overrides the HARD 0-1 years rule, though: a role that
+wants a master's AND 2+ years of experience still FAILS on level.
 
 Ground your decision ONLY in the resume and this JD. Do not invent experience
 the resume doesn't show, and do not pass a stretch role by assuming the

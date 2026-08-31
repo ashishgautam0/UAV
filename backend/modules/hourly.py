@@ -212,6 +212,42 @@ def _matches_desired_title(job_title, threshold=60):
     return best >= threshold
 
 
+# Entry-level signals: if the JD says any of these, it is treating the role as
+# 0-1 years / fresher, so keep it regardless of any other number it mentions.
+_ENTRY_SIGNAL_RE = re.compile(
+    r"\b(0\s*[-–to]{1,3}\s*1\s*years?|0\s*[-–to]{1,3}\s*2\s*years?|"
+    r"fresher|entry[\s-]?level|new\s*grad|recent\s+graduate|"
+    r"up\s+to\s+1\s+year|less\s+than\s+(?:1|one)\s+year|no\s+experience|"
+    r"1\s*\+?\s*years?)\b",
+    re.IGNORECASE,
+)
+# A requirement of 2+ years (lower bound >= 2), in the common JD phrasings.
+_SENIOR_YEARS_RE = re.compile(
+    r"\b("
+    r"[2-9]\d*\s*\+\s*years?|"                 # "3+ years"
+    r"[2-9]\d*\s*[-–to]{1,3}\s*\d+\s*years?|"  # "2-4 years", "3 to 5 years"
+    r"(?:minimum|min|at\s+least|atleast)\s+[2-9]\d*\s*years?|"  # "at least 3 years"
+    r"[2-9]\d*\s*years?\s+(?:of\s+)?experience"  # "5 years of experience"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _experience_ok(description):
+    """Coarse 0-1-years pre-net on the JD text.
+
+    Keeps a job when its stated experience requirement is entry-level (0-1
+    years / fresher) OR no years are stated at all; drops a job that clearly
+    requires 2+ years. Claude's resume-screener makes the final level call.
+    """
+    text = description or ""
+    if _ENTRY_SIGNAL_RE.search(text):
+        return True
+    if _SENIOR_YEARS_RE.search(text):
+        return False
+    return True  # no explicit years stated — let Claude decide
+
+
 def _resume_fit_filter(jobs):
     """Coarse resume pre-net — NOT the real decision.
 
@@ -294,6 +330,13 @@ def main():
     # Only keep jobs whose title matches or is similar to the desired titles list
     new_jobs = [j for j in new_jobs if _matches_desired_title(j.get("title", ""))]
     print(f"After title filter (desired titles match): {len(new_jobs)}")
+
+    # Keep only entry-level roles: JD requires 0-1 years (or states no years).
+    # Drops anything clearly asking for 2+ years before Claude screens.
+    before_exp = len(new_jobs)
+    new_jobs = [j for j in new_jobs if _experience_ok(j.get("description", ""))]
+    print(f"After experience filter (0-1 yrs): {len(new_jobs)} "
+          f"(dropped {before_exp - len(new_jobs)} needing 2+ yrs)")
 
     # Coarse resume pre-net (the routine's resume-screener agent is the real
     # fit + experience-level decision — Claude, not keywords).
