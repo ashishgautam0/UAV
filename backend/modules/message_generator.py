@@ -21,7 +21,22 @@ _DEFAULT_PROFILE = """
 
 
 def _get_profile_text():
-    """Try to load profile from DB, fall back to hardcoded default."""
+    """Return the candidate's profile text for screening + drafting.
+
+    Source of truth order:
+      1. The uploaded resume (PDF text the user manages in Settings) — the most
+         complete, current record; it carries the AWS certifications, the M.Tech,
+         and the full experience the screener/agents must ground on.
+      2. The structured DB profile summary (get_profile_text).
+      3. The hardcoded fallback (only if nothing is stored yet).
+    """
+    try:
+        from profile import get_resume_text
+        resume = get_resume_text()
+        if resume and len(resume.strip()) >= 200:
+            return resume
+    except Exception:
+        pass
     try:
         from profile import get_profile_text
         text = get_profile_text()

@@ -47,6 +47,13 @@ front-end, embedded, non-technical) OR the level clearly mismatches
 (Senior/Staff/Principal/Lead/Manager or "6+/8+ years" when he is early-career).
 When in doubt on a cloud role, PASS and let Subidh decide.
 
+**Advanced-degree advantage** — Subidh holds an M.Tech (master's) in Artificial
+Intelligence. When a JD prefers or requires a master's / advanced degree (or
+"MS/PhD"), treat that as a STRONG fit signal, not a barrier: he meets it, and
+most applicants don't. Never fail a job for "requires a master's degree" — that
+is his edge. A PhD-strictly-required research role is a stretch to note in the
+reason, but if the core domain is AI/ML it can still PASS on his behalf.
+
 Ground your decision ONLY in the resume and this JD. Do not invent experience
 the resume doesn't show, and do not pass a stretch role by assuming the
 candidate can learn it.

@@ -23,10 +23,11 @@ from datetime import datetime, timezone
 # AWS gets its own weight: Subidh holds an AWS certification that few
 # candidates have, so a job that wants AWS/cloud (especially a certification)
 # is a rare-advantage role and should rank higher.
-W_FIT = 0.50
-W_FRESH = 0.18
-W_EASE = 0.07
-W_AWS = 0.25
+W_FIT = 0.46
+W_FRESH = 0.15
+W_EASE = 0.06
+W_AWS = 0.22
+W_DEGREE = 0.11
 
 # Detect AWS / cloud-certification relevance in a JD.
 _AWS_CERT_RE = re.compile(
@@ -40,6 +41,16 @@ _AWS_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Detect an advanced-degree preference in a JD. Subidh holds an M.Tech in AI,
+# so a role that wants a master's (or advanced degree) is one where that degree
+# is a real differentiator — surface it higher.
+_DEGREE_RE = re.compile(
+    r"master'?s?\s+degree|master\s+of|\bm\.?s\.?\b|\bm\.?sc\b|\bm\.?tech\b|"
+    r"\bms\s*/\s*phd\b|\bphd\b|doctoral|postgraduate|graduate\s+degree|"
+    r"advanced\s+degree",
+    re.IGNORECASE,
+)
+
 
 def _aws_signal(job):
     """1.0 when the JD wants an AWS/cloud certification, 0.6 when it just uses
@@ -50,6 +61,13 @@ def _aws_signal(job):
     if _AWS_RE.search(text):
         return 0.6
     return 0.0
+
+
+def _degree_signal(job):
+    """1.0 when the JD wants a master's / advanced degree (Subidh's M.Tech in AI
+    is a differentiator there), 0 otherwise."""
+    text = f"{job.get('title', '')} {job.get('description', '')}"
+    return 1.0 if _DEGREE_RE.search(text) else 0.0
 
 _STOP = {
     "the", "and", "for", "with", "you", "our", "are", "will", "your", "that",
@@ -127,14 +145,19 @@ def compute_bestscore(job, profile_tokens, eval_score=None):
     fresh = _freshness(job.get("scraped_at"))
     ease = 1.0 if (job.get("verdict") == "EASY_APPLY") else 0.55
     aws = _aws_signal(job)
+    degree = _degree_signal(job)
 
-    score = 100.0 * (W_FIT * fit + W_FRESH * fresh + W_EASE * ease + W_AWS * aws)
+    score = 100.0 * (
+        W_FIT * fit + W_FRESH * fresh + W_EASE * ease
+        + W_AWS * aws + W_DEGREE * degree
+    )
     breakdown = {
         "fit": round(fit, 3),
         "fit_source": fit_src,
         "freshness": round(fresh, 3),
         "ease": round(ease, 3),
         "aws": round(aws, 3),
+        "degree": round(degree, 3),
         "score": round(score, 1),
     }
     return round(score, 1), breakdown
