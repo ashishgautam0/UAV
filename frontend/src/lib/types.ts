@@ -345,33 +345,6 @@ export interface ReferralStats {
   [key: string]: number;
 }
 
-// ---- Mini Demos ----
-export interface MiniDemo {
-  id: number;
-  company: string;
-  role: string;
-  demo_idea: string;
-  status: string;
-  github_url?: string;
-  demo_url?: string;
-  hours_spent?: number;
-  result?: string;
-}
-
-export interface AddDemoRequest {
-  company: string;
-  role: string;
-  demo_idea: string;
-}
-
-export interface UpdateDemoRequest {
-  status?: string;
-  github_url?: string;
-  demo_url?: string;
-  hours_spent?: number;
-  result?: string;
-}
-
 // ---- Profile ----
 export interface ProjectEntry {
   name: string;

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { getRankedScrapedJobs, createApplication, markScrapedJob } from "@/lib/api";
 import type { ScrapedJob } from "@/lib/types";
 
@@ -219,7 +218,6 @@ function SwipeableCard({
 // Page Component
 // ---------------------------------------------------------------------------
 export default function TonightPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<ScrapedJob[]>([]);
   const [filterMode, setFilterMode] = useState<"all" | "remote" | "hybrid" | "onsite">("all");
