@@ -434,6 +434,10 @@ def cmd_screen(args):
     save_job_message(args.job_id, tag.strip(), message_type="screen")
     if decision == "fail":
         mark_scraped_job(args.job_id, "dismissed")
+    else:
+        # A PASS must make the job visible even if a prior FAIL had hidden it
+        # (re-screens across rule changes), so explicitly un-dismiss.
+        mark_scraped_job(args.job_id, "keep")
     print(f"Screened job {args.job_id}: {decision}. {args.reason or ''}".strip())
     return 0
 
