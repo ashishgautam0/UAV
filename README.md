@@ -49,7 +49,6 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 
 ### Additional Tools
 - **JD Analyzer** — NOC compatibility check, skill match scoring, red flag detection, ATS compatibility
-- **Resume Tailor** — Project ordering, skill prioritization, gap analysis based on JD
 - **Company Research** — Web search with result caching
 - **Referral Manager** — Track referral contacts and follow-ups
 - **Mini Demos** — Track custom demo projects for target companies
@@ -83,7 +82,6 @@ job_search_tool/
 │       ├── tracker.py           # Application tracking (Supabase)
 │       ├── hourly.py            # Daily automation script
 │       ├── jd_analyzer.py       # Job description analysis
-│       ├── resume_tailor.py     # Resume tailoring
 │       ├── company_research.py  # Company research & caching
 │       ├── pending_messages.py  # CLI the Claude routine drives to write DMs
 │       └── digest.py            # Markdown digest builder
@@ -95,7 +93,6 @@ job_search_tool/
 │       │   ├── tracker/         # Application tracker
 │       │   ├── messages/        # AI message generator
 │       │   ├── analyzer/        # JD analyzer
-│       │   ├── resume-tailor/   # Resume tailor
 │       │   ├── referrals/       # Referral manager
 │       │   ├── links/           # Quick links
 │       │   └── settings/        # Settings
@@ -184,8 +181,8 @@ Environment variables:
 
 - **API project** — `SUPABASE_URL`, `SUPABASE_KEY`,
   `APP_USERNAME`, `APP_PASSWORD`, `JWT_SECRET`, and `FRONTEND_URL` (so CORS
-  allows the frontend origin). `OPENAI_API_KEY` and the `VAPID_*` keys are
-  optional — see `backend/app/config.py`.
+  allows the frontend origin). The `VAPID_*` keys are optional (they enable
+  web-push notifications) — see `backend/app/config.py`.
 - **Frontend project** — `NEXT_PUBLIC_API_URL`, set to the API project's URL.
   This is read at build time (`frontend/src/lib/api.ts` falls back to
   `http://localhost:8000`), so set it **before** the first build, or redeploy
@@ -247,7 +244,6 @@ GET      /api/messages/requests/{id}  # Poll one queued request
 GET      /api/tonight         # Tonight's Plan jobs
 POST     /api/messages        # AI message generation
 POST     /api/analyze         # JD analysis
-POST     /api/resume-tailor   # Resume tailoring
 POST     /api/company-research # Company research
 GET/POST /api/referrals       # Referral tracking
 GET/POST /api/demos           # Mini demo projects

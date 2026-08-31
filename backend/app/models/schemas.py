@@ -140,13 +140,6 @@ class ATSCheckRequest(BaseModel):
     custom_resume: Optional[str] = None
 
 
-# ---- Resume Tailor ----
-
-class ResumeTailorRequest(BaseModel):
-    title: str
-    jd_text: str
-
-
 # ---- Company Research ----
 
 class CompanyResearchRequest(BaseModel):

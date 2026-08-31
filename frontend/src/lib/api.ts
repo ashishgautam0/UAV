@@ -28,8 +28,6 @@ import type {
   Referral,
   ReferralRequestBody,
   ReferralStats,
-  ResumeTailorRequest,
-  ResumeTailorResult,
   RoleAnalysis,
   ScrapedJob,
   StatusFunnel,
@@ -264,14 +262,6 @@ export async function analyzeFullJD(data: FullAnalyzeRequest): Promise<AnalysisR
 
 export async function checkATS(data: ATSCheckRequest): Promise<ATSResult> {
   return apiFetch<ATSResult>("/api/analyze/ats", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-// ---- Resume Tailor ----
-export async function tailorResume(data: ResumeTailorRequest): Promise<ResumeTailorResult> {
-  return apiFetch<ResumeTailorResult>("/api/resume-tailor/", {
     method: "POST",
     body: JSON.stringify(data),
   });

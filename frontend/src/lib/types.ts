@@ -255,34 +255,6 @@ export interface AnalysisResult {
   company_intel?: CompanyIntel;
 }
 
-// ---- Resume Tailor ----
-export interface ResumeTailorRequest {
-  title: string;
-  jd_text: string;
-}
-
-export interface ResumeTailorResult {
-  tailored_latex: string;
-  changes: Array<{
-    section: string;
-    what_changed: string;
-    why: string;
-  }>;
-  bullet_diffs: Array<{
-    section: string;
-    original: string;
-    rewritten: string;
-    keywords_added: string[];
-  }>;
-  ats_before: number;
-  ats_after: number;
-  gaps: Array<{
-    skill: string;
-    difficulty: string;
-    note: string;
-  }>;
-}
-
 // ---- Company Research ----
 export interface CompanyIntel {
   description?: string;
