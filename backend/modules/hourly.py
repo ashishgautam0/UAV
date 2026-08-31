@@ -215,36 +215,39 @@ def _matches_desired_title(job_title, threshold=60):
 # Entry-level signals: if the JD says any of these, it is treating the role as
 # 0-1 years / fresher, so keep it regardless of any other number it mentions.
 _ENTRY_SIGNAL_RE = re.compile(
-    r"\b(0\s*[-–to]{1,3}\s*1\s*years?|0\s*[-–to]{1,3}\s*2\s*years?|"
+    r"(0\s*[-–to]{1,3}\s*1\s*years?|0\s*[-–to]{1,3}\s*2\s*years?|"
     r"fresher|entry[\s-]?level|new\s*grad|recent\s+graduate|"
     r"up\s+to\s+1\s+year|less\s+than\s+(?:1|one)\s+year|no\s+experience|"
-    r"1\s*\+?\s*years?)\b",
+    r"\b1\s*\+?\s*years?\b)",
     re.IGNORECASE,
 )
-# A requirement of 2+ years (lower bound >= 2), in the common JD phrasings.
-_SENIOR_YEARS_RE = re.compile(
-    r"\b("
-    r"[2-9]\d*\s*\+\s*years?|"                 # "3+ years"
-    r"[2-9]\d*\s*[-–to]{1,3}\s*\d+\s*years?|"  # "2-4 years", "3 to 5 years"
-    r"(?:minimum|min|at\s+least|atleast)\s+[2-9]\d*\s*years?|"  # "at least 3 years"
-    r"[2-9]\d*\s*years?\s+(?:of\s+)?experience"  # "5 years of experience"
-    r")\b",
-    re.IGNORECASE,
-)
+# Any experience phrase whose LOWER bound is a number — used to read the minimum
+# years a JD asks for. Matches "5 years", "3-5 years", "6-8 years", "2+ years",
+# "3 to 5 years" and (with backslashes stripped first) markdown-escaped forms
+# like "6\-8 years".
+_YEARS_PHRASE_RE = re.compile(r"(\d+)\s*(?:[-–+]|to)?\s*\d*\s*\+?\s*years?", re.IGNORECASE)
 
 
 def _experience_ok(description):
     """Coarse 0-1-years pre-net on the JD text.
 
     Keeps a job when its stated experience requirement is entry-level (0-1
-    years / fresher) OR no years are stated at all; drops a job that clearly
-    requires 2+ years. Claude's resume-screener makes the final level call.
+    years / fresher) OR no years are stated at all; drops a job whose minimum
+    stated experience is 2+ years. Claude's resume-screener makes the final call.
+
+    JD text scraped from LinkedIn/Indeed is markdown, so hyphens arrive escaped
+    ("6\\-8 years"); strip backslashes before matching so ranges are read.
     """
-    text = description or ""
+    text = (description or "").replace("\\", "")
     if _ENTRY_SIGNAL_RE.search(text):
         return True
-    if _SENIOR_YEARS_RE.search(text):
-        return False
+    # Drop if any experience phrase's lower bound is >= 2 years.
+    for m in _YEARS_PHRASE_RE.finditer(text):
+        try:
+            if int(m.group(1)) >= 2:
+                return False
+        except (ValueError, TypeError):
+            continue
     return True  # no explicit years stated — let Claude decide
 
 
