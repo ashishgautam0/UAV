@@ -506,6 +506,14 @@ def cmd_notify(args):
     except Exception as e:
         print(f"Could not send push: {e}", file=sys.stderr)
         return 1
+
+    # Also email the summary (no-ops if no email backend is configured).
+    try:
+        from emailer import send_email
+        send_email(subject=args.title, body_text=args.body)
+    except Exception as e:
+        print(f"Could not send email: {e}", file=sys.stderr)
+
     return 0
 
 
