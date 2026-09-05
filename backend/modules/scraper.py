@@ -105,66 +105,6 @@ def _is_india_or_remote(location_str):
     return "india" in loc or "remote" in loc
 
 
-# Gulf / GCC location terms — cities and countries Subidh is targeting there.
-_GULF_TERMS = (
-    "united arab emirates", "uae", "dubai", "abu dhabi", "sharjah", "ajman",
-    "saudi arabia", "ksa", "riyadh", "jeddah", "dammam", "khobar",
-    "qatar", "doha", "kuwait", "bahrain", "manama",
-    "oman", "muscat", "gcc", "middle east",
-)
-# JobSpy locations to search for Gulf roles.
-_GULF_LOCATIONS = ["Dubai, United Arab Emirates", "Abu Dhabi, United Arab Emirates",
-                   "Riyadh, Saudi Arabia", "Doha, Qatar"]
-# JobSpy Indeed country domains to sweep for the Gulf.
-_GULF_INDEED_COUNTRIES = ["United Arab Emirates", "Saudi Arabia", "Qatar",
-                          "Kuwait", "Bahrain", "Oman"]
-
-
-def _is_gulf(location_str):
-    """Keep job if its location is in a Gulf/GCC country."""
-    if not location_str or not location_str.strip():
-        return False
-    loc = location_str.lower()
-    return any(t in loc for t in _GULF_TERMS)
-
-
-def _is_allowed_location(location_str):
-    """India, Remote, or Gulf — the full set of places Subidh will work."""
-    return _is_india_or_remote(location_str) or _is_gulf(location_str)
-
-
-# Worldwide sweep — developed nations across Europe, North America, APAC and the
-# Middle East (the markets that sponsor AI/ML talent). JobSpy Indeed country
-# domains. India has its own boards and the Gulf its own sweep, so they're not
-# repeated here.
-_WORLD_INDEED_COUNTRIES = [
-    # North America
-    "usa", "canada",
-    # Europe
-    "uk", "ireland", "germany", "netherlands", "france", "belgium",
-    "luxembourg", "austria", "switzerland", "sweden", "norway", "denmark",
-    "finland", "spain", "italy", "portugal", "poland", "czech republic",
-    "estonia",
-    # Asia-Pacific
-    "australia", "new zealand", "singapore", "japan", "south korea",
-    "hong kong", "taiwan", "thailand", "malaysia",
-    # Middle East (non-Gulf tech hub)
-    "israel",
-]
-# A short, high-signal query set — kept to two so the ~30-country sweep stays
-# bounded in runtime and in how many new jobs hit the screening cap each run.
-_WORLD_SEARCH_QUERIES = [
-    "ai engineer",
-    "machine learning engineer",
-]
-
-
-def _is_any_location(location_str):
-    """Accept any non-empty location — the worldwide sweep is global by design;
-    the 0-1-years, nationality and resume-screener filters do the narrowing."""
-    return bool(location_str and location_str.strip())
-
-
 def _load_blacklist():
     """Load company blacklist from blacklist.txt. Returns a set of lowercase names."""
     blacklist_path = os.path.join(os.path.dirname(__file__), "..", "..", "blacklist.txt")
@@ -474,56 +414,6 @@ def scrape_google_jobs():
     return _scrape_jobspy_board("google", "Google Jobs")
 
 
-def scrape_gulf():
-    """Gulf / GCC AI-ML roles (UAE, Saudi, Qatar + Bayt, the Middle East board).
-
-    The 0-1-years and nationality filters run downstream; here we just source
-    field-matched postings from the region. Indeed is swept per Gulf country so
-    JobSpy uses the right country domain; Bayt covers the region broadly.
-    """
-    jobs = []
-    for country in _GULF_INDEED_COUNTRIES:
-        jobs += _scrape_jobspy_board(
-            "indeed", f"Indeed {country}", country_indeed=country,
-            locations=[country], location_ok=_is_allowed_location,
-        )
-    # Bayt — the main Middle East / GCC job board.
-    jobs += _scrape_jobspy_board(
-        "bayt", "Bayt", locations=_GULF_LOCATIONS, location_ok=_is_allowed_location,
-    )
-    # Google Jobs, Gulf-scoped.
-    jobs += _scrape_jobspy_board(
-        "google", "Google Jobs Gulf", locations=_GULF_LOCATIONS,
-        location_ok=_is_allowed_location, google_region="the Gulf",
-    )
-    print(f"--- Gulf (total): {len(jobs)} jobs ---")
-    return jobs
-
-
-def scrape_world():
-    """Worldwide AI/ML roles from sponsorship-strong countries (US, UK, Canada,
-    Australia, Ireland, Germany, Netherlands, Japan, Singapore, Sweden,
-    Switzerland, New Zealand) via Indeed's per-country domains, plus a global
-    Google Jobs pass. A short query set keeps the sweep bounded; the 0-1-years,
-    nationality and resume-screener filters decide what actually reaches Subidh.
-    """
-    jobs = []
-    for country in _WORLD_INDEED_COUNTRIES:
-        jobs += _scrape_jobspy_board(
-            "indeed", f"Indeed {country.upper()}", country_indeed=country,
-            locations=[country], location_ok=_is_any_location,
-            queries=_WORLD_SEARCH_QUERIES,
-        )
-    # Global Google Jobs pass.
-    jobs += _scrape_jobspy_board(
-        "google", "Google Jobs World", locations=["Remote"],
-        location_ok=_is_any_location, google_region="the world",
-        queries=_WORLD_SEARCH_QUERIES,
-    )
-    print(f"--- World (total): {len(jobs)} jobs ---")
-    return jobs
-
-
 def scrape_amazon_jobs():
     """AWS's own careers (amazon.jobs) via its public search.json — the source
     most likely to want AWS. India + AWS/ML/AI queries."""
@@ -647,8 +537,6 @@ def run_all_scrapers():
         ("Google Jobs", scrape_google_jobs),
         ("amazon.jobs", scrape_amazon_jobs),
         ("Partner ATS", scrape_partner_ats),
-        ("Gulf (UAE/KSA/Qatar/Bayt)", scrape_gulf),
-        ("World (US/UK/EU/Japan/…)", scrape_world),
     ]
 
     for name, scraper_fn in scrapers:
