@@ -262,7 +262,11 @@ _NATIONALITY_BLOCK_RE = re.compile(
     r"only\s+(?:for\s+)?(?:saudi|emirati|qatari|kuwaiti|gcc)\s+nationals?|"
     r"nationals?\s+only|citizens?\s+only|"
     r"saudi(?:s)?ation|saudization|emirati(?:s)?ation|emiratization|qatarization|"
-    r"must\s+be\s+a\s+(?:saudi|emirati|uae|qatari|kuwaiti|bahraini|omani|gcc|local)\s+(?:national|citizen))",
+    r"must\s+be\s+a\s+(?:saudi|emirati|uae|qatari|kuwaiti|bahraini|omani|gcc|local)\s+(?:national|citizen)|"
+    # Explicit sponsorship exclusions (worldwide) — unambiguous only.
+    r"no\s+visa\s+sponsorship|visa\s+sponsorship\s+(?:is\s+)?not\s+(?:available|provided|offered)|"
+    r"(?:not\s+able|unable|cannot|can'?t|do\s+not|does\s+not|will\s+not)\s+(?:to\s+)?sponsor|"
+    r"without\s+(?:visa\s+)?sponsorship|us\s+citizens?\s+only|security\s+clearance\s+required)",
     re.IGNORECASE,
 )
 

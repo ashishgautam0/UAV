@@ -132,6 +132,28 @@ def _is_allowed_location(location_str):
     return _is_india_or_remote(location_str) or _is_gulf(location_str)
 
 
+# Worldwide sweep — sponsorship-strong countries for an AI/ML fresher with a
+# master's + AWS certs. JobSpy Indeed country domains.
+_WORLD_INDEED_COUNTRIES = [
+    "usa", "uk", "canada", "australia", "ireland", "germany",
+    "netherlands", "japan", "singapore", "sweden", "switzerland",
+    "new zealand",
+]
+# A short, high-signal query set so the worldwide sweep stays bounded.
+_WORLD_SEARCH_QUERIES = [
+    "ai engineer",
+    "machine learning engineer",
+    "aws machine learning engineer",
+    "generative ai engineer",
+]
+
+
+def _is_any_location(location_str):
+    """Accept any non-empty location — the worldwide sweep is global by design;
+    the 0-1-years, nationality and resume-screener filters do the narrowing."""
+    return bool(location_str and location_str.strip())
+
+
 def _load_blacklist():
     """Load company blacklist from blacklist.txt. Returns a set of lowercase names."""
     blacklist_path = os.path.join(os.path.dirname(__file__), "..", "..", "blacklist.txt")
@@ -344,7 +366,7 @@ def scrape_linkedin():
 # ---------------------------------------------------------------------------
 
 def _scrape_jobspy_board(site, label, country_indeed=None, locations=None,
-                         location_ok=None, google_region="India"):
+                         location_ok=None, google_region="India", queries=None):
     """Generic JobSpy scraper for an extra board (Naukri / Indeed / Google / Bayt).
 
     AWS-first query set, recent postings, with the same title/location/blacklist
@@ -358,9 +380,10 @@ def _scrape_jobspy_board(site, label, country_indeed=None, locations=None,
 
     locations = locations or _LINKEDIN_LOCATIONS
     loc_ok = location_ok or _is_india_or_remote
+    queries = queries or _BOARD_SEARCH_QUERIES
     blacklist = _load_blacklist()
     dedup_map = {}
-    combos = [(q, loc) for q in _BOARD_SEARCH_QUERIES for loc in locations]
+    combos = [(q, loc) for q in queries for loc in locations]
     random.shuffle(combos)
 
     for query, location in combos:
@@ -463,6 +486,30 @@ def scrape_gulf():
         location_ok=_is_allowed_location, google_region="the Gulf",
     )
     print(f"--- Gulf (total): {len(jobs)} jobs ---")
+    return jobs
+
+
+def scrape_world():
+    """Worldwide AI/ML roles from sponsorship-strong countries (US, UK, Canada,
+    Australia, Ireland, Germany, Netherlands, Japan, Singapore, Sweden,
+    Switzerland, New Zealand) via Indeed's per-country domains, plus a global
+    Google Jobs pass. A short query set keeps the sweep bounded; the 0-1-years,
+    nationality and resume-screener filters decide what actually reaches Subidh.
+    """
+    jobs = []
+    for country in _WORLD_INDEED_COUNTRIES:
+        jobs += _scrape_jobspy_board(
+            "indeed", f"Indeed {country.upper()}", country_indeed=country,
+            locations=[country], location_ok=_is_any_location,
+            queries=_WORLD_SEARCH_QUERIES,
+        )
+    # Global Google Jobs pass.
+    jobs += _scrape_jobspy_board(
+        "google", "Google Jobs World", locations=["Remote"],
+        location_ok=_is_any_location, google_region="the world",
+        queries=_WORLD_SEARCH_QUERIES,
+    )
+    print(f"--- World (total): {len(jobs)} jobs ---")
     return jobs
 
 
@@ -590,6 +637,7 @@ def run_all_scrapers():
         ("amazon.jobs", scrape_amazon_jobs),
         ("Partner ATS", scrape_partner_ats),
         ("Gulf (UAE/KSA/Qatar/Bayt)", scrape_gulf),
+        ("World (US/UK/EU/Japan/…)", scrape_world),
     ]
 
     for name, scraper_fn in scrapers:
