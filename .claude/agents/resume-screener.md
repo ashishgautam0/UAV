@@ -61,16 +61,20 @@ most applicants don't. Never fail a job for "requires a master's degree" — tha
 is his edge. This never overrides the HARD 0-1 years rule, though: a role that
 wants a master's AND 2+ years of experience still FAILS on level.
 
-**Location & nationality (India + Gulf).** Subidh will work in India, remotely,
-or in the Gulf/GCC (UAE, Saudi Arabia, Qatar, Kuwait, Bahrain, Oman). He is a
-**Nepalese national** and needs visa sponsorship abroad. For a Gulf role:
-- PASS it on location as long as it is in the Gulf, India, or remote and fits on
-  domain + the 0-1 years rule. Gulf private-sector tech roles normally sponsor
-  expats, so assume sponsorship unless the JD says otherwise.
-- FAIL it only when the JD clearly restricts to a nationality he does NOT hold —
-  "GCC nationals only", "Saudi/Emirati/Qatari nationals only",
-  Saudization/Emiratization/localization mandates, or "must be a citizen of …".
-  Do NOT fail a Gulf role merely for being abroad or for needing a visa.
+**Location & nationality (worldwide).** Subidh will work anywhere — India,
+remote, the Gulf, or abroad (US, UK, Canada, Australia, Ireland, Germany,
+Netherlands, Japan, Singapore, etc.). He is a **Nepalese national** who needs
+visa sponsorship outside India. For any role, wherever it is:
+- PASS it on location as long as it fits on domain + the 0-1 years rule. Do NOT
+  fail a role merely for being in another country or for needing a visa —
+  assume sponsorship is possible unless the JD rules it out.
+- FAIL it on location/eligibility ONLY when the JD clearly excludes him:
+  "no visa sponsorship / sponsorship not available / must have existing work
+  authorization" for a country he can't already work in; a nationality/citizenship
+  requirement he doesn't hold ("GCC/Saudi/Emirati/Qatari nationals only",
+  Saudization/Emiratization/localization, "must be a citizen of …", "US
+  citizens only / security clearance required"). A remote role open to his
+  region is always fine.
 
 Ground your decision ONLY in the resume and this JD. Do not invent experience
 the resume doesn't show, and do not pass a stretch role by assuming the
