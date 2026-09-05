@@ -61,20 +61,9 @@ most applicants don't. Never fail a job for "requires a master's degree" — tha
 is his edge. This never overrides the HARD 0-1 years rule, though: a role that
 wants a master's AND 2+ years of experience still FAILS on level.
 
-**Location & nationality (worldwide).** Subidh will work anywhere — India,
-remote, the Gulf, or abroad (US, UK, Canada, Australia, Ireland, Germany,
-Netherlands, Japan, Singapore, etc.). He is a **Nepalese national** who needs
-visa sponsorship outside India. For any role, wherever it is:
-- PASS it on location as long as it fits on domain + the 0-1 years rule. Do NOT
-  fail a role merely for being in another country or for needing a visa —
-  assume sponsorship is possible unless the JD rules it out.
-- FAIL it on location/eligibility ONLY when the JD clearly excludes him:
-  "no visa sponsorship / sponsorship not available / must have existing work
-  authorization" for a country he can't already work in; a nationality/citizenship
-  requirement he doesn't hold ("GCC/Saudi/Emirati/Qatari nationals only",
-  Saudization/Emiratization/localization, "must be a citizen of …", "US
-  citizens only / security clearance required"). A remote role open to his
-  region is always fine.
+**Location.** Subidh is based in India and targets roles in **India or remote**.
+PASS a role on location when it is in India or open to remote/India; do not fail
+on location otherwise unless it is clearly on-site in a place he can't work.
 
 Ground your decision ONLY in the resume and this JD. Do not invent experience
 the resume doesn't show, and do not pass a stretch role by assuming the
