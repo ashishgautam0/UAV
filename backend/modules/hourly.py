@@ -251,6 +251,30 @@ def _experience_ok(description):
     return True  # no explicit years stated — let Claude decide
 
 
+# Gulf JDs sometimes restrict to local/GCC nationals (Saudization etc.).
+# Subidh is a Nepalese national needing visa sponsorship, so drop postings that
+# clearly require a nationality/citizenship he does not hold. Expat-open roles
+# (the default in Gulf private-sector tech) are kept.
+_NATIONALITY_BLOCK_RE = re.compile(
+    r"(gcc\s+nationals?\s+only|"
+    r"(?:saudi|emirati|qatari|kuwaiti|bahraini|omani|uae)\s+nationals?\s+only|"
+    r"(?:saudi|emirati|qatari)\s+nationals?\s+(?:are\s+)?(?:preferred|required)|"
+    r"only\s+(?:for\s+)?(?:saudi|emirati|qatari|kuwaiti|gcc)\s+nationals?|"
+    r"nationals?\s+only|citizens?\s+only|"
+    r"saudi(?:s)?ation|saudization|emirati(?:s)?ation|emiratization|qatarization|"
+    r"must\s+be\s+a\s+(?:saudi|emirati|uae|qatari|kuwaiti|bahraini|omani|gcc|local)\s+(?:national|citizen))",
+    re.IGNORECASE,
+)
+
+
+def _nationality_ok(description):
+    """Drop a JD that explicitly restricts to a nationality/citizenship Subidh
+    (Nepalese) does not hold. Everything else is kept — Claude makes the final
+    call on sponsorship."""
+    text = (description or "").replace("\\", "")
+    return not _NATIONALITY_BLOCK_RE.search(text)
+
+
 def _resume_fit_filter(jobs):
     """Coarse resume pre-net — NOT the real decision.
 
@@ -340,6 +364,12 @@ def main():
     new_jobs = [j for j in new_jobs if _experience_ok(j.get("description", ""))]
     print(f"After experience filter (0-1 yrs): {len(new_jobs)} "
           f"(dropped {before_exp - len(new_jobs)} needing 2+ yrs)")
+
+    # Drop Gulf/other postings restricted to nationalities Subidh doesn't hold.
+    before_nat = len(new_jobs)
+    new_jobs = [j for j in new_jobs if _nationality_ok(j.get("description", ""))]
+    print(f"After nationality filter: {len(new_jobs)} "
+          f"(dropped {before_nat - len(new_jobs)} nationals-only)")
 
     # Coarse resume pre-net (the routine's resume-screener agent is the real
     # fit + experience-level decision — Claude, not keywords).
