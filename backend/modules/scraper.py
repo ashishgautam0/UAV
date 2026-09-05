@@ -116,7 +116,8 @@ _GULF_TERMS = (
 _GULF_LOCATIONS = ["Dubai, United Arab Emirates", "Abu Dhabi, United Arab Emirates",
                    "Riyadh, Saudi Arabia", "Doha, Qatar"]
 # JobSpy Indeed country domains to sweep for the Gulf.
-_GULF_INDEED_COUNTRIES = ["United Arab Emirates", "Saudi Arabia", "Qatar"]
+_GULF_INDEED_COUNTRIES = ["United Arab Emirates", "Saudi Arabia", "Qatar",
+                          "Kuwait", "Bahrain", "Oman"]
 
 
 def _is_gulf(location_str):
@@ -132,19 +133,29 @@ def _is_allowed_location(location_str):
     return _is_india_or_remote(location_str) or _is_gulf(location_str)
 
 
-# Worldwide sweep — sponsorship-strong countries for an AI/ML fresher with a
-# master's + AWS certs. JobSpy Indeed country domains.
+# Worldwide sweep — developed nations across Europe, North America, APAC and the
+# Middle East (the markets that sponsor AI/ML talent). JobSpy Indeed country
+# domains. India has its own boards and the Gulf its own sweep, so they're not
+# repeated here.
 _WORLD_INDEED_COUNTRIES = [
-    "usa", "uk", "canada", "australia", "ireland", "germany",
-    "netherlands", "japan", "singapore", "sweden", "switzerland",
-    "new zealand",
+    # North America
+    "usa", "canada",
+    # Europe
+    "uk", "ireland", "germany", "netherlands", "france", "belgium",
+    "luxembourg", "austria", "switzerland", "sweden", "norway", "denmark",
+    "finland", "spain", "italy", "portugal", "poland", "czech republic",
+    "estonia",
+    # Asia-Pacific
+    "australia", "new zealand", "singapore", "japan", "south korea",
+    "hong kong", "taiwan", "thailand", "malaysia",
+    # Middle East (non-Gulf tech hub)
+    "israel",
 ]
-# A short, high-signal query set so the worldwide sweep stays bounded.
+# A short, high-signal query set — kept to two so the ~30-country sweep stays
+# bounded in runtime and in how many new jobs hit the screening cap each run.
 _WORLD_SEARCH_QUERIES = [
     "ai engineer",
     "machine learning engineer",
-    "aws machine learning engineer",
-    "generative ai engineer",
 ]
 
 
