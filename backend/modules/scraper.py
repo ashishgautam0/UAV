@@ -105,6 +105,33 @@ def _is_india_or_remote(location_str):
     return "india" in loc or "remote" in loc
 
 
+# Gulf / GCC location terms — cities and countries Subidh is targeting there.
+_GULF_TERMS = (
+    "united arab emirates", "uae", "dubai", "abu dhabi", "sharjah", "ajman",
+    "saudi arabia", "ksa", "riyadh", "jeddah", "dammam", "khobar",
+    "qatar", "doha", "kuwait", "bahrain", "manama",
+    "oman", "muscat", "gcc", "middle east",
+)
+# JobSpy locations to search for Gulf roles.
+_GULF_LOCATIONS = ["Dubai, United Arab Emirates", "Abu Dhabi, United Arab Emirates",
+                   "Riyadh, Saudi Arabia", "Doha, Qatar"]
+# JobSpy Indeed country domains to sweep for the Gulf.
+_GULF_INDEED_COUNTRIES = ["United Arab Emirates", "Saudi Arabia", "Qatar"]
+
+
+def _is_gulf(location_str):
+    """Keep job if its location is in a Gulf/GCC country."""
+    if not location_str or not location_str.strip():
+        return False
+    loc = location_str.lower()
+    return any(t in loc for t in _GULF_TERMS)
+
+
+def _is_allowed_location(location_str):
+    """India, Remote, or Gulf — the full set of places Subidh will work."""
+    return _is_india_or_remote(location_str) or _is_gulf(location_str)
+
+
 def _load_blacklist():
     """Load company blacklist from blacklist.txt. Returns a set of lowercase names."""
     blacklist_path = os.path.join(os.path.dirname(__file__), "..", "..", "blacklist.txt")
@@ -316,20 +343,24 @@ def scrape_linkedin():
 # Additional boards — all-in on AWS/cloud roles that fit the field.
 # ---------------------------------------------------------------------------
 
-def _scrape_jobspy_board(site, label, country_indeed=None):
-    """Generic JobSpy scraper for an extra board (Naukri / Indeed / Google).
+def _scrape_jobspy_board(site, label, country_indeed=None, locations=None,
+                         location_ok=None, google_region="India"):
+    """Generic JobSpy scraper for an extra board (Naukri / Indeed / Google / Bayt).
 
-    AWS-first query set, India + Remote, recent postings, with the same title/
-    location/blacklist filters and in-memory dedup as LinkedIn.
+    AWS-first query set, recent postings, with the same title/location/blacklist
+    filters and in-memory dedup as LinkedIn. `locations` and `location_ok` let a
+    caller (e.g. the Gulf sweep) target a different region.
     """
     try:
         from jobspy import scrape_jobs
     except ImportError:
         return []
 
+    locations = locations or _LINKEDIN_LOCATIONS
+    loc_ok = location_ok or _is_india_or_remote
     blacklist = _load_blacklist()
     dedup_map = {}
-    combos = [(q, loc) for q in _BOARD_SEARCH_QUERIES for loc in _LINKEDIN_LOCATIONS]
+    combos = [(q, loc) for q in _BOARD_SEARCH_QUERIES for loc in locations]
     random.shuffle(combos)
 
     for query, location in combos:
@@ -344,7 +375,7 @@ def _scrape_jobspy_board(site, label, country_indeed=None):
             if country_indeed:
                 kwargs["country_indeed"] = country_indeed
             if site == "google":
-                kwargs["google_search_term"] = f"{query} jobs in India since yesterday"
+                kwargs["google_search_term"] = f"{query} jobs in {google_region} since yesterday"
             results = scrape_jobs(**kwargs)
 
             for _, row in results.iterrows():
@@ -354,7 +385,12 @@ def _scrape_jobspy_board(site, label, country_indeed=None):
                 if not _title_passes_filter(title):
                     continue
                 loc_str = str(row.get("location", "")).strip()
-                if site == "google" and not _is_india_or_remote(loc_str):
+                # Google and Gulf sweeps enforce the region; India boards keep
+                # the original google-only check.
+                if location_ok is not None:
+                    if loc_str and not loc_ok(loc_str):
+                        continue
+                elif site == "google" and not _is_india_or_remote(loc_str):
                     continue
                 company = str(row.get("company", "Unknown")).strip() or "Unknown"
                 if _is_blacklisted(company, blacklist):
@@ -402,6 +438,32 @@ def scrape_indeed_india():
 def scrape_google_jobs():
     """Google Jobs aggregator — pulls cert-mentioning postings web-wide."""
     return _scrape_jobspy_board("google", "Google Jobs")
+
+
+def scrape_gulf():
+    """Gulf / GCC AI-ML roles (UAE, Saudi, Qatar + Bayt, the Middle East board).
+
+    The 0-1-years and nationality filters run downstream; here we just source
+    field-matched postings from the region. Indeed is swept per Gulf country so
+    JobSpy uses the right country domain; Bayt covers the region broadly.
+    """
+    jobs = []
+    for country in _GULF_INDEED_COUNTRIES:
+        jobs += _scrape_jobspy_board(
+            "indeed", f"Indeed {country}", country_indeed=country,
+            locations=[country], location_ok=_is_allowed_location,
+        )
+    # Bayt — the main Middle East / GCC job board.
+    jobs += _scrape_jobspy_board(
+        "bayt", "Bayt", locations=_GULF_LOCATIONS, location_ok=_is_allowed_location,
+    )
+    # Google Jobs, Gulf-scoped.
+    jobs += _scrape_jobspy_board(
+        "google", "Google Jobs Gulf", locations=_GULF_LOCATIONS,
+        location_ok=_is_allowed_location, google_region="the Gulf",
+    )
+    print(f"--- Gulf (total): {len(jobs)} jobs ---")
+    return jobs
 
 
 def scrape_amazon_jobs():
@@ -527,6 +589,7 @@ def run_all_scrapers():
         ("Google Jobs", scrape_google_jobs),
         ("amazon.jobs", scrape_amazon_jobs),
         ("Partner ATS", scrape_partner_ats),
+        ("Gulf (UAE/KSA/Qatar/Bayt)", scrape_gulf),
     ]
 
     for name, scraper_fn in scrapers:

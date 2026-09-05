@@ -61,6 +61,17 @@ most applicants don't. Never fail a job for "requires a master's degree" — tha
 is his edge. This never overrides the HARD 0-1 years rule, though: a role that
 wants a master's AND 2+ years of experience still FAILS on level.
 
+**Location & nationality (India + Gulf).** Subidh will work in India, remotely,
+or in the Gulf/GCC (UAE, Saudi Arabia, Qatar, Kuwait, Bahrain, Oman). He is a
+**Nepalese national** and needs visa sponsorship abroad. For a Gulf role:
+- PASS it on location as long as it is in the Gulf, India, or remote and fits on
+  domain + the 0-1 years rule. Gulf private-sector tech roles normally sponsor
+  expats, so assume sponsorship unless the JD says otherwise.
+- FAIL it only when the JD clearly restricts to a nationality he does NOT hold —
+  "GCC nationals only", "Saudi/Emirati/Qatari nationals only",
+  Saudization/Emiratization/localization mandates, or "must be a citizen of …".
+  Do NOT fail a Gulf role merely for being abroad or for needing a visa.
+
 Ground your decision ONLY in the resume and this JD. Do not invent experience
 the resume doesn't show, and do not pass a stretch role by assuming the
 candidate can learn it.
