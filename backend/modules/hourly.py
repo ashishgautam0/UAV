@@ -10,7 +10,7 @@ from datetime import datetime
 from rapidfuzz import fuzz
 from tracker import (
     init_db, save_scraped_job, save_email_log, get_existing_job_urls,
-    save_notification, init_notifications_table,
+    save_notification, init_notifications_table, send_push_notifications,
 )
 from scraper import run_all_scrapers
 from digest import build_email_content, get_alert_number
@@ -483,6 +483,24 @@ def main():
         )
     except Exception as e:
         print(f"  WARNING: Could not save notification: {e}")
+
+    # Push notification to subscribed mobile/desktop devices (only when
+    # there's something new worth interrupting the user for).
+    if new_jobs:
+        print("Sending push notifications to subscribed devices...")
+        try:
+            top = new_jobs[0]
+            more = len(new_jobs) - 1
+            body = f"{top.get('title', 'New role')} at {top.get('company', 'a company')}"
+            if more > 0:
+                body += f" + {more} more"
+            send_push_notifications(
+                title=f"{len(new_jobs)} new job{'s' if len(new_jobs) != 1 else ''} found",
+                body=body,
+                url="/dashboard",
+            )
+        except Exception as e:
+            print(f"  WARNING: Could not send push notifications: {e}")
 
     print(f"\nDone! Job Alert #{alert_number}: {len(new_jobs)} jobs saved.")
 

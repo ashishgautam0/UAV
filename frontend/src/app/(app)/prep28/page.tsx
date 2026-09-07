@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PLAN,
   SESSION_NAMES,
@@ -8,6 +8,7 @@ import {
   recallAll,
   type BlockKey,
 } from "@/lib/prep28";
+import { getPrep28, savePrep28 } from "@/lib/api";
 import {
   Card,
   CardHeader,
@@ -62,6 +63,16 @@ function autoSession(): BlockKey {
   return "b";
 }
 
+// Does this state hold any real progress worth preserving? Used to decide
+// whether a first-load empty server row should adopt existing local progress.
+function hasProgress(s: PrepState): boolean {
+  return Boolean(
+    s.start ||
+      s.dayOverride ||
+      (s.done && Object.values(s.done).some(Boolean))
+  );
+}
+
 function computeDay(s: PrepState): number {
   if (s.dayOverride) return s.dayOverride;
   if (!s.start) return 1;
@@ -85,13 +96,49 @@ export default function Prep28Page() {
   const [startInput, setStartInput] = useState(() =>
     new Date().toISOString().slice(0, 10)
   );
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const s = readState();
-    setState(s);
-    setSess(s.sess || autoSession());
-    if (!s.start) setShowStart(true);
+    // 1) Paint instantly from the local cache (offline-friendly).
+    const local = readState();
+    setState(local);
+    setSess(local.sess || autoSession());
     setMounted(true);
+
+    // 2) Reconcile with Supabase (source of truth across devices).
+    let cancelled = false;
+    (async () => {
+      try {
+        const server = await getPrep28();
+        if (cancelled) return;
+        const serverState: PrepState = {
+          start: server.start ?? null,
+          dayOverride: server.dayOverride ?? null,
+          sess: (server.sess as BlockKey | null) ?? null,
+          done: server.done ?? {},
+        };
+        if (hasProgress(serverState)) {
+          // Server has real data — it wins; refresh the local cache.
+          setState(serverState);
+          setSess(serverState.sess || autoSession());
+          writeState(serverState);
+          setShowStart(!serverState.start);
+        } else if (hasProgress(local)) {
+          // First sync: server empty but this device has progress → upload it.
+          void savePrep28(local).catch(() => {});
+          setShowStart(!local.start);
+        } else {
+          setShowStart(!local.start);
+        }
+      } catch {
+        // Backend unreachable — keep working from the local cache.
+        setShowStart(!local.start);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const day = useMemo(() => computeDay(state), [state]);
@@ -100,7 +147,15 @@ export default function Prep28Page() {
 
   function persist(next: PrepState) {
     setState(next);
-    writeState(next);
+    writeState(next); // instant local cache
+    // Debounced write-through to Supabase so rapid toggles collapse into one
+    // request; the local cache already covers the offline case.
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      void savePrep28(next).catch(() => {
+        /* offline / backend down — local cache still holds the change */
+      });
+    }, 600);
   }
 
   function toggle(id: string) {

@@ -196,9 +196,17 @@ def scrape_linkedin():
         print("python-jobspy not installed — skipping LinkedIn scraper. Run: pip install python-jobspy")
         return []
 
-    # Build and randomize 34 query+location combos
+    # Build and randomize the query+location combos, then CAP them. LinkedIn's
+    # per-job description fetch (linkedin_fetch_description=True) is slow and
+    # heavily rate-limited, so the full 34x2=68 combos never finish inside an
+    # hourly window — they stall for hours and block every source behind them.
+    # The cap (and per-query result count) are env-tunable; shuffling first
+    # keeps coverage rotating across runs.
     combos = [(q, loc) for q in _LINKEDIN_SEARCH_QUERIES for loc in _LINKEDIN_LOCATIONS]
     random.shuffle(combos)
+    max_combos = int(os.environ.get("LINKEDIN_MAX_COMBOS", "12"))
+    combos = combos[:max_combos]
+    results_wanted = int(os.environ.get("LINKEDIN_RESULTS_WANTED", "30"))
 
     blacklist = _load_blacklist()
 
@@ -220,7 +228,7 @@ def scrape_linkedin():
                 search_term=query,
                 location=location,
                 hours_old=24,
-                results_wanted=50,
+                results_wanted=results_wanted,
                 # Fetch each posting's full JD text. Without this JobSpy returns
                 # empty descriptions, so the experience (0-1 years) filter and
                 # Claude's resume-screener have nothing to read.
@@ -530,14 +538,21 @@ def run_all_scrapers():
     sources_status = {}
     sources_errors = {}
 
+    # Fast sources first (they return descriptions inline, no per-job fetch),
+    # LinkedIn last since its per-job description fetch is the slow, rate-limited
+    # stage — this way a slow LinkedIn run never blocks the others. Set
+    # SKIP_LINKEDIN=1 to skip it entirely for a quick run.
     scrapers = [
-        ("LinkedIn AI/ML", scrape_linkedin),
         ("Naukri", scrape_naukri),
         ("Indeed India", scrape_indeed_india),
         ("Google Jobs", scrape_google_jobs),
         ("amazon.jobs", scrape_amazon_jobs),
         ("Partner ATS", scrape_partner_ats),
+        ("LinkedIn AI/ML", scrape_linkedin),
     ]
+    if os.environ.get("SKIP_LINKEDIN") == "1":
+        scrapers = [s for s in scrapers if s[0] != "LinkedIn AI/ML"]
+        print("SKIP_LINKEDIN=1 — skipping LinkedIn for this run.")
 
     for name, scraper_fn in scrapers:
         print(f"Scraping {name}...")

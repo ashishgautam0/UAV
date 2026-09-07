@@ -196,3 +196,20 @@ class UpdateDemoRequest(BaseModel):
 class PushSubscriptionRequest(BaseModel):
     endpoint: str
     keys: dict
+
+
+# ---- 28-Day Prep ----
+
+class Prep28Request(BaseModel):
+    """The mutable prep28 state. Freeform to match the frontend blob."""
+    start: Optional[str] = None
+    dayOverride: Optional[int] = None
+    sess: Optional[str] = None
+    done: dict = {}
+
+
+class Prep28Response(BaseModel):
+    start: Optional[str] = None
+    dayOverride: Optional[int] = None
+    sess: Optional[str] = None
+    done: dict = {}
