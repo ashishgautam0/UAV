@@ -166,21 +166,6 @@ def _normalize_for_dedup(text):
     return " ".join(text.split())
 
 
-def _company_size_note(row):
-    """Return a ' [Company size: N employees]' note when JobSpy provides the
-    headcount, so the resume-screener can apply the 500+ company-size rule.
-    Empty string when the source doesn't expose it (often the case)."""
-    val = row.get("company_num_employees")
-    try:
-        import math
-        if val is None or (isinstance(val, float) and math.isnan(val)):
-            return ""
-    except Exception:
-        pass
-    s = str(val).strip()
-    return f" [Company size: {s} employees]" if s and s.lower() != "nan" else ""
-
-
 def _title_passes_filter(title):
     """Return True if title passes REJECT/INCLUDE filter. REJECT checked first."""
     title_lower = title.lower()
@@ -267,7 +252,7 @@ def scrape_linkedin():
                 after_blacklist += 1
 
                 job_location = str(row.get("location", "")).strip() or location
-                desc = str(row.get("description", "") or "")[:2500] + _company_size_note(row)
+                desc = str(row.get("description", "") or "")[:2500]
                 posted_date = str(row.get("date_posted", "") or "") or None
 
                 # In-memory dedup by normalized title + company
@@ -385,7 +370,7 @@ def _scrape_jobspy_board(site, label, country_indeed=None, locations=None,
                 if _is_blacklisted(company, blacklist):
                     continue
                 url = str(row.get("job_url", "")).strip()
-                desc = str(row.get("description", "") or "")[:2500] + _company_size_note(row)
+                desc = str(row.get("description", "") or "")[:2500]
                 key = _normalize_for_dedup(title) + "||" + _normalize_for_dedup(company)
                 if key in dedup_map:
                     dedup_map[key]["match_count"] += 1
