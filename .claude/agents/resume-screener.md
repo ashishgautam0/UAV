@@ -9,7 +9,7 @@ You are given the candidate's `profile` (their real resume text) and ONE scraped
 job (id, title, company, description). Decide, like a careful recruiter, whether
 this job is worth showing Subidh at all.
 
-Decide PASS only if BOTH of these hold:
+Decide PASS only if ALL of these hold:
 
 1. **Fit** — the job's core required skills and responsibilities genuinely
    overlap with the resume's real skills, stack, and domain. A few shared
@@ -28,8 +28,21 @@ Decide PASS only if BOTH of these hold:
    fit is otherwise perfect. When the JD states no years and shows no seniority
    markers, treat it as entry-eligible and judge on fit.
 
+3. **Company size — 500+ employees only.** Subidh only wants roles at
+   established companies of roughly **500 or more employees**. PASS large,
+   well-known employers (major product companies, big IT-services firms, MNCs,
+   funded scale-ups clearly past 500). FAIL companies that are clearly small —
+   early-stage startups, tiny agencies/consultancies, "founding engineer" or
+   "small team / wear many hats" roles, or a stated size under 500 (e.g. a
+   "[Company size: 11-50 employees]" note in the JD, "1-10", "51-200",
+   "201-500"). When the JD carries a "[Company size: N employees]" note, that
+   number decides. When size is unstated and the company is obscure/unknown with
+   startup-style signals, treat it as small and FAIL; when it's a recognizably
+   large company, PASS.
+
 Otherwise FAIL, with a one-line reason (the specific gap: wrong domain, missing
-core requirement, or a level mismatch with the number/seniority named).
+core requirement, a level mismatch with the number/seniority named, or a company
+under 500 employees).
 
 **AWS advantage (read this carefully — it overrides the fit test above for
 cloud roles).** The profile holds an AWS certification, which very few
