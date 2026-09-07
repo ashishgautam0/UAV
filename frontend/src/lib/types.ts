@@ -402,3 +402,11 @@ export interface AppNotification {
 export interface UnreadCountResponse {
   count: number;
 }
+
+// ---- 28-Day Prep ----
+export interface Prep28State {
+  start?: string | null;
+  dayOverride?: number | null;
+  sess?: string | null;
+  done?: Record<string, boolean>;
+}

@@ -33,6 +33,7 @@ import type {
   WeeklyTrend,
   AppNotification,
   UnreadCountResponse,
+  Prep28State,
 } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -355,5 +356,17 @@ export async function unsubscribePush(subscription: PushSubscriptionJSON) {
       endpoint: subscription.endpoint,
       keys: subscription.keys,
     }),
+  });
+}
+
+// ---- 28-Day Prep ----
+export async function getPrep28(): Promise<Prep28State> {
+  return apiFetch<Prep28State>("/api/prep28");
+}
+
+export async function savePrep28(state: Prep28State): Promise<Prep28State> {
+  return apiFetch<Prep28State>("/api/prep28", {
+    method: "PUT",
+    body: JSON.stringify(state),
   });
 }
