@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   getApplications,
-  createApplication,
   updateApplicationStatus,
   updateApplicationNotes,
   deleteApplication,
@@ -18,9 +17,7 @@ import type { Application, FollowUpDraft, FollowUpHistory } from "@/lib/types";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectTrigger,
@@ -56,7 +53,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   ClipboardList,
   MessageSquareText,
-  Plus,
   ChevronDown,
   Trash2,
   Loader2,
@@ -128,23 +124,8 @@ export default function TrackerPage() {
   const APPS_PER_PAGE = 10;
   const [appsLoading, setAppsLoading] = useState(true);
 
-  // ---- Add application form ----
-  const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({
-    company: "",
-    role: "",
-    job_type: "Job",
-    platform: "LinkedIn",
-    url: "",
-    conversion: "N/A",
-    salary: "",
-    notes: "",
-  });
-  const [addLoading, setAddLoading] = useState(false);
-
   // ---- Filters ----
   const [filterStatus, setFilterStatus] = useState("All");
-  const [filterType, setFilterType] = useState("All");
   const [filterPlatform, setFilterPlatform] = useState("All");
 
   // ---- Application status update ----
@@ -298,9 +279,8 @@ export default function TrackerPage() {
   const fetchApplications = useCallback(async () => {
     setAppsLoading(true);
     try {
-      const filters: { status?: string; type?: string; platform?: string } = {};
+      const filters: { status?: string; platform?: string } = {};
       if (filterStatus !== "All") filters.status = filterStatus;
-      if (filterType !== "All") filters.type = filterType;
       if (filterPlatform !== "All") filters.platform = filterPlatform;
       const data = await getApplications(filters);
       setApplications(data);
@@ -311,7 +291,7 @@ export default function TrackerPage() {
     } finally {
       setAppsLoading(false);
     }
-  }, [filterStatus, filterType, filterPlatform]);
+  }, [filterStatus, filterPlatform]);
 
   // ---- Load on mount + filter change ----
   useEffect(() => {
@@ -321,7 +301,7 @@ export default function TrackerPage() {
   // Back to the first page whenever the filters change
   useEffect(() => {
     setAppPage(1);
-  }, [filterStatus, filterType, filterPlatform]);
+  }, [filterStatus, filterPlatform]);
 
   const appTotalPages = Math.max(
     1,
@@ -334,42 +314,6 @@ export default function TrackerPage() {
   );
 
   // ---- Handlers: Applications ----
-  async function handleAddApplication() {
-    if (!addForm.company.trim() || !addForm.role.trim()) return;
-    setAddLoading(true);
-    try {
-      await createApplication({
-        company: addForm.company.trim(),
-        role: addForm.role.trim(),
-        job_type: addForm.job_type,
-        platform: addForm.platform,
-        url: addForm.url.trim() || undefined,
-        conversion: addForm.conversion,
-        salary: addForm.salary.trim() || undefined,
-        notes: addForm.notes.trim() || undefined,
-      });
-      toast.success("Application logged successfully");
-      setAddForm({
-        company: "",
-        role: "",
-        job_type: "Job",
-        platform: "LinkedIn",
-        url: "",
-        conversion: "N/A",
-        salary: "",
-        notes: "",
-      });
-      setAddOpen(false);
-      await fetchApplications();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to add application"
-      );
-    } finally {
-      setAddLoading(false);
-    }
-  }
-
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -403,158 +347,9 @@ export default function TrackerPage() {
       </div>
 
       {/* ================================================================== */}
-      {/* Toolbar: Add button + Filters (compact row)                       */}
+      {/* Toolbar: Filters (compact row)                                    */}
       {/* ================================================================== */}
       <div className="flex flex-wrap items-end gap-3">
-        {/* Add Application Dialog */}
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Application
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Log New Application</DialogTitle>
-              <DialogDescription>
-                Fill in the details of your job application.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid grid-cols-1 gap-4 py-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="app-company">Company *</Label>
-                <Input
-                  id="app-company"
-                  placeholder="e.g. Shopify"
-                  value={addForm.company}
-                  onChange={(e) =>
-                    setAddForm((p) => ({ ...p, company: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="app-role">Role *</Label>
-                <Input
-                  id="app-role"
-                  placeholder="e.g. Full-Stack Developer"
-                  value={addForm.role}
-                  onChange={(e) =>
-                    setAddForm((p) => ({ ...p, role: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <Select
-                  value={addForm.job_type}
-                  onValueChange={(v) =>
-                    setAddForm((p) => ({ ...p, job_type: v }))
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Job">Job</SelectItem>
-                    <SelectItem value="Internship">Internship</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Platform</Label>
-                <Select
-                  value={addForm.platform}
-                  onValueChange={(v) =>
-                    setAddForm((p) => ({ ...p, platform: v }))
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PLATFORMS.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="app-url">URL</Label>
-                <Input
-                  id="app-url"
-                  placeholder="https://..."
-                  value={addForm.url}
-                  onChange={(e) =>
-                    setAddForm((p) => ({ ...p, url: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Conversion Potential</Label>
-                <Select
-                  value={addForm.conversion}
-                  onValueChange={(v) =>
-                    setAddForm((p) => ({ ...p, conversion: v }))
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="N/A">N/A</SelectItem>
-                    <SelectItem value="Likely">Likely</SelectItem>
-                    <SelectItem value="Unlikely">Unlikely</SelectItem>
-                    <SelectItem value="Unknown">Unknown</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="app-salary">Salary</Label>
-                <Input
-                  id="app-salary"
-                  placeholder="e.g. $80,000"
-                  value={addForm.salary}
-                  onChange={(e) =>
-                    setAddForm((p) => ({ ...p, salary: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2 col-span-2">
-                <Label htmlFor="app-notes">Notes</Label>
-                <Textarea
-                  id="app-notes"
-                  placeholder="Any additional notes..."
-                  value={addForm.notes}
-                  onChange={(e) =>
-                    setAddForm((p) => ({ ...p, notes: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                onClick={handleAddApplication}
-                disabled={
-                  addLoading ||
-                  !addForm.company.trim() ||
-                  !addForm.role.trim()
-                }
-                className="w-full"
-              >
-                {addLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="mr-2 h-4 w-4" />
-                )}
-                {addLoading ? "Logging..." : "Log Application"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
         {/* Compact Filters */}
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="w-[150px]">
@@ -567,17 +362,6 @@ export default function TrackerPage() {
                 {s}
               </SelectItem>
             ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={filterType} onValueChange={setFilterType}>
-          <SelectTrigger className="w-[130px]">
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All Types</SelectItem>
-            <SelectItem value="Job">Job</SelectItem>
-            <SelectItem value="Internship">Internship</SelectItem>
           </SelectContent>
         </Select>
 
@@ -612,7 +396,7 @@ export default function TrackerPage() {
         ) : applications.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
-              No applications found. Add one above to get started.
+              No applications found. Applications you apply to appear here.
             </CardContent>
           </Card>
         ) : (
