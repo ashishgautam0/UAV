@@ -1,65 +1,28 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { getProfile, updateProfile } from "@/lib/api";
 import type { UserProfile, UserProfileUpdate } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Save, Loader2, Upload, FileText } from "lucide-react";
+import { Save, Loader2, Download } from "lucide-react";
 
 // ---------------------------------------------------------------------------
-// Extract plain text from a PDF, in the browser, via pdf.js.
-// Loaded dynamically so pdf.js never runs during SSR / build.
-// ---------------------------------------------------------------------------
-async function extractPdfText(file: File): Promise<string> {
-  const pdfjs = await import("pdfjs-dist");
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-  const buf = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: buf }).promise;
-  const pages: string[] = [];
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    // Join items; insert line breaks on large vertical jumps so the text
-    // keeps a readable structure rather than one long run.
-    let lastY: number | null = null;
-    let line = "";
-    const out: string[] = [];
-    for (const item of content.items as Array<{ str: string; transform: number[] }>) {
-      const y = item.transform[5];
-      if (lastY !== null && Math.abs(y - lastY) > 4) {
-        out.push(line.trim());
-        line = "";
-      }
-      line += item.str + " ";
-      lastY = y;
-    }
-    if (line.trim()) out.push(line.trim());
-    pages.push(out.join("\n"));
-  }
-  return pages.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
-}
-
-// ---------------------------------------------------------------------------
-// Settings Page
+// Settings Page — the resume is stored and edited as LaTeX source.
 // ---------------------------------------------------------------------------
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [parsing, setParsing] = useState(false);
-  const [fileName, setFileName] = useState<string | null>(null);
-
-  const [resumeText, setResumeText] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [resumeTex, setResumeTex] = useState("");
 
   // ------ Load profile on mount ------
   useEffect(() => {
     async function load() {
       try {
         const profile: UserProfile = await getProfile();
-        setResumeText(profile.resume_text ?? "");
+        setResumeTex(profile.resume_text ?? "");
       } catch {
         toast.error("Failed to load profile");
       } finally {
@@ -69,41 +32,38 @@ export default function SettingsPage() {
     load();
   }, []);
 
-  // ------ Handle a picked PDF ------
-  async function handleFile(file: File | undefined | null) {
-    if (!file) return;
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      toast.error("Please upload a PDF file.");
+  // ------ Save profile ------
+  async function handleSave() {
+    if (!resumeTex.trim()) {
+      toast.error("Resume is empty.");
       return;
     }
-    setParsing(true);
+    setSaving(true);
     try {
-      const text = await extractPdfText(file);
-      if (!text) {
-        toast.error("Couldn't read any text — is this a scanned/image PDF?");
-        return;
-      }
-      setResumeText(text);
-      setFileName(file.name);
-      toast.success(`Extracted ${text.length.toLocaleString()} characters from ${file.name}`);
+      const data: UserProfileUpdate = { resume_text: resumeTex };
+      await updateProfile(data);
+      toast.success("Resume saved");
     } catch {
-      toast.error("Failed to read the PDF.");
+      toast.error("Failed to save resume");
     } finally {
-      setParsing(false);
+      setSaving(false);
     }
   }
 
-  // ------ Save profile ------
-  async function handleSave() {
-    setSaving(true);
+  // ------ Download the .tex so it can be compiled to PDF elsewhere ------
+  function handleDownload() {
     try {
-      const data: UserProfileUpdate = { resume_text: resumeText };
-      await updateProfile(data);
-      toast.success("Profile saved successfully");
+      const blob = new Blob([resumeTex], { type: "application/x-tex" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "resume.tex";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     } catch {
-      toast.error("Failed to save profile");
-    } finally {
-      setSaving(false);
+      toast.error("Download failed");
     }
   }
 
@@ -131,62 +91,36 @@ export default function SettingsPage() {
         </Button>
       </div>
 
-      {/* ---- Resume ---- */}
+      {/* ---- Resume (LaTeX) ---- */}
       <Card>
         <CardHeader>
-          <CardTitle>Resume</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Upload your resume as a PDF. The text is extracted and used by the
-            JD Analyzer, Resume Tailor, and the hourly outreach agents.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Drop / pick a PDF */}
-          <div
-            onClick={() => fileRef.current?.click()}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              handleFile(e.dataTransfer.files?.[0]);
-            }}
-            className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 p-8 text-center transition-colors hover:bg-muted/50"
-          >
-            {parsing ? (
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            ) : (
-              <Upload className="h-6 w-6 text-muted-foreground" />
-            )}
-            <p className="text-sm font-medium">
-              {parsing ? "Reading PDF…" : "Click to upload or drag a PDF here"}
-            </p>
-            {fileName && !parsing && (
-              <p className="flex items-center gap-1.5 text-xs text-emerald-400">
-                <FileText className="h-3.5 w-3.5" />
-                {fileName} — extracted
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>Resume (LaTeX)</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Your resume is stored as LaTeX source. Edit it here and Save —
+                this is what the hourly outreach agents read. Use Download to get
+                the <code>.tex</code> and compile it to PDF (e.g. on Overleaf).
               </p>
-            )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="application/pdf,.pdf"
-              className="hidden"
-              onChange={(e) => handleFile(e.target.files?.[0])}
-            />
+            </div>
+            <Button variant="outline" size="sm" onClick={handleDownload}>
+              <Download className="mr-1.5 h-3.5 w-3.5" />
+              .tex
+            </Button>
           </div>
-
-          {/* Extracted text — editable before saving */}
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-muted-foreground">
-              Extracted text (review and edit if needed, then Save)
-            </p>
-            <Textarea
-              value={resumeText}
-              onChange={(e) => setResumeText(e.target.value)}
-              placeholder="Upload a PDF above, or paste your resume text here…"
-              rows={18}
-              className="text-sm"
-            />
-          </div>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Textarea
+            value={resumeTex}
+            onChange={(e) => setResumeTex(e.target.value)}
+            placeholder="\documentclass{article} ..."
+            rows={26}
+            spellCheck={false}
+            className="font-mono text-xs leading-relaxed"
+          />
+          <p className="text-xs text-muted-foreground">
+            {resumeTex.length.toLocaleString()} characters
+          </p>
         </CardContent>
       </Card>
 
