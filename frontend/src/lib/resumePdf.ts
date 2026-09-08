@@ -58,7 +58,7 @@ function readArgs(str: string, pos: number, count: number): { args: string[]; en
   return { args, end: i };
 }
 
-type Block =
+export type Block =
   | { t: "name"; text: string }
   | { t: "contact"; text: string }
   | { t: "section"; text: string }
@@ -68,7 +68,7 @@ type Block =
   | { t: "skill"; label: string; rest: string }
   | { t: "plain"; text: string };
 
-function parseResume(tex: string): Block[] {
+export function parseResume(tex: string): Block[] {
   const blocks: Block[] = [];
   const docStart = tex.indexOf("\\begin{document}");
   const body = docStart >= 0 ? tex.slice(docStart + "\\begin{document}".length) : tex;
