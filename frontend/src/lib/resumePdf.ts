@@ -281,7 +281,7 @@ export function buildResumePdf(latex: string): jsPDF {
 }
 
 // Trigger a browser download of the résumé as a PDF.
-export function downloadResumePdf(latex: string, filename = "resume.pdf"): void {
+export function downloadResumePdf(latex: string, filename = "Subidh Khanal Resume.pdf"): void {
   const doc = buildResumePdf(latex);
   doc.save(filename);
 }

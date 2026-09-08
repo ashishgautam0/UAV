@@ -58,7 +58,7 @@ export default function SettingsPage() {
       return;
     }
     try {
-      downloadResumePdf(resumeTex, "resume.pdf");
+      downloadResumePdf(resumeTex, "Subidh Khanal Resume.pdf");
     } catch {
       toast.error("Could not generate the PDF");
     }
@@ -120,18 +120,6 @@ export default function SettingsPage() {
           </p>
         </CardContent>
       </Card>
-
-      {/* ---- Bottom Save ---- */}
-      <div className="flex justify-end pb-8">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="mr-2 h-4 w-4" />
-          )}
-          Save
-        </Button>
-      </div>
     </div>
   );
 }
