@@ -48,7 +48,6 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 - Raises an in-app notification and a web push
 
 ### Additional Tools
-- **JD Analyzer** — NOC compatibility check, skill match scoring, red flag detection, ATS compatibility
 - **Company Research** — Web search with result caching
 - **Referral Manager** — Track referral contacts and follow-ups
 - **Mini Demos** — Track custom demo projects for target companies
@@ -91,10 +90,8 @@ job_search_tool/
 │       │   ├── dashboard/       # Analytics dashboard
 │       │   ├── tonight/         # Tonight's Plan view
 │       │   ├── tracker/         # Application tracker
-│       │   ├── messages/        # AI message generator
-│       │   ├── analyzer/        # JD analyzer
 │       │   ├── referrals/       # Referral manager
-│       │   ├── links/           # Quick links
+│       │   ├── prep28/          # 28-day prep plan
 │       │   └── settings/        # Settings
 │       └── page.tsx             # Landing page
 └── supabase/
@@ -209,9 +206,8 @@ python pending_messages.py list --limit 10
 python pending_messages.py save --job-id <ID> < message.txt
 ```
 
-It also drains the freeform queue. Anything requested from the Messages or
-Referrals page lands in `message_requests`; the routine renders each request
-back into the prompt the app would have sent and answers it:
+It also drains the freeform queue. Anything parked in `message_requests` is
+rendered back into the prompt the app would have sent, and the routine answers it:
 
 ```bash
 python pending_messages.py requests
@@ -239,12 +235,9 @@ GET/POST /api/applications    # Application CRUD
 GET      /api/stats           # Dashboard analytics
 GET      /api/scraped-jobs    # Scraped job listings
 GET      /api/scraped-jobs/{id}/message  # Routine-written outreach message
-GET      /api/messages/requests   # Queued message requests
-GET      /api/messages/requests/{id}  # Poll one queued request
 GET      /api/tonight         # Tonight's Plan jobs
-POST     /api/messages        # AI message generation
-POST     /api/analyze         # JD analysis
 POST     /api/company-research # Company research
+GET/PUT  /api/prep28          # 28-day prep progress
 GET/POST /api/referrals       # Referral tracking
 GET/POST /api/demos           # Mini demo projects
 GET/PUT  /api/profile         # User profile

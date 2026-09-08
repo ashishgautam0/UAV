@@ -14,8 +14,6 @@ from .routers import (
     applications,
     company_research,
     follow_ups,
-    jd_analyzer,
-    messages,
     mini_demos,
     notifications,
     prep28,
@@ -78,8 +76,6 @@ app.include_router(applications.router, prefix="/api/applications", tags=["Appli
 app.include_router(stats.router, prefix="/api/stats", tags=["Stats"])
 app.include_router(scraper.router, prefix="/api/scraped-jobs", tags=["Scraped Jobs"])
 app.include_router(tonight.router, prefix="/api/tonight", tags=["Tonight"])
-app.include_router(messages.router, prefix="/api/messages", tags=["Messages"])
-app.include_router(jd_analyzer.router, prefix="/api/analyze", tags=["JD Analyzer"])
 app.include_router(company_research.router, prefix="/api/company-research", tags=["Company Research"])
 app.include_router(referrals.router, prefix="/api/referrals", tags=["Referrals"])
 app.include_router(mini_demos.router, prefix="/api/demos", tags=["Mini Demos"])

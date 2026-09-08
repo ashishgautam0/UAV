@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   getDashboard,
   getFollowUps,
@@ -49,7 +48,6 @@ import {
   Copy,
   GraduationCap,
   Loader2,
-  MessageSquare,
   MessageSquareText,
   ThumbsUp,
   Trophy,
@@ -112,7 +110,6 @@ const WEEKLY_TARGET = 50;
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const router = useRouter();
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [prep, setPrep] = useState<PrepState | null>(null);
   const [fuDrafts, setFuDrafts] = useState<Record<number, FollowUpDraft>>({});
@@ -475,22 +472,6 @@ export default function DashboardPage() {
                           <MessageSquareText className="mr-1.5 h-3.5 w-3.5" />
                         )}
                         {fuOpen.has(fu.id) ? "Hide Draft" : "View Draft"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => {
-                          const params = new URLSearchParams({
-                            company: fu.company,
-                            role: fu.role,
-                            type: "follow-up",
-                          });
-                          router.push(`/messages?${params.toString()}`);
-                        }}
-                      >
-                        <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
-                        Write
                       </Button>
                     </div>
                   </div>

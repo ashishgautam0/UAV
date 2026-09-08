@@ -13,11 +13,8 @@ import {
 import {
   LayoutDashboard,
   Moon,
-  FileSearch,
-  MessageSquare,
   ClipboardList,
   Users,
-  ExternalLink,
   GraduationCap,
   Settings,
   Menu,
@@ -31,11 +28,8 @@ import { NotificationBell } from "./notification-bell";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tonight", label: "Today Todo", icon: Moon },
-  { href: "/analyzer", label: "JD Analyzer", icon: FileSearch },
-  { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/tracker", label: "Tracker", icon: ClipboardList },
   { href: "/referrals", label: "Referrals", icon: Users },
-  { href: "/links", label: "Quick Links", icon: ExternalLink },
   { href: "/prep28", label: "28-Day Prep", icon: GraduationCap },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

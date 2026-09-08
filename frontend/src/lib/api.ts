@@ -1,33 +1,21 @@
 import type {
   AddApplicationRequest,
   AddReferralRequest,
-  AnalysisResult,
   Application,
-  ATSCheckRequest,
-  ATSResult,
   CachedCompanyIntel,
-  ColdDMRequest,
-  CoverLetterRequest,
   DashboardStats,
-  DemoOutreachRequest,
   FollowUp,
   FollowUpDraft,
   FollowUpEffectiveness,
   FollowUpHistory,
-  FollowUpRequest,
-  FullAnalyzeRequest,
   JobMessage,
   LogFollowUpRequest,
-  MessageRequest,
-  MessageResponse,
   PlatformEffectiveness,
   Referral,
-  ReferralRequestBody,
   ReferralStats,
   RoleAnalysis,
   ScrapedJob,
   StatusFunnel,
-  ThankYouRequest,
   UserProfile,
   UserProfileUpdate,
   WeeklyTrend,
@@ -181,68 +169,6 @@ export async function getJobMessage(
   return apiFetch<JobMessage>(
     `/api/scraped-jobs/${id}/message?type=${encodeURIComponent(type)}`
   );
-}
-
-// ---- Messages ----
-export async function generateColdDM(data: ColdDMRequest): Promise<MessageResponse> {
-  return apiFetch<MessageResponse>("/api/messages/cold-dm", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function generateFollowUp(data: FollowUpRequest): Promise<MessageResponse> {
-  return apiFetch<MessageResponse>("/api/messages/follow-up", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function generateCoverLetter(data: CoverLetterRequest): Promise<MessageResponse> {
-  return apiFetch<MessageResponse>("/api/messages/cover-letter", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function generateThankYou(data: ThankYouRequest): Promise<MessageResponse> {
-  return apiFetch<MessageResponse>("/api/messages/thank-you", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function generateReferralRequest(data: ReferralRequestBody): Promise<MessageResponse> {
-  return apiFetch<MessageResponse>("/api/messages/referral-request", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function generateDemoOutreach(data: DemoOutreachRequest): Promise<MessageResponse> {
-  return apiFetch<MessageResponse>("/api/messages/demo-outreach", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function getMessageRequest(id: number): Promise<MessageRequest> {
-  return apiFetch<MessageRequest>(`/api/messages/requests/${id}`);
-}
-
-// ---- JD Analyzer ----
-export async function analyzeFullJD(data: FullAnalyzeRequest): Promise<AnalysisResult> {
-  return apiFetch<AnalysisResult>("/api/analyze/full", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function checkATS(data: ATSCheckRequest): Promise<ATSResult> {
-  return apiFetch<ATSResult>("/api/analyze/ats", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
 }
 
 // ---- Referrals ----

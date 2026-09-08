@@ -78,68 +78,6 @@ class MarkScrapedJobRequest(BaseModel):
     action: str  # "applied" or "dismissed"
 
 
-# ---- Messages ----
-
-class ColdDMRequest(BaseModel):
-    company: str
-    role: str
-    company_desc: str = ""
-    platform: str = "LinkedIn"
-    project_link: str = ""
-
-
-class FollowUpRequest(BaseModel):
-    company: str
-    role: str
-    days: int = 7
-    platform: str = "LinkedIn"
-    follow_up_number: int = 1
-    previous_messages: list[str] = []
-
-
-class CoverLetterRequest(BaseModel):
-    company: str
-    role: str
-    jd: str
-    company_info: str = ""
-
-
-class ThankYouRequest(BaseModel):
-    company: str
-    interviewer: str
-    discussion: str = ""
-
-
-class ReferralRequestBody(BaseModel):
-    contact_name: str
-    contact_role: str = ""
-    company: str
-    role_applying_for: str
-    relationship: str = ""
-
-
-class DemoOutreachRequest(BaseModel):
-    company: str
-    role: str
-    demo_url: str
-    demo_description: str
-    company_desc: str = ""
-
-
-# ---- JD Analyzer ----
-
-class FullAnalyzeRequest(BaseModel):
-    title: str
-    description: str
-    company: Optional[str] = None
-    custom_resume: Optional[str] = None
-
-
-class ATSCheckRequest(BaseModel):
-    jd_text: str
-    custom_resume: Optional[str] = None
-
-
 # ---- Company Research ----
 
 class CompanyResearchRequest(BaseModel):
