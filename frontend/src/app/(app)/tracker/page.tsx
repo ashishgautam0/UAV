@@ -52,12 +52,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-  TooltipProvider,
-} from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   ClipboardList,
   MessageSquareText,
@@ -68,7 +63,6 @@ import {
   ExternalLink,
   Pencil,
   MessageSquare,
-  Mail,
   Check,
   X as XIcon,
   History,
@@ -690,46 +684,6 @@ export default function TrackerPage() {
                       {/* Quick action buttons */}
                       <TooltipProvider delayDuration={300}>
                         <div className="ml-auto flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => {
-                                  const params = new URLSearchParams({
-                                    company: app.company,
-                                    role: app.role,
-                                    type: "follow-up",
-                                  });
-                                  router.push(`/messages?${params.toString()}`);
-                                }}
-                              >
-                                <MessageSquare className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Follow-up</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => {
-                                  const params = new URLSearchParams({
-                                    company: app.company,
-                                    role: app.role,
-                                    type: "cold-dm",
-                                  });
-                                  router.push(`/messages?${params.toString()}`);
-                                }}
-                              >
-                                <Mail className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Cold DM</TooltipContent>
-                          </Tooltip>
                           <CollapsibleTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-7 w-7">
                               <ChevronDown className="h-4 w-4 text-muted-foreground" />

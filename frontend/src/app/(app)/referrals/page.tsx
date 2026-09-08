@@ -7,7 +7,6 @@ import {
   updateReferralStatus,
   getReferralStats,
   getReferralFollowUps,
-  generateReferralRequest,
 } from "@/lib/api";
 import type { Referral, ReferralStats } from "@/lib/types";
 
@@ -50,8 +49,6 @@ import {
   AlertTriangle,
   ExternalLink,
   Mail,
-  Copy,
-  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -134,20 +131,6 @@ export default function ReferralsPage() {
     {}
   );
   const [updatingStatus, setUpdatingStatus] = useState<Record<number, boolean>>(
-    {}
-  );
-
-  // ---- Per-referral generate request state ----
-  const [roleApplyingFor, setRoleApplyingFor] = useState<
-    Record<number, string>
-  >({});
-  const [generatingRequest, setGeneratingRequest] = useState<
-    Record<number, boolean>
-  >({});
-  const [generatedMessages, setGeneratedMessages] = useState<
-    Record<number, string>
-  >({});
-  const [copiedMessage, setCopiedMessage] = useState<Record<number, boolean>>(
     {}
   );
 
@@ -237,55 +220,6 @@ export default function ReferralsPage() {
       toast.error("Failed to update status. Please try again.");
     } finally {
       setUpdatingStatus((prev) => ({ ...prev, [id]: false }));
-    }
-  }
-
-  async function handleGenerateRequest(referral: Referral) {
-    const role = roleApplyingFor[referral.id];
-    if (!role?.trim()) {
-      toast.error("Please enter the role you are applying for.");
-      return;
-    }
-
-    setGeneratingRequest((prev) => ({ ...prev, [referral.id]: true }));
-    try {
-      const response = await generateReferralRequest({
-        contact_name: referral.contact_name,
-        contact_role: referral.contact_role || undefined,
-        company: referral.company,
-        role_applying_for: role.trim(),
-        relationship: referral.relationship || undefined,
-      });
-      if (response.content) {
-        setGeneratedMessages((prev) => ({
-          ...prev,
-          [referral.id]: response.content as string,
-        }));
-      } else {
-        toast.success(
-          "Queued — Claude writes this on the next hourly run. It'll appear on the Messages page."
-        );
-      }
-    } catch (err) {
-      console.error("Failed to generate referral request", err);
-      toast.error("Failed to generate referral request. Please try again.");
-    } finally {
-      setGeneratingRequest((prev) => ({ ...prev, [referral.id]: false }));
-    }
-  }
-
-  async function handleCopyMessage(id: number) {
-    const message = generatedMessages[id];
-    if (!message) return;
-    try {
-      await navigator.clipboard.writeText(message);
-      setCopiedMessage((prev) => ({ ...prev, [id]: true }));
-      toast.success("Copied to clipboard!");
-      setTimeout(() => {
-        setCopiedMessage((prev) => ({ ...prev, [id]: false }));
-      }, 2000);
-    } catch {
-      toast.error("Failed to copy to clipboard.");
     }
   }
 
@@ -725,82 +659,6 @@ export default function ReferralsPage() {
                           </div>
                         </div>
 
-                        {/* Generate Referral Request (only for Responded / Referral Requested) */}
-                        {(referral.status === "Responded" ||
-                          referral.status === "Referral Requested") && (
-                          <>
-                            <Separator />
-                            <div className="space-y-3">
-                              <p className="text-sm font-medium">
-                                Generate Referral Request Message
-                              </p>
-                              <div className="flex flex-col gap-2 sm:flex-row">
-                                <Input
-                                  placeholder="Role you are applying for..."
-                                  value={roleApplyingFor[referral.id] ?? ""}
-                                  onChange={(e) =>
-                                    setRoleApplyingFor((prev) => ({
-                                      ...prev,
-                                      [referral.id]: e.target.value,
-                                    }))
-                                  }
-                                  className="flex-1"
-                                />
-                                <Button
-                                  onClick={() =>
-                                    handleGenerateRequest(referral)
-                                  }
-                                  disabled={
-                                    generatingRequest[referral.id] ||
-                                    !roleApplyingFor[referral.id]?.trim()
-                                  }
-                                  size="sm"
-                                >
-                                  {generatingRequest[referral.id] ? (
-                                    <>
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                      Generating...
-                                    </>
-                                  ) : (
-                                    "Generate Referral Request"
-                                  )}
-                                </Button>
-                              </div>
-
-                              {generatedMessages[referral.id] && (
-                                <Card>
-                                  <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
-                                    <CardTitle className="text-sm">
-                                      Generated Message
-                                    </CardTitle>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() =>
-                                        handleCopyMessage(referral.id)
-                                      }
-                                      className="flex items-center gap-2"
-                                    >
-                                      {copiedMessage[referral.id] ? (
-                                        <Check className="h-4 w-4" />
-                                      ) : (
-                                        <Copy className="h-4 w-4" />
-                                      )}
-                                      {copiedMessage[referral.id]
-                                        ? "Copied"
-                                        : "Copy"}
-                                    </Button>
-                                  </CardHeader>
-                                  <CardContent>
-                                    <div className="whitespace-pre-wrap rounded-lg border bg-muted/50 p-4 text-sm">
-                                      {generatedMessages[referral.id]}
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              )}
-                            </div>
-                          </>
-                        )}
                       </CardContent>
                     </CollapsibleContent>
                   </Card>
