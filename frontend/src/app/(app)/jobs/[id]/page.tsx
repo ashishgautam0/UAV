@@ -10,6 +10,7 @@ import {
   findRecruiterEmails,
   createApplication,
   markScrapedJob,
+  getProfile,
 } from "@/lib/api";
 import type {
   CachedCompanyIntel,
@@ -34,6 +35,7 @@ import {
   Check,
   ClipboardPlus,
   Copy,
+  Download,
   ExternalLink,
   FileText,
   Loader2,
@@ -97,6 +99,7 @@ export default function JobDetailPage() {
   const [evaluation, setEvaluation] = useState<string | null>(null);
   const [demoReady, setDemoReady] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [resumeDownloading, setResumeDownloading] = useState(false);
   const [logged, setLogged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [emailReport, setEmailReport] = useState<RecruiterEmailReport | null>(
@@ -148,6 +151,32 @@ export default function JobDetailPage() {
     setCopied(type);
     toast.success("Copied to clipboard");
     setTimeout(() => setCopied(null), 2000);
+  }
+
+  // Download the latest resume (LaTeX source) to attach while applying.
+  async function handleDownloadResume() {
+    setResumeDownloading(true);
+    try {
+      const profile = await getProfile();
+      const tex = profile.resume_text ?? "";
+      if (!tex.trim()) {
+        toast.error("No resume saved yet — add it in Settings.");
+        return;
+      }
+      const blob = new Blob([tex], { type: "application/x-tex" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "resume.tex";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Failed to download resume");
+    } finally {
+      setResumeDownloading(false);
+    }
   }
 
   async function handleLog() {
@@ -349,6 +378,19 @@ export default function JobDetailPage() {
                     <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                     Apply on {job.source || "LinkedIn"}
                   </a>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadResume}
+                  disabled={resumeDownloading}
+                >
+                  {resumeDownloading ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Download className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Download résumé
                 </Button>
                 {messages["cold_dm"] && (
                   <Button variant="outline" size="sm" onClick={() => handleCopy("cold_dm")}>

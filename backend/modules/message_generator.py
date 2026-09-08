@@ -24,7 +24,7 @@ def _get_profile_text():
     """Return the candidate's profile text for screening + drafting.
 
     Source of truth order:
-      1. The uploaded resume (PDF text the user manages in Settings) — the most
+      1. The resume LaTeX source the user manages in Settings — the most
          complete, current record; it carries the AWS certifications, the M.Tech,
          and the full experience the screener/agents must ground on.
       2. The structured DB profile summary (get_profile_text).
