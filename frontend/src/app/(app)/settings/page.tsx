@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Save, Loader2, Download } from "lucide-react";
+import { downloadResumePdf } from "@/lib/resumePdf";
 
 // ---------------------------------------------------------------------------
 // Settings Page — the resume is stored and edited as LaTeX source.
@@ -50,20 +51,16 @@ export default function SettingsPage() {
     }
   }
 
-  // ------ Download the .tex so it can be compiled to PDF elsewhere ------
+  // ------ Download the résumé as a PDF (generated in-browser) ------
   function handleDownload() {
+    if (!resumeTex.trim()) {
+      toast.error("Resume is empty.");
+      return;
+    }
     try {
-      const blob = new Blob([resumeTex], { type: "application/x-tex" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "resume.tex";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadResumePdf(resumeTex, "resume.pdf");
     } catch {
-      toast.error("Download failed");
+      toast.error("Could not generate the PDF");
     }
   }
 
@@ -99,13 +96,13 @@ export default function SettingsPage() {
               <CardTitle>Resume (LaTeX)</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
                 Your resume is stored as LaTeX source. Edit it here and Save —
-                this is what the hourly outreach agents read. Use Download to get
-                the <code>.tex</code> and compile it to PDF (e.g. on Overleaf).
+                this is what the hourly outreach agents read. Use Download PDF to
+                get a ready-to-attach PDF (generated in your browser).
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={handleDownload}>
               <Download className="mr-1.5 h-3.5 w-3.5" />
-              .tex
+              Download PDF
             </Button>
           </div>
         </CardHeader>
