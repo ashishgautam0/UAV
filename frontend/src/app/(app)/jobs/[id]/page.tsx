@@ -153,7 +153,7 @@ export default function JobDetailPage() {
     setTimeout(() => setCopied(null), 2000);
   }
 
-  // Download the latest resume (LaTeX source) to attach while applying.
+  // Download the latest resume as a PDF (generated in-browser) to attach while applying.
   async function handleDownloadResume() {
     setResumeDownloading(true);
     try {
@@ -163,15 +163,8 @@ export default function JobDetailPage() {
         toast.error("No resume saved yet — add it in Settings.");
         return;
       }
-      const blob = new Blob([tex], { type: "application/x-tex" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "resume.tex";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      const { downloadResumePdf } = await import("@/lib/resumePdf");
+      downloadResumePdf(tex, "resume.pdf");
     } catch {
       toast.error("Failed to download resume");
     } finally {
