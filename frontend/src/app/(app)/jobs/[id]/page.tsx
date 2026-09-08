@@ -164,7 +164,7 @@ export default function JobDetailPage() {
         return;
       }
       const { downloadResumePdf } = await import("@/lib/resumePdf");
-      downloadResumePdf(tex, "resume.pdf");
+      downloadResumePdf(tex, "Subidh Khanal Resume.pdf");
     } catch {
       toast.error("Failed to download resume");
     } finally {
