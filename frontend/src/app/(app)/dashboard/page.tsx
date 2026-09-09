@@ -11,6 +11,7 @@ import {
   getRoleAnalysis,
   getFollowUpEffectiveness,
   snoozeFollowUp,
+  getPrep28,
 } from "@/lib/api";
 import type {
   DashboardStats,
@@ -21,6 +22,7 @@ import type {
   PlatformEffectiveness,
   StatusFunnel,
   RoleAnalysis,
+  Prep28State,
 } from "@/lib/types";
 
 import {
@@ -78,31 +80,29 @@ interface PrepState {
   todayTotal: number;
 }
 
-function readPrepState(): PrepState | null {
-  try {
-    const raw = localStorage.getItem("prep28");
-    if (!raw) return { started: false, day: 1, planDone: 0, todayDone: 0, todayTotal: 0 };
-    const s = JSON.parse(raw);
-    let day = 1;
-    if (s.dayOverride) day = s.dayOverride;
-    else if (s.start) {
-      const t = new Date();
-      t.setHours(0, 0, 0, 0);
-      day = Math.min(28, Math.max(1, Math.floor((t.getTime() - new Date(s.start).getTime()) / 86400000) + 1));
-    }
-    const done = s.done || {};
-    let planDone = 0;
-    let todayDone = 0;
-    for (const k of Object.keys(done)) {
-      if (!done[k]) continue;
-      planDone++;
-      if (k.startsWith(day + "-")) todayDone++;
-    }
-    const [a, b, r] = PREP_COUNTS[day - 1];
-    return { started: Boolean(s.start), day, planDone, todayDone, todayTotal: a + b + r };
-  } catch {
-    return null;
+// Compute the widget's PrepState from a stored prep28 state object (the same
+// shape used by the /prep28 page and stored in Supabase).
+function computePrepState(s: Prep28State | null | undefined): PrepState {
+  if (!s || (!s.start && !s.dayOverride && !(s.done && Object.keys(s.done).length))) {
+    return { started: false, day: 1, planDone: 0, todayDone: 0, todayTotal: 0 };
   }
+  let day = 1;
+  if (s.dayOverride) day = s.dayOverride;
+  else if (s.start) {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    day = Math.min(28, Math.max(1, Math.floor((t.getTime() - new Date(s.start).getTime()) / 86400000) + 1));
+  }
+  const done = s.done || {};
+  let planDone = 0;
+  let todayDone = 0;
+  for (const k of Object.keys(done)) {
+    if (!done[k]) continue;
+    planDone++;
+    if (k.startsWith(day + "-")) todayDone++;
+  }
+  const [a, b, r] = PREP_COUNTS[day - 1];
+  return { started: Boolean(s.start), day, planDone, todayDone, todayTotal: a + b + r };
 }
 
 const WEEKLY_TARGET = 50;
@@ -117,7 +117,24 @@ export default function DashboardPage() {
   const [fuLoading, setFuLoading] = useState<number | null>(null);
 
   useEffect(() => {
-    setPrep(readPrepState());
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = await getPrep28();
+        if (!cancelled) setPrep(computePrepState(s));
+      } catch {
+        // Backend unreachable — fall back to the local cache the /prep28 page keeps.
+        try {
+          const raw = localStorage.getItem("prep28");
+          if (!cancelled) setPrep(computePrepState(raw ? JSON.parse(raw) : null));
+        } catch {
+          if (!cancelled) setPrep(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const toggleFuDraft = async (fu: FollowUp) => {
@@ -651,19 +668,13 @@ export default function DashboardPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Week</TableHead>
-                  <TableHead className="text-right">Jobs</TableHead>
-                  <TableHead className="text-right">Internships</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Applications</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {weeklyTrend.map((w) => (
                   <TableRow key={w.week}>
                     <TableCell className="font-medium">{w.week}</TableCell>
-                    <TableCell className="text-right">{w.Job ?? 0}</TableCell>
-                    <TableCell className="text-right">
-                      {w.Internship ?? 0}
-                    </TableCell>
                     <TableCell className="text-right">{w.total}</TableCell>
                   </TableRow>
                 ))}
