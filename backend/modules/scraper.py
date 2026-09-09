@@ -542,10 +542,13 @@ def run_all_scrapers():
     # LinkedIn last since its per-job description fetch is the slow, rate-limited
     # stage — this way a slow LinkedIn run never blocks the others. Set
     # SKIP_LINKEDIN=1 to skip it entirely for a quick run.
+    # Naukri (406 reCAPTCHA anti-bot) and Google Jobs (upstream JobSpy connector
+    # returns 0 rows — see JobSpy issue #302) both yield nothing and only waste
+    # ~130s per run. They're dropped from the rotation but kept as functions so
+    # re-enabling is a one-line change if those sites become scrapable (e.g. with
+    # a residential proxy). scrape_naukri / scrape_google_jobs remain defined.
     scrapers = [
-        ("Naukri", scrape_naukri),
         ("Indeed India", scrape_indeed_india),
-        ("Google Jobs", scrape_google_jobs),
         ("amazon.jobs", scrape_amazon_jobs),
         ("Partner ATS", scrape_partner_ats),
         ("LinkedIn AI/ML", scrape_linkedin),
