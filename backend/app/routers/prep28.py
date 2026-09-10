@@ -9,7 +9,8 @@ from prep28 import (
     upsert_prep28,
     upload_prep_pdf,
     get_prep_pdf,
-    list_prep_pdf_ids,
+    list_task_pdfs,
+    list_all_prep_pdfs,
     delete_prep_pdf,
 )
 
@@ -40,49 +41,53 @@ def update_prep28(body: Prep28Request):
 
 @router.get("/pdfs")
 def list_pdfs():
-    """Task ids (Block B) that currently have an uploaded PDF."""
-    return {"task_ids": list_prep_pdf_ids(_DEFAULT_USERNAME)}
+    """Map of Block-B task id -> [filenames] for every task that has PDFs."""
+    return {"pdfs": list_all_prep_pdfs(_DEFAULT_USERNAME)}
 
 
 @router.post("/pdf/{task_id}")
-async def upload_pdf(task_id: str, request: Request):
-    """Upload/replace a Block-B task's PDF. Body is the raw PDF bytes."""
+async def upload_pdf(task_id: str, request: Request, name: str = ""):
+    """Upload a named PDF under a Block-B task. Body is the raw PDF bytes and
+    the display filename is passed as ?name=."""
     if not _TASK_ID_RE.match(task_id):
         raise HTTPException(status_code=400, detail="Invalid task id")
+    if not name.strip():
+        raise HTTPException(status_code=400, detail="Missing file name")
     data = await request.body()
     if not data or data[:5] != b"%PDF-":
         raise HTTPException(status_code=400, detail="Not a PDF file")
     if len(data) > _MAX_PDF_BYTES:
         raise HTTPException(status_code=400, detail="PDF too large (max 20 MB)")
     try:
-        upload_prep_pdf(task_id, data, _DEFAULT_USERNAME)
+        stored = upload_prep_pdf(task_id, name, data, _DEFAULT_USERNAME)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
-    return {"ok": True, "task_id": task_id}
+    return {"ok": True, "task_id": task_id, "name": stored}
 
 
-@router.get("/pdf/{task_id}")
-def view_pdf(task_id: str):
-    """Stream the PDF inline (served from our origin so it embeds in an
-    iframe and reads in-app without downloading)."""
+@router.get("/pdf/{task_id}/{filename}")
+def view_pdf(task_id: str, filename: str):
+    """Stream one named PDF inline (served from our origin so it opens in a new
+    browser tab)."""
     if not _TASK_ID_RE.match(task_id):
         raise HTTPException(status_code=404, detail="Not found")
-    data = get_prep_pdf(task_id, _DEFAULT_USERNAME)
+    data = get_prep_pdf(task_id, filename, _DEFAULT_USERNAME)
     if not data:
-        raise HTTPException(status_code=404, detail="No PDF for this task")
+        raise HTTPException(status_code=404, detail="No such PDF")
+    safe = filename.replace('"', "")
     return Response(
         content=data,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'inline; filename="{task_id}.pdf"',
+            "Content-Disposition": f'inline; filename="{safe}"',
             "Cache-Control": "private, max-age=60",
         },
     )
 
 
-@router.delete("/pdf/{task_id}")
-def remove_pdf(task_id: str):
+@router.delete("/pdf/{task_id}/{filename}")
+def remove_pdf(task_id: str, filename: str):
     if not _TASK_ID_RE.match(task_id):
         raise HTTPException(status_code=404, detail="Not found")
-    delete_prep_pdf(task_id, _DEFAULT_USERNAME)
+    delete_prep_pdf(task_id, filename, _DEFAULT_USERNAME)
     return {"ok": True}
