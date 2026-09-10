@@ -69,14 +69,38 @@ def upsert_prep28(username="subidh", state=None):
 
 
 # ===================== BLOCK-B STUDY PDFs (Supabase Storage) =====================
-# Per Block-B task, the user can upload a PDF and read it inline in the app.
-# Stored privately in the "prep28-pdfs" bucket at "<username>/<task_id>.pdf".
+# Per Block-B task, the user can upload one or more PDFs and open each in a new
+# tab. Stored privately in the "prep28-pdfs" bucket, one folder per task:
+#   "<username>/<task_id>/<safe filename>.pdf"
+# The real filename is preserved so the app can show it and open a link to it.
+
+import re
 
 _PDF_BUCKET = "prep28-pdfs"
 
 
-def _pdf_path(task_id, username="subidh"):
-    return f"{username}/{task_id}.pdf"
+def _safe_name(filename):
+    """Sanitize an uploaded filename into a safe storage key.
+
+    Strips any path components, keeps a conservative character set, guarantees a
+    ".pdf" extension, and caps the length so it fits comfortably as a key.
+    """
+    name = str(filename or "").replace("\\", "/").split("/")[-1].strip()
+    name = re.sub(r"[^A-Za-z0-9._() -]", "_", name)
+    name = name.lstrip(".") or "document"
+    if not name.lower().endswith(".pdf"):
+        name = f"{name}.pdf"
+    if len(name) > 120:
+        name = name[-120:]
+    return name
+
+
+def _task_dir(task_id, username="subidh"):
+    return f"{username}/{task_id}"
+
+
+def _pdf_path(task_id, filename, username="subidh"):
+    return f"{_task_dir(task_id, username)}/{_safe_name(filename)}"
 
 
 def _ensure_pdf_bucket(db):
@@ -86,46 +110,74 @@ def _ensure_pdf_bucket(db):
         pass  # already exists — create is only needed once
 
 
-def upload_prep_pdf(task_id, data, username="subidh"):
-    """Store (or replace) the PDF for a Block-B task. Returns True on success."""
+def upload_prep_pdf(task_id, filename, data, username="subidh"):
+    """Store (or replace) a named PDF under a Block-B task. Returns the stored
+    (safe) filename."""
     db = _get_client()
     _ensure_pdf_bucket(db)
+    safe = _safe_name(filename)
     db.storage.from_(_PDF_BUCKET).upload(
-        _pdf_path(task_id, username),
+        _pdf_path(task_id, safe, username),
         data,
         {"content-type": "application/pdf", "upsert": "true"},
     )
-    return True
+    return safe
 
 
-def get_prep_pdf(task_id, username="subidh"):
-    """Return the PDF bytes for a task, or None if none stored."""
+def get_prep_pdf(task_id, filename, username="subidh"):
+    """Return the bytes for one named PDF under a task, or None."""
     try:
         db = _get_client()
-        return db.storage.from_(_PDF_BUCKET).download(_pdf_path(task_id, username))
+        return db.storage.from_(_PDF_BUCKET).download(
+            _pdf_path(task_id, filename, username)
+        )
     except Exception:
         return None
 
 
-def list_prep_pdf_ids(username="subidh"):
-    """Return the list of task ids that have an uploaded PDF."""
+def list_task_pdfs(task_id, username="subidh"):
+    """Return the filenames of PDFs stored under a single task."""
     try:
         db = _get_client()
-        items = db.storage.from_(_PDF_BUCKET).list(username)
-        return [
-            it["name"][:-4]
+        items = db.storage.from_(_PDF_BUCKET).list(_task_dir(task_id, username))
+        return sorted(
+            it["name"]
             for it in items
             if isinstance(it, dict) and str(it.get("name", "")).endswith(".pdf")
-        ]
+        )
     except Exception as e:
-        print(f"[prep28] list_prep_pdf_ids failed: {e}")
+        print(f"[prep28] list_task_pdfs failed: {e}")
         return []
 
 
-def delete_prep_pdf(task_id, username="subidh"):
+def list_all_prep_pdfs(username="subidh"):
+    """Return a mapping of task_id -> [filenames] for every task with PDFs."""
     try:
         db = _get_client()
-        db.storage.from_(_PDF_BUCKET).remove([_pdf_path(task_id, username)])
+        folders = db.storage.from_(_PDF_BUCKET).list(username)
+        out = {}
+        for f in folders:
+            if not isinstance(f, dict):
+                continue
+            task_id = str(f.get("name", ""))
+            # Folder entries have no file metadata (id is None for prefixes).
+            if not task_id or task_id.endswith(".pdf"):
+                continue
+            names = list_task_pdfs(task_id, username)
+            if names:
+                out[task_id] = names
+        return out
+    except Exception as e:
+        print(f"[prep28] list_all_prep_pdfs failed: {e}")
+        return {}
+
+
+def delete_prep_pdf(task_id, filename, username="subidh"):
+    try:
+        db = _get_client()
+        db.storage.from_(_PDF_BUCKET).remove(
+            [_pdf_path(task_id, filename, username)]
+        )
         return True
     except Exception:
         return False

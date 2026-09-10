@@ -298,23 +298,34 @@ export async function savePrep28(state: Prep28State): Promise<Prep28State> {
 }
 
 // ---- Block-B study PDFs ----
-// Inline view URL (served from our origin so it embeds without downloading).
-export function prepPdfUrl(taskId: string): string {
-  return `${API_URL}/api/prep28/pdf/${encodeURIComponent(taskId)}`;
+// Open-in-new-tab URL for one named PDF (served inline from our origin).
+export function prepPdfUrl(taskId: string, filename: string): string {
+  return `${API_URL}/api/prep28/pdf/${encodeURIComponent(
+    taskId
+  )}/${encodeURIComponent(filename)}`;
 }
 
-export async function listPrepPdfs(): Promise<string[]> {
-  const r = await apiFetch<{ task_ids: string[] }>("/api/prep28/pdfs");
-  return r.task_ids || [];
+// Returns a map of task id -> [filenames] for every Block-B task with PDFs.
+export async function listPrepPdfs(): Promise<Record<string, string[]>> {
+  const r = await apiFetch<{ pdfs: Record<string, string[]> }>(
+    "/api/prep28/pdfs"
+  );
+  return r.pdfs || {};
 }
 
 export async function uploadPrepPdf(taskId: string, file: File): Promise<void> {
-  // Raw-body upload (no multipart) — the backend reads request.body().
-  const res = await fetch(prepPdfUrl(taskId), {
-    method: "POST",
-    headers: { "Content-Type": "application/pdf" },
-    body: file,
-  });
+  // Raw-body upload (no multipart) — the backend reads request.body(); the
+  // display filename travels as a query param.
+  const res = await fetch(
+    `${API_URL}/api/prep28/pdf/${encodeURIComponent(
+      taskId
+    )}?name=${encodeURIComponent(file.name)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/pdf" },
+      body: file,
+    }
+  );
   if (!res.ok) {
     let detail = "Upload failed";
     try {
@@ -326,8 +337,14 @@ export async function uploadPrepPdf(taskId: string, file: File): Promise<void> {
   }
 }
 
-export async function deletePrepPdf(taskId: string): Promise<void> {
-  await apiFetch(`/api/prep28/pdf/${encodeURIComponent(taskId)}`, {
-    method: "DELETE",
-  });
+export async function deletePrepPdf(
+  taskId: string,
+  filename: string
+): Promise<void> {
+  await apiFetch(
+    `/api/prep28/pdf/${encodeURIComponent(taskId)}/${encodeURIComponent(
+      filename
+    )}`,
+    { method: "DELETE" }
+  );
 }
