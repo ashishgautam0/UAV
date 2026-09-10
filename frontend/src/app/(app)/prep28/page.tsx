@@ -8,7 +8,14 @@ import {
   recallAll,
   type BlockKey,
 } from "@/lib/prep28";
-import { getPrep28, savePrep28 } from "@/lib/api";
+import {
+  getPrep28,
+  savePrep28,
+  listPrepPdfs,
+  uploadPrepPdf,
+  deletePrepPdf,
+  prepPdfUrl,
+} from "@/lib/api";
 import {
   Card,
   CardHeader,
@@ -26,7 +33,17 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { GraduationCap, Check, ExternalLink, Copy, Sparkles } from "lucide-react";
+import {
+  GraduationCap,
+  Check,
+  ExternalLink,
+  Copy,
+  Sparkles,
+  FileText,
+  Upload,
+  Trash2,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -97,6 +114,50 @@ export default function Prep28Page() {
     new Date().toISOString().slice(0, 10)
   );
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ---- Block-B study PDFs ----
+  const [pdfIds, setPdfIds] = useState<Set<string>>(new Set());
+  const [pdfOpenId, setPdfOpenId] = useState<string | null>(null);
+  const [pdfUploading, setPdfUploading] = useState<string | null>(null);
+
+  useEffect(() => {
+    listPrepPdfs()
+      .then((ids) => setPdfIds(new Set(ids)))
+      .catch(() => {});
+  }, []);
+
+  async function handleUploadPdf(taskId: string, file: File) {
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      toast.error("Please choose a PDF file.");
+      return;
+    }
+    setPdfUploading(taskId);
+    try {
+      await uploadPrepPdf(taskId, file);
+      setPdfIds((prev) => new Set(prev).add(taskId));
+      setPdfOpenId(taskId);
+      toast.success("PDF uploaded");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setPdfUploading(null);
+    }
+  }
+
+  async function handleRemovePdf(taskId: string) {
+    try {
+      await deletePrepPdf(taskId);
+      setPdfIds((prev) => {
+        const next = new Set(prev);
+        next.delete(taskId);
+        return next;
+      });
+      if (pdfOpenId === taskId) setPdfOpenId(null);
+      toast.success("PDF removed");
+    } catch {
+      toast.error("Failed to remove PDF");
+    }
+  }
 
   useEffect(() => {
     // 1) Paint instantly from the local cache (offline-friendly).
@@ -398,6 +459,16 @@ export default function Prep28Page() {
                     done={isDone(t.id)}
                     fromDay={t.day}
                     onToggle={() => toggle(t.id)}
+                    showPdf={sess === "b"}
+                    hasPdf={pdfIds.has(t.id)}
+                    pdfOpen={pdfOpenId === t.id}
+                    uploading={pdfUploading === t.id}
+                    pdfUrl={prepPdfUrl(t.id)}
+                    onUploadPdf={(f) => handleUploadPdf(t.id, f)}
+                    onTogglePdf={() =>
+                      setPdfOpenId((p) => (p === t.id ? null : t.id))
+                    }
+                    onRemovePdf={() => handleRemovePdf(t.id)}
                   />
                 ))}
               </>
@@ -417,6 +488,16 @@ export default function Prep28Page() {
                 task={t}
                 done={isDone(t.id)}
                 onToggle={() => toggle(t.id)}
+                showPdf={sess === "b"}
+                hasPdf={pdfIds.has(t.id)}
+                pdfOpen={pdfOpenId === t.id}
+                uploading={pdfUploading === t.id}
+                pdfUrl={prepPdfUrl(t.id)}
+                onUploadPdf={(f) => handleUploadPdf(t.id, f)}
+                onTogglePdf={() =>
+                  setPdfOpenId((p) => (p === t.id ? null : t.id))
+                }
+                onRemovePdf={() => handleRemovePdf(t.id)}
               />
             ))}
           </>
@@ -451,12 +532,29 @@ function TaskCard({
   done,
   fromDay,
   onToggle,
+  showPdf = false,
+  hasPdf = false,
+  pdfOpen = false,
+  uploading = false,
+  pdfUrl,
+  onUploadPdf,
+  onTogglePdf,
+  onRemovePdf,
 }: {
   task: { t: string; d: string; u: string };
   done: boolean;
   fromDay?: number;
   onToggle: () => void;
+  showPdf?: boolean;
+  hasPdf?: boolean;
+  pdfOpen?: boolean;
+  uploading?: boolean;
+  pdfUrl?: string;
+  onUploadPdf?: (file: File) => void;
+  onTogglePdf?: () => void;
+  onRemovePdf?: () => void;
 }) {
+  const fileRef = useRef<HTMLInputElement>(null);
   return (
     <div
       className={cn(
@@ -475,15 +573,95 @@ function TaskCard({
             from Day {fromDay}
           </Badge>
         )}
-        <a
-          href={task.u}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-0.5 inline-flex items-center gap-1 text-xs text-sky-400 hover:underline"
-        >
-          Open on Educative
-          <ExternalLink className="h-3 w-3" />
-        </a>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <a
+            href={task.u}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-0.5 inline-flex items-center gap-1 text-xs text-sky-400 hover:underline"
+          >
+            Open on Educative
+            <ExternalLink className="h-3 w-3" />
+          </a>
+
+          {showPdf && (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) onUploadPdf?.(f);
+                  e.target.value = "";
+                }}
+              />
+              {hasPdf ? (
+                <>
+                  <button
+                    onClick={onTogglePdf}
+                    className="inline-flex items-center gap-1 text-xs text-emerald-400 hover:underline"
+                  >
+                    <FileText className="h-3 w-3" />
+                    {pdfOpen ? "Hide PDF" : "Read PDF"}
+                  </button>
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploading}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    {uploading ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Upload className="h-3 w-3" />
+                    )}
+                    Replace
+                  </button>
+                  <button
+                    onClick={onRemovePdf}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-red-400"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Remove
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                  className="inline-flex items-center gap-1 text-xs text-sky-400 hover:underline"
+                >
+                  {uploading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Upload className="h-3 w-3" />
+                  )}
+                  {uploading ? "Uploading…" : "Add PDF"}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+
+        {showPdf && hasPdf && pdfOpen && pdfUrl && (
+          <div className="mt-2 space-y-1">
+            <iframe
+              src={pdfUrl}
+              title={`PDF — ${task.t}`}
+              className="h-[75vh] w-full rounded border border-border bg-white"
+            />
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:underline"
+            >
+              Open in a new tab
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );
