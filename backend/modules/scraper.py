@@ -105,6 +105,24 @@ def _is_india_or_remote(location_str):
     return "india" in loc or "remote" in loc
 
 
+# Gulf / tax-free markets (the "zero tax" region: UAE + Saudi + wider GCC).
+_GULF_TERMS = [
+    "united arab emirates", "uae", "dubai", "abu dhabi", "sharjah",
+    "saudi arabia", "ksa", "riyadh", "jeddah", "dammam", "khobar",
+    "qatar", "doha", "kuwait", "bahrain", "manama", "oman", "muscat",
+    "remote",
+]
+
+
+def _is_gulf(location_str):
+    """Keep job if it's in a Gulf / tax-free market (UAE, Saudi, wider GCC)
+    or remote. Mirrors _is_india_or_remote for the Gulf sweep."""
+    if not location_str or not location_str.strip():
+        return False
+    loc = location_str.lower()
+    return any(term in loc for term in _GULF_TERMS)
+
+
 def _load_blacklist():
     """Load company blacklist from blacklist.txt. Returns a set of lowercase names."""
     blacklist_path = os.path.join(os.path.dirname(__file__), "..", "..", "blacklist.txt")
@@ -422,6 +440,34 @@ def scrape_google_jobs():
     return _scrape_jobspy_board("google", "Google Jobs")
 
 
+def scrape_gulf():
+    """Gulf / tax-free markets (UAE + Saudi) via Indeed's country domains.
+
+    This is the free, working stand-in for Cloudflare-walled Gulf boards like
+    zerotaxjobs.com and bot-blocked Bayt — Indeed serves ae.indeed.com and
+    sa.indeed.com from datacenter IPs, returning real Dubai/Riyadh AI/ML roles.
+    Each country needs its own `country_indeed` (it picks the Indeed domain), so
+    the two sweeps run separately and merge with title+company dedup."""
+    regions = [
+        ("United Arab Emirates", ["Dubai", "Abu Dhabi"]),
+        ("Saudi Arabia", ["Riyadh", "Jeddah"]),
+    ]
+    dedup_map = {}
+    for country, locs in regions:
+        for job in _scrape_jobspy_board(
+            "indeed", "Gulf (tax-free)",
+            country_indeed=country, locations=locs, location_ok=_is_gulf,
+        ):
+            key = _normalize_for_dedup(job["title"]) + "||" + _normalize_for_dedup(job["company"])
+            if key in dedup_map:
+                dedup_map[key]["match_count"] += 1
+            else:
+                dedup_map[key] = job
+    jobs = list(dedup_map.values())
+    print(f"--- Gulf (tax-free): {len(jobs)} jobs after filter+dedup ---")
+    return jobs
+
+
 def scrape_amazon_jobs():
     """AWS's own careers (amazon.jobs) via its public search.json — the source
     most likely to want AWS. India + AWS/ML/AI queries."""
@@ -551,8 +597,12 @@ def run_all_scrapers():
         ("Indeed India", scrape_indeed_india),
         ("amazon.jobs", scrape_amazon_jobs),
         ("Partner ATS", scrape_partner_ats),
+        ("Gulf (tax-free)", scrape_gulf),
         ("LinkedIn AI/ML", scrape_linkedin),
     ]
+    if os.environ.get("SKIP_GULF") == "1":
+        scrapers = [s for s in scrapers if s[0] != "Gulf (tax-free)"]
+        print("SKIP_GULF=1 — skipping the Gulf sweep for this run.")
     if os.environ.get("SKIP_LINKEDIN") == "1":
         scrapers = [s for s in scrapers if s[0] != "LinkedIn AI/ML"]
         print("SKIP_LINKEDIN=1 — skipping LinkedIn for this run.")
