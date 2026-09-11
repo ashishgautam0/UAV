@@ -314,26 +314,24 @@ export async function listPrepPdfs(): Promise<Record<string, string[]>> {
 }
 
 export async function uploadPrepPdf(taskId: string, file: File): Promise<void> {
-  // Raw-body upload (no multipart) — the backend reads request.body(); the
-  // display filename travels as a query param.
-  const res = await fetch(
-    `${API_URL}/api/prep28/pdf/${encodeURIComponent(
+  // Two steps, on purpose: ask the API for a signed URL, then send the bytes
+  // straight to storage. Routing the file through the API fails — the platform
+  // caps serverless request bodies at ~4.5 MB and rejects any real study PDF
+  // with a 413 before our code ever runs.
+  const { signed_url } = await apiFetch<{ signed_url: string; name: string }>(
+    `/api/prep28/pdf-url/${encodeURIComponent(
       taskId
     )}?name=${encodeURIComponent(file.name)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/pdf" },
-      body: file,
-    }
+    { method: "POST" }
   );
+
+  const res = await fetch(signed_url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/pdf" },
+    body: file,
+  });
   if (!res.ok) {
-    let detail = "Upload failed";
-    try {
-      detail = (await res.json()).detail || detail;
-    } catch {
-      /* non-JSON error */
-    }
-    throw new Error(detail);
+    throw new Error(`Upload failed (${res.status})`);
   }
 }
 

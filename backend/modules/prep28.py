@@ -124,6 +124,39 @@ def upload_prep_pdf(task_id, filename, data, username="subidh"):
     return safe
 
 
+def create_pdf_upload_url(task_id, filename, username="subidh"):
+    """Signed URL letting the browser upload straight to Supabase Storage.
+
+    Uploads must NOT be proxied through the API: the serverless platform caps
+    request bodies at ~4.5 MB and rejects anything larger with a 413 before our
+    code runs, which is smaller than a real study PDF. The browser PUTs the
+    bytes to this URL instead, so only the signed-URL request touches the API.
+    """
+    from storage3.types import CreateSignedUploadUrlOptions
+
+    db = _get_client()
+    _ensure_pdf_bucket(db)
+    safe = _safe_name(filename)
+    res = db.storage.from_(_PDF_BUCKET).create_signed_upload_url(
+        _pdf_path(task_id, safe, username),
+        CreateSignedUploadUrlOptions(upsert="true"),
+    )
+    return {"signed_url": res["signed_url"], "name": safe}
+
+
+def create_pdf_view_url(task_id, filename, username="subidh", expires_in=3600):
+    """Short-lived signed URL to read one PDF straight from Supabase Storage.
+
+    Responses are size-capped on the serverless platform too, so the API
+    redirects to this instead of streaming the bytes itself.
+    """
+    db = _get_client()
+    res = db.storage.from_(_PDF_BUCKET).create_signed_url(
+        _pdf_path(task_id, filename, username), expires_in
+    )
+    return res.get("signedURL") or res.get("signedUrl")
+
+
 def get_prep_pdf(task_id, filename, username="subidh"):
     """Return the bytes for one named PDF under a task, or None."""
     try:
