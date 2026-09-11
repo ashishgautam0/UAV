@@ -103,6 +103,19 @@ def _pdf_path(task_id, filename, username="subidh"):
     return f"{_task_dir(task_id, username)}/{_safe_name(filename)}"
 
 
+def _encode_url_path(url):
+    """Percent-encode the path of a signed URL, leaving the query intact.
+
+    The storage client builds the signed URL by concatenating the raw object
+    key, so a filename containing a space yields a malformed URL that strict
+    clients reject outright.
+    """
+    from urllib.parse import quote, urlsplit, urlunsplit
+
+    parts = urlsplit(url)
+    return urlunsplit(parts._replace(path=quote(parts.path, safe="/%")))
+
+
 def _ensure_pdf_bucket(db):
     try:
         db.storage.create_bucket(_PDF_BUCKET, options={"public": False})
@@ -141,7 +154,7 @@ def create_pdf_upload_url(task_id, filename, username="subidh"):
         _pdf_path(task_id, safe, username),
         CreateSignedUploadUrlOptions(upsert="true"),
     )
-    return {"signed_url": res["signed_url"], "name": safe}
+    return {"signed_url": _encode_url_path(res["signed_url"]), "name": safe}
 
 
 def create_pdf_view_url(task_id, filename, username="subidh", expires_in=3600):
@@ -173,10 +186,13 @@ def list_task_pdfs(task_id, username="subidh"):
     try:
         db = _get_client()
         items = db.storage.from_(_PDF_BUCKET).list(_task_dir(task_id, username))
+        # Case-insensitive: real-world files are often named ".PDF", and a
+        # case-sensitive match silently hides them from the UI.
         return sorted(
             it["name"]
             for it in items
-            if isinstance(it, dict) and str(it.get("name", "")).endswith(".pdf")
+            if isinstance(it, dict)
+            and str(it.get("name", "")).lower().endswith(".pdf")
         )
     except Exception as e:
         print(f"[prep28] list_task_pdfs failed: {e}")
@@ -193,8 +209,9 @@ def list_all_prep_pdfs(username="subidh"):
             if not isinstance(f, dict):
                 continue
             task_id = str(f.get("name", ""))
-            # Folder entries have no file metadata (id is None for prefixes).
-            if not task_id or task_id.endswith(".pdf"):
+            # Folder entries have no file metadata (id is None for prefixes);
+            # anything ending in .pdf here is a stray file, not a task folder.
+            if not task_id or task_id.lower().endswith(".pdf"):
                 continue
             names = list_task_pdfs(task_id, username)
             if names:
