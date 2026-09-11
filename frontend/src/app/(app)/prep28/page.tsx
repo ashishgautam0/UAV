@@ -118,6 +118,10 @@ export default function Prep28Page() {
   // ---- Block-B study PDFs (multiple per task) ----
   const [pdfMap, setPdfMap] = useState<Record<string, string[]>>({});
   const [pdfUploading, setPdfUploading] = useState<string | null>(null);
+  // Upload failures stay on screen until the next attempt — a toast disappears
+  // before you can read it, which made failed uploads look like nothing at all
+  // had happened.
+  const [pdfError, setPdfError] = useState<Record<string, string>>({});
 
   useEffect(() => {
     listPrepPdfs()
@@ -130,8 +134,13 @@ export default function Prep28Page() {
       (f) =>
         f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")
     );
+    setPdfError((p) => {
+      const n = { ...p };
+      delete n[taskId];
+      return n;
+    });
     if (pdfs.length === 0) {
-      toast.error("Please choose PDF file(s).");
+      setPdfError((p) => ({ ...p, [taskId]: "That file isn't a PDF." }));
       return;
     }
     setPdfUploading(taskId);
@@ -142,9 +151,14 @@ export default function Prep28Page() {
       // Re-read the task's list so we reflect the server-side (safe) names.
       const fresh = await listPrepPdfs();
       setPdfMap(fresh);
+      if (!fresh[taskId]?.length) {
+        throw new Error("Upload reported success but the file isn't stored.");
+      }
       toast.success(pdfs.length > 1 ? `${pdfs.length} PDFs uploaded` : "PDF uploaded");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Upload failed");
+      const msg = e instanceof Error ? e.message : String(e);
+      setPdfError((p) => ({ ...p, [taskId]: msg }));
+      toast.error(msg);
     } finally {
       setPdfUploading(null);
     }
@@ -472,6 +486,7 @@ export default function Prep28Page() {
                     showPdf={sess === "b"}
                     pdfs={pdfMap[t.id] || []}
                     uploading={pdfUploading === t.id}
+                    uploadError={pdfError[t.id]}
                     pdfHref={(name) => prepPdfUrl(t.id, name)}
                     onUploadPdf={(files) => handleUploadPdf(t.id, files)}
                     onRemovePdf={(name) => handleRemovePdf(t.id, name)}
@@ -497,6 +512,7 @@ export default function Prep28Page() {
                 showPdf={sess === "b"}
                 pdfs={pdfMap[t.id] || []}
                 uploading={pdfUploading === t.id}
+                uploadError={pdfError[t.id]}
                 pdfHref={(name) => prepPdfUrl(t.id, name)}
                 onUploadPdf={(files) => handleUploadPdf(t.id, files)}
                 onRemovePdf={(name) => handleRemovePdf(t.id, name)}
@@ -537,6 +553,7 @@ function TaskCard({
   showPdf = false,
   pdfs = [],
   uploading = false,
+  uploadError,
   pdfHref,
   onUploadPdf,
   onRemovePdf,
@@ -548,6 +565,7 @@ function TaskCard({
   showPdf?: boolean;
   pdfs?: string[];
   uploading?: boolean;
+  uploadError?: string;
   pdfHref?: (filename: string) => string;
   onUploadPdf?: (files: File[]) => void;
   onRemovePdf?: (filename: string) => void;
@@ -591,9 +609,15 @@ function TaskCard({
                 multiple
                 className="hidden"
                 onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
-                  if (files.length) onUploadPdf?.(files);
-                  e.target.value = "";
+                  const input = e.target;
+                  const files = Array.from(input.files || []);
+                  if (!files.length) return;
+                  // Reset the picker only once the bytes have been read —
+                  // clearing it while the upload is still streaming the file
+                  // can abort the read in some browsers.
+                  Promise.resolve(onUploadPdf?.(files)).finally(() => {
+                    input.value = "";
+                  });
                 }}
               />
               <button
@@ -611,6 +635,12 @@ function TaskCard({
             </>
           )}
         </div>
+
+        {showPdf && uploadError && (
+          <p className="mt-1.5 break-words rounded-md border border-red-500/30 bg-red-500/5 px-2 py-1.5 text-[11px] leading-relaxed text-red-400">
+            Upload failed: {uploadError}
+          </p>
+        )}
 
         {showPdf && pdfs.length > 0 && (
           <ul className="mt-1.5 space-y-1">
