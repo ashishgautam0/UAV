@@ -34,6 +34,12 @@ _LINKEDIN_SEARCH_QUERIES = [
     "ai research engineer",
     "research engineer ai",
     "applied scientist",
+    # Research roles — Subidh holds an M.Tech, which these postings usually
+    # ask for explicitly, so the degree is a real differentiator here.
+    "research engineer",
+    "research scientist",
+    "machine learning research engineer",
+    "ai research scientist",
     "software development engineer",
     "software engineer ai",
     "python developer",
@@ -80,6 +86,10 @@ _BOARD_SEARCH_QUERIES = [
     "aws certified developer",
     "aws certified solutions architect",
     "aws certified machine learning engineer",
+    # Research roles (M.Tech is a stated requirement in most of these).
+    "research engineer",
+    "research scientist",
+    "applied scientist",
 ]
 
 _LINKEDIN_LOCATIONS = ["India", "Remote"]
@@ -91,6 +101,9 @@ _TITLE_INCLUDE = [
     "large language model", "langchain", "rag", "agentic ai",
     "ai trainee", "deep learning", "computer vision", "data science",
     "aws", "mlops", "cloud ai", "cloud ml", "sagemaker",
+    # Research titles. Kept as full phrases, never a bare "research", so
+    # market/clinical research postings don't slip through.
+    "research engineer", "research scientist", "applied scientist",
 ]
 
 # "cloud" and "devops" removed from rejects: AWS/cloud roles (incl. AWS DevOps)
@@ -99,6 +112,10 @@ _TITLE_INCLUDE = [
 _TITLE_REJECT = [
     "frontend", "react", "angular", "ui/ux", "data analyst",
     "content", "marketing", "sales", "hr", "finance", "blockchain",
+    # Security is explicitly out of scope. REJECT is checked before the
+    # include-gate and is the one filter the "aws certified" queries still
+    # honour, so these stay out of that sweep too.
+    "security", "cyber", "infosec", "penetration test", "soc analyst",
 ]
 
 # Exact phrases score higher than partial keyword matches
