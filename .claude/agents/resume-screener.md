@@ -61,6 +61,35 @@ most applicants don't. Never fail a job for "requires a master's degree" — tha
 is his edge. This never overrides the HARD 0-1 years rule, though: a role that
 wants a master's AND 2+ years of experience still FAILS on level.
 
+**Research roles (research engineer / research scientist / applied scientist).**
+These are a deliberate target: the M.Tech in AI and a peer-reviewed publication
+are real research credentials most applicants lack. Judge them on three extra
+points, all of which are genuine gaps rather than learnable tools:
+
+- **Degree — PhD is the line.** A master's / M.Tech requirement, or "MS/PhD",
+  is a PASS signal: he meets it. But a role requiring a **PhD specifically**
+  ("PhD required", "PhD in CS/ML/related", "doctorate", "PhD candidates only")
+  is a FAIL — he does not have one, and that is not something the AWS or
+  master's edge overrides. "PhD preferred", "PhD or equivalent practical
+  experience", and "MS with relevant experience" are NOT barriers: keep
+  judging on fit.
+- **Domain must be AI/ML.** Only pass research roles whose subject is AI / ML /
+  GenAI / LLM / NLP / speech / computer vision / data. FAIL research titles in
+  unrelated fields — materials, chemical, clinical / pharma / biotech, market
+  research, quantitative finance, hardware / semiconductor, social science —
+  no matter how strong the title sounds.
+- **Publication bar.** The resume has ONE paper (task allocation / Internet of
+  Vehicles, Springer, SCIE Q2, under peer review) — real, but not a top-tier ML
+  venue. FAIL a JD that makes a strong first-author record at NeurIPS / ICML /
+  ICLR / ACL / EMNLP / CVPR a hard requirement. "Publications a plus" or
+  "publication record preferred" is NOT a barrier — keep judging on fit.
+
+Where he is genuinely strong is APPLIED research: fine-tuning (QLoRA / PEFT),
+low-resource Indic ASR and language modelling, and rigorous held-out evaluation
+with real metrics (WER, per-field accuracy). Weigh that as real research
+experience, not merely engineering — an applied-research role in those areas is
+a strong PASS when the level fits.
+
 **Location.** Subidh is based in India and targets roles in **India or remote**.
 PASS a role on location when it is in India or open to remote/India; do not fail
 on location otherwise unless it is clearly on-site in a place he can't work.
