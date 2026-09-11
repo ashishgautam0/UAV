@@ -43,7 +43,6 @@ import {
   Upload,
   Trash2,
   Loader2,
-  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -73,19 +72,6 @@ function writeState(s: PrepState) {
 }
 
 const tid = (d: number, blk: BlockKey, i: number) => `${d}-${blk}-${i}`;
-
-// Task ids look like "<day>-<block>-<index>" — used to label/sort library rows.
-function taskDay(taskId: string): number {
-  return Number(taskId.split("-")[0]) || 0;
-}
-
-function taskLabel(taskId: string): string {
-  const [d, , i] = taskId.split("-");
-  const day = Number(d);
-  const idx = Number(i);
-  const task = PLAN[day - 1]?.b?.[idx];
-  return task ? `Day ${day} · ${task.t}` : `Day ${day}`;
-}
 
 function autoSession(): BlockKey {
   const h = new Date().getHours();
@@ -132,26 +118,12 @@ export default function Prep28Page() {
   // ---- Block-B study PDFs (multiple per task) ----
   const [pdfMap, setPdfMap] = useState<Record<string, string[]>>({});
   const [pdfUploading, setPdfUploading] = useState<string | null>(null);
-  const [libOpen, setLibOpen] = useState(false);
 
   useEffect(() => {
     listPrepPdfs()
       .then((m) => setPdfMap(m))
       .catch(() => toast.error("Couldn't load your study PDFs"));
   }, []);
-
-  // Every uploaded PDF across all days, newest day first.
-  const libEntries = useMemo(
-    () =>
-      Object.entries(pdfMap)
-        .filter(([, names]) => names.length > 0)
-        .sort((a, b) => taskDay(a[0]) - taskDay(b[0])),
-    [pdfMap]
-  );
-  const libCount = useMemo(
-    () => libEntries.reduce((n, [, names]) => n + names.length, 0),
-    [libEntries]
-  );
 
   async function handleUploadPdf(taskId: string, files: File[]) {
     const pdfs = files.filter(
@@ -434,76 +406,6 @@ export default function Prep28Page() {
           </div>
         </div>
 
-        {/* Study-PDF library — every uploaded PDF, from any day, in one place.
-            Without this, a PDF is only reachable on the exact day/task it was
-            uploaded to. */}
-        <div className="rounded-lg border bg-card">
-          <button
-            onClick={() => setLibOpen((o) => !o)}
-            className="flex w-full items-center justify-between gap-2 p-3 text-left"
-          >
-            <span className="flex items-center gap-2 text-sm font-medium">
-              <FileText className="h-4 w-4 text-emerald-400" />
-              My study PDFs
-              <Badge variant="outline" className="text-[10px]">
-                {libCount}
-              </Badge>
-            </span>
-            <ChevronDown
-              className={cn(
-                "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                libOpen && "rotate-180"
-              )}
-            />
-          </button>
-
-          {libOpen && (
-            <div className="space-y-2 border-t p-3">
-              {libCount === 0 ? (
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  No PDFs yet. Switch to{" "}
-                  <span className="text-emerald-400">Block B · ML/GenAI</span>{" "}
-                  and use <span className="text-sky-400">Add PDF</span> on any
-                  task — you can pick several files at once. They&apos;ll all
-                  show up here, from every day.
-                </p>
-              ) : (
-                libEntries.map(([taskId, names]) => (
-                  <div key={taskId} className="space-y-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {taskLabel(taskId)}
-                    </p>
-                    {names.map((name) => (
-                      <div
-                        key={name}
-                        className="flex items-center gap-2 rounded-md border border-border/60 bg-background/50 px-2 py-1.5"
-                      >
-                        <FileText className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-                        <a
-                          href={prepPdfUrl(taskId, name)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="min-w-0 flex-1 truncate text-xs text-emerald-400 hover:underline"
-                          title={name}
-                        >
-                          {name}
-                        </a>
-                        <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
-                        <button
-                          onClick={() => handleRemovePdf(taskId, name)}
-                          aria-label={`Remove ${name}`}
-                          className="shrink-0 text-muted-foreground hover:text-red-400"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Content */}
