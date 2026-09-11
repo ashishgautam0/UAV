@@ -53,6 +53,15 @@ _LINKEDIN_SEARCH_QUERIES = [
     "cloud ai engineer",
     "machine learning engineer aws certified",
     "ai engineer cloud",
+    # AWS-certified roles — Subidh holds AWS certifications, so surface postings
+    # that explicitly ask for them (a genuine differentiator).
+    "aws certified engineer",
+    "aws certified developer",
+    "aws certified solutions architect",
+    "aws certified machine learning engineer",
+    "aws certified data engineer",
+    "aws certified devops engineer",
+    "aws certified cloud engineer",
 ]
 
 # Focused query set for the additional boards (Naukri / Indeed / Google Jobs):
@@ -66,6 +75,11 @@ _BOARD_SEARCH_QUERIES = [
     "machine learning engineer",
     "ai engineer",
     "generative ai engineer",
+    # AWS-certified roles across every board.
+    "aws certified engineer",
+    "aws certified developer",
+    "aws certified solutions architect",
+    "aws certified machine learning engineer",
 ]
 
 _LINKEDIN_LOCATIONS = ["India", "Remote"]
@@ -378,11 +392,20 @@ def _scrape_jobspy_board(site, label, country_indeed=None, locations=None,
                 kwargs["google_search_term"] = f"{query} jobs in {google_region} since yesterday"
             results = scrape_jobs(**kwargs)
 
+            # "aws certified ..." roles are usually titled generically (DevOps,
+            # Cloud/Solutions Architect, Security) with the cert named in the JD,
+            # so the query itself guarantees AWS relevance — trust it and only
+            # drop clearly off-target titles (frontend/marketing/etc.).
+            is_aws_cert = "aws certified" in query.lower()
+
             for _, row in results.iterrows():
                 title = str(row.get("title", "")).strip()
                 if not title or is_internship(title):
                     continue
-                if not _title_passes_filter(title):
+                if is_aws_cert:
+                    if any(kw in title.lower() for kw in _TITLE_REJECT):
+                        continue
+                elif not _title_passes_filter(title):
                     continue
                 loc_str = str(row.get("location", "")).strip()
                 # Google and Gulf sweeps enforce the region; India boards keep
