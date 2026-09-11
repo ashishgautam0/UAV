@@ -236,10 +236,12 @@ export default function Prep28Page() {
   }
 
   function pickSession(value: string) {
-    // Manual pick is session-only; on reload it auto-detects again (matches
-    // the original behaviour), so clear the stored session.
+    // Persist the manual pick so it survives a reload/reopen — previously this
+    // was cleared and silently reverted to the time-of-day auto-detected block,
+    // which made a manually-selected Block B (and its PDF uploads) disappear
+    // the next time the page loaded.
     setSess(value as BlockKey);
-    persist({ ...state, sess: null });
+    persist({ ...state, sess: value as BlockKey });
   }
 
   function confirmStart() {
