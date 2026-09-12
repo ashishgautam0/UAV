@@ -76,7 +76,6 @@ const tid = (d: number, blk: BlockKey, i: number) => `${d}-${blk}-${i}`;
 function autoSession(): BlockKey {
   const h = new Date().getHours();
   if (h >= 20 || h < 5) return "r";
-  if (h < 9.5 && h >= 5) return "a";
   return "b";
 }
 
@@ -100,7 +99,6 @@ function computeDay(s: PrepState): number {
 }
 
 const BLOCK_ACCENT: Record<BlockKey, string> = {
-  a: "text-primary",
   b: "text-emerald-400",
   r: "text-violet-400",
 };
@@ -108,7 +106,7 @@ const BLOCK_ACCENT: Record<BlockKey, string> = {
 export default function Prep28Page() {
   const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<PrepState>({});
-  const [sess, setSess] = useState<BlockKey>("a");
+  const [sess, setSess] = useState<BlockKey>("b");
   const [showStart, setShowStart] = useState(false);
   const [startInput, setStartInput] = useState(() =>
     new Date().toISOString().slice(0, 10)
@@ -278,7 +276,7 @@ export default function Prep28Page() {
     let total = 0;
     let tdone = 0;
     PLAN.forEach((p, di) => {
-      (["a", "b", "r"] as BlockKey[]).forEach((b) => {
+      (["b", "r"] as BlockKey[]).forEach((b) => {
         const n = (b === "r" ? p.r : p[b]).length;
         total += n;
         for (let i = 0; i < n; i++) {
@@ -290,7 +288,7 @@ export default function Prep28Page() {
       });
     });
     const cur = PLAN[day - 1];
-    const todayN = cur.a.length + cur.b.length + cur.r.length;
+    const todayN = cur.b.length + cur.r.length;
     return {
       pct: total ? (100 * doneCount) / total : 0,
       doneCount,
@@ -306,11 +304,9 @@ export default function Prep28Page() {
   const footnote =
     sess === "r"
       ? "No screen after copying — paste the prompt to Claude, put the phone face-down, and answer out loud."
-      : sess === "a"
-        ? "Attempt before revealing. 25-minute cap on mediums — then read the solution and weak-list it."
-        : "Interviews eat Block B, never Block A.";
+      : "Protect this block — interviews should never eat it.";
 
-  // carried tasks (a/b): unchecked from all previous days, this block
+  // carried tasks: unchecked Block B items from all previous days
   const carried =
     sess === "r"
       ? []
@@ -396,7 +392,6 @@ export default function Prep28Page() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="a">Block A · Coding</SelectItem>
                 <SelectItem value="b">Block B · ML/GenAI</SelectItem>
                 <SelectItem value="r">Recall</SelectItem>
               </SelectContent>
