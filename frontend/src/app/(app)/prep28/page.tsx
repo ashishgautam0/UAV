@@ -243,7 +243,7 @@ export default function Prep28Page() {
   }
 
   function pickDay(value: string) {
-    persist({ ...state, dayOverride: value === "auto" ? null : Number(value) });
+    persist({ ...state, dayOverride: Number(value) });
   }
 
   function confirmStart() {
@@ -357,15 +357,11 @@ export default function Prep28Page() {
             </span>
           </h1>
           <div className="flex gap-2">
-            <Select
-              value={state.dayOverride ? String(day) : "auto"}
-              onValueChange={pickDay}
-            >
+            <Select value={String(day)} onValueChange={pickDay}>
               <SelectTrigger className="w-[120px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="auto">Day: auto</SelectItem>
                 {Array.from({ length: PLAN_DAYS }, (_, i) => (
                   <SelectItem key={i + 1} value={String(i + 1)}>
                     Day {i + 1}
