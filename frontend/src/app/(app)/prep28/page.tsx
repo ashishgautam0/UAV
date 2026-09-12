@@ -32,6 +32,9 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  SelectGroup,
+  SelectLabel,
+  SelectSeparator,
 } from "@/components/ui/select";
 import {
   GraduationCap,
@@ -382,28 +385,31 @@ export default function Prep28Page() {
           </h1>
           <div className="flex gap-2">
             <Select
-              value={state.dayOverride ? String(day) : "auto"}
-              onValueChange={pickDay}
+              value={state.dayOverride ? `day:${day}` : "day:auto"}
+              onValueChange={(value) => {
+                if (value.startsWith("day:")) pickDay(value.slice(4));
+                else if (value.startsWith("sess:")) pickSession(value.slice(5));
+              }}
             >
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="w-[160px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="auto">Day: auto</SelectItem>
-                {Array.from({ length: 28 }, (_, i) => (
-                  <SelectItem key={i + 1} value={String(i + 1)}>
-                    Day {i + 1}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={sess} onValueChange={pickSession}>
-              <SelectTrigger className="w-[130px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="b">Block B · ML/GenAI</SelectItem>
-                <SelectItem value="r">Recall</SelectItem>
+                <SelectGroup>
+                  <SelectLabel>Day</SelectLabel>
+                  <SelectItem value="day:auto">Day: auto</SelectItem>
+                  {Array.from({ length: 28 }, (_, i) => (
+                    <SelectItem key={i + 1} value={`day:${i + 1}`}>
+                      Day {i + 1}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel>Session</SelectLabel>
+                  <SelectItem value="sess:b">Block B · ML/GenAI</SelectItem>
+                  <SelectItem value="sess:r">Recall</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
