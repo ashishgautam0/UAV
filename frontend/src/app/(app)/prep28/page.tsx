@@ -79,6 +79,15 @@ function autoSession(): BlockKey {
   return "b";
 }
 
+// Saved state can name a block that no longer exists — "a" (coding) was
+// dropped from the plan but is still persisted in older local/Supabase state.
+// Unknown values become null ("no manual pick") rather than a concrete block,
+// so they clear themselves without pinning the session and disabling the
+// time-of-day switch to Recall.
+function storedSession(v: unknown): BlockKey | null {
+  return v === "b" || v === "r" ? v : null;
+}
+
 // Does this state hold any real progress worth preserving? Used to decide
 // whether a first-load empty server row should adopt existing local progress.
 function hasProgress(s: PrepState): boolean {
@@ -181,8 +190,9 @@ export default function Prep28Page() {
   useEffect(() => {
     // 1) Paint instantly from the local cache (offline-friendly).
     const local = readState();
-    setState(local);
-    setSess(local.sess || autoSession());
+    const localSess = storedSession(local.sess);
+    setState({ ...local, sess: localSess });
+    setSess(localSess ?? autoSession());
     setMounted(true);
 
     // 2) Reconcile with Supabase (source of truth across devices).
@@ -194,13 +204,13 @@ export default function Prep28Page() {
         const serverState: PrepState = {
           start: server.start ?? null,
           dayOverride: server.dayOverride ?? null,
-          sess: (server.sess as BlockKey | null) ?? null,
+          sess: storedSession(server.sess),
           done: server.done ?? {},
         };
         if (hasProgress(serverState)) {
           // Server has real data — it wins; refresh the local cache.
           setState(serverState);
-          setSess(serverState.sess || autoSession());
+          setSess(serverState.sess ?? autoSession());
           writeState(serverState);
           setShowStart(!serverState.start);
         } else if (hasProgress(local)) {
@@ -311,7 +321,7 @@ export default function Prep28Page() {
     sess === "r"
       ? []
       : Array.from({ length: day - 1 }, (_, k) => k + 1).flatMap((d) =>
-          PLAN[d - 1][sess]
+          (PLAN[d - 1]?.[sess] ?? [])
             .map((t, i) => ({ ...t, day: d, id: tid(d, sess, i) }))
             .filter((t) => !isDone(t.id))
         );
@@ -327,7 +337,7 @@ export default function Prep28Page() {
   const todaysAB =
     sess === "r"
       ? []
-      : PLAN[day - 1][sess].map((t, i) => ({ ...t, day, id: tid(day, sess, i) }));
+      : (PLAN[day - 1]?.[sess] ?? []).map((t, i) => ({ ...t, day, id: tid(day, sess, i) }));
   const abAllDone = todaysAB.length > 0 && todaysAB.every((t) => isDone(t.id));
 
   return (
