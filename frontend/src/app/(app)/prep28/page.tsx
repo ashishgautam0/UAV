@@ -32,9 +32,6 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-  SelectGroup,
-  SelectLabel,
-  SelectSeparator,
 } from "@/components/ui/select";
 import {
   GraduationCap,
@@ -55,7 +52,6 @@ const STORAGE_KEY = "prep28";
 interface PrepState {
   start?: string | null;
   dayOverride?: number | null;
-  sess?: BlockKey | null;
   done?: Record<string, boolean>;
 }
 
@@ -75,21 +71,6 @@ function writeState(s: PrepState) {
 }
 
 const tid = (d: number, blk: BlockKey, i: number) => `${d}-${blk}-${i}`;
-
-function autoSession(): BlockKey {
-  const h = new Date().getHours();
-  if (h >= 20 || h < 5) return "r";
-  return "b";
-}
-
-// Saved state can name a block that no longer exists — "a" (coding) was
-// dropped from the plan but is still persisted in older local/Supabase state.
-// Unknown values become null ("no manual pick") rather than a concrete block,
-// so they clear themselves without pinning the session and disabling the
-// time-of-day switch to Recall.
-function storedSession(v: unknown): BlockKey | null {
-  return v === "b" || v === "r" ? v : null;
-}
 
 // Does this state hold any real progress worth preserving? Used to decide
 // whether a first-load empty server row should adopt existing local progress.
@@ -118,7 +99,6 @@ const BLOCK_ACCENT: Record<BlockKey, string> = {
 export default function Prep28Page() {
   const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<PrepState>({});
-  const [sess, setSess] = useState<BlockKey>("b");
   const [showStart, setShowStart] = useState(false);
   const [startInput, setStartInput] = useState(() =>
     new Date().toISOString().slice(0, 10)
@@ -193,9 +173,7 @@ export default function Prep28Page() {
   useEffect(() => {
     // 1) Paint instantly from the local cache (offline-friendly).
     const local = readState();
-    const localSess = storedSession(local.sess);
-    setState({ ...local, sess: localSess });
-    setSess(localSess ?? autoSession());
+    setState(local);
     setMounted(true);
 
     // 2) Reconcile with Supabase (source of truth across devices).
@@ -207,13 +185,11 @@ export default function Prep28Page() {
         const serverState: PrepState = {
           start: server.start ?? null,
           dayOverride: server.dayOverride ?? null,
-          sess: storedSession(server.sess),
           done: server.done ?? {},
         };
         if (hasProgress(serverState)) {
           // Server has real data — it wins; refresh the local cache.
           setState(serverState);
-          setSess(serverState.sess ?? autoSession());
           writeState(serverState);
           setShowStart(!serverState.start);
         } else if (hasProgress(local)) {
@@ -258,15 +234,6 @@ export default function Prep28Page() {
 
   function pickDay(value: string) {
     persist({ ...state, dayOverride: value === "auto" ? null : Number(value) });
-  }
-
-  function pickSession(value: string) {
-    // Persist the manual pick so it survives a reload/reopen — previously this
-    // was cleared and silently reverted to the time-of-day auto-detected block,
-    // which made a manually-selected Block B (and its PDF uploads) disappear
-    // the next time the page loaded.
-    setSess(value as BlockKey);
-    persist({ ...state, sess: value as BlockKey });
   }
 
   function confirmStart() {
@@ -314,34 +281,29 @@ export default function Prep28Page() {
   if (!mounted) return null;
 
   const cur = PLAN[day - 1];
-  const footnote =
-    sess === "r"
-      ? "No screen after copying — paste the prompt to Claude, put the phone face-down, and answer out loud."
-      : "Protect this block — interviews should never eat it.";
 
-  // carried tasks: unchecked Block B items from all previous days
-  const carried =
-    sess === "r"
-      ? []
-      : Array.from({ length: day - 1 }, (_, k) => k + 1).flatMap((d) =>
-          (PLAN[d - 1]?.[sess] ?? [])
-            .map((t, i) => ({ ...t, day: d, id: tid(d, sess, i) }))
-            .filter((t) => !isDone(t.id))
-        );
+  // carried Block B: unchecked items from the previous day only
+  const carriedB =
+    day > 1
+      ? (PLAN[day - 2]?.b ?? [])
+          .map((t, i) => ({ ...t, day: day - 1, id: tid(day - 1, "b", i) }))
+          .filter((t) => !isDone(t.id))
+      : [];
 
-  // carried recall: unchecked from yesterday only
+  // carried recall: unchecked from the previous day only
   const carriedRecall =
-    sess === "r" && day > 1
-      ? PLAN[day - 2].r
+    day > 1
+      ? (PLAN[day - 2]?.r ?? [])
           .map((t, i) => ({ t, id: tid(day - 1, "r", i) }))
           .filter((x) => !isDone(x.id))
       : [];
 
-  const todaysAB =
-    sess === "r"
-      ? []
-      : (PLAN[day - 1]?.[sess] ?? []).map((t, i) => ({ ...t, day, id: tid(day, sess, i) }));
-  const abAllDone = todaysAB.length > 0 && todaysAB.every((t) => isDone(t.id));
+  const todaysB = (PLAN[day - 1]?.b ?? []).map((t, i) => ({
+    ...t,
+    day,
+    id: tid(day, "b", i),
+  }));
+  const bAllDone = todaysB.length > 0 && todaysB.every((t) => isDone(t.id));
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -385,39 +347,25 @@ export default function Prep28Page() {
           </h1>
           <div className="flex gap-2">
             <Select
-              value={state.dayOverride ? `day:${day}` : "day:auto"}
-              onValueChange={(value) => {
-                if (value.startsWith("day:")) pickDay(value.slice(4));
-                else if (value.startsWith("sess:")) pickSession(value.slice(5));
-              }}
+              value={state.dayOverride ? String(day) : "auto"}
+              onValueChange={pickDay}
             >
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-[120px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Day</SelectLabel>
-                  <SelectItem value="day:auto">Day: auto</SelectItem>
-                  {Array.from({ length: 28 }, (_, i) => (
-                    <SelectItem key={i + 1} value={`day:${i + 1}`}>
-                      Day {i + 1}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-                <SelectSeparator />
-                <SelectGroup>
-                  <SelectLabel>Session</SelectLabel>
-                  <SelectItem value="sess:b">Block B · ML/GenAI</SelectItem>
-                  <SelectItem value="sess:r">Recall</SelectItem>
-                </SelectGroup>
+                <SelectItem value="auto">Day: auto</SelectItem>
+                {Array.from({ length: 28 }, (_, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>
+                    Day {i + 1}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        <p className={cn("text-sm font-medium", BLOCK_ACCENT[sess])}>
-          {SESSION_NAMES[sess]} · {cur.tag}
-        </p>
+        <p className="text-sm font-medium text-muted-foreground">{cur.tag}</p>
 
         {/* Progress */}
         <div className="space-y-1.5">
@@ -433,94 +381,23 @@ export default function Prep28Page() {
 
       </div>
 
-      {/* Content */}
+      {/* Content — Block B and Recall are both always shown for the selected day */}
       <div className="space-y-3">
-        {sess === "r" ? (
+        <p className={cn("text-sm font-medium", BLOCK_ACCENT.b)}>{SESSION_NAMES.b}</p>
+
+        {carriedB.length > 0 && (
           <>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => copy(recallAll(cur.r, day))}
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Copy tonight&apos;s full recall prompt
-            </Button>
-
-            {carriedRecall.length > 0 && (
-              <>
-                <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-amber-400">
-                  Blanked yesterday — revise first
-                </p>
-                {carriedRecall.map((x) => (
-                  <RecallCard
-                    key={x.id}
-                    topic={x.t}
-                    done={isDone(x.id)}
-                    fromDay={day - 1}
-                    onToggle={() => toggle(x.id)}
-                    onCopy={() => copy(recallPrompt(x.t, day))}
-                  />
-                ))}
-              </>
-            )}
-
-            <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Tonight · Day {day}
+            <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-amber-400">
+              Carried over from Day {day - 1}
             </p>
-            {cur.r.map((topic, i) => {
-              const id = tid(day, "r", i);
-              return (
-                <RecallCard
-                  key={id}
-                  topic={topic}
-                  done={isDone(id)}
-                  onToggle={() => toggle(id)}
-                  onCopy={() => copy(recallPrompt(topic, day))}
-                />
-              );
-            })}
-          </>
-        ) : (
-          <>
-            {carried.length > 0 && (
-              <>
-                <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-amber-400">
-                  Carried over ({carried.length})
-                </p>
-                {carried.map((t) => (
-                  <TaskCard
-                    key={t.id}
-                    task={t}
-                    done={isDone(t.id)}
-                    fromDay={t.day}
-                    onToggle={() => toggle(t.id)}
-                    showPdf={sess === "b"}
-                    pdfs={pdfMap[t.id] || []}
-                    uploading={pdfUploading === t.id}
-                    uploadError={pdfError[t.id]}
-                    pdfHref={(name) => prepPdfUrl(t.id, name)}
-                    onUploadPdf={(files) => handleUploadPdf(t.id, files)}
-                    onRemovePdf={(name) => handleRemovePdf(t.id, name)}
-                  />
-                ))}
-              </>
-            )}
-
-            <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Today · Day {day}
-            </p>
-            {abAllDone && (
-              <p className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 text-sm text-emerald-400">
-                Block complete. Close the app.
-              </p>
-            )}
-            {todaysAB.map((t) => (
+            {carriedB.map((t) => (
               <TaskCard
                 key={t.id}
                 task={t}
                 done={isDone(t.id)}
+                fromDay={t.day}
                 onToggle={() => toggle(t.id)}
-                showPdf={sess === "b"}
+                showPdf
                 pdfs={pdfMap[t.id] || []}
                 uploading={pdfUploading === t.id}
                 uploadError={pdfError[t.id]}
@@ -532,7 +409,80 @@ export default function Prep28Page() {
           </>
         )}
 
-        <p className="pt-2 text-xs italic text-muted-foreground">{footnote}</p>
+        <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Day {day}
+        </p>
+        {bAllDone && (
+          <p className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 text-sm text-emerald-400">
+            Block complete. Close the app.
+          </p>
+        )}
+        {todaysB.map((t) => (
+          <TaskCard
+            key={t.id}
+            task={t}
+            done={isDone(t.id)}
+            onToggle={() => toggle(t.id)}
+            showPdf
+            pdfs={pdfMap[t.id] || []}
+            uploading={pdfUploading === t.id}
+            uploadError={pdfError[t.id]}
+            pdfHref={(name) => prepPdfUrl(t.id, name)}
+            onUploadPdf={(files) => handleUploadPdf(t.id, files)}
+            onRemovePdf={(name) => handleRemovePdf(t.id, name)}
+          />
+        ))}
+        <p className="pt-1 text-xs italic text-muted-foreground">
+          Protect this block — interviews should never eat it.
+        </p>
+
+        <p className={cn("pt-3 text-sm font-medium", BLOCK_ACCENT.r)}>{SESSION_NAMES.r}</p>
+
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => copy(recallAll(cur.r, day))}
+        >
+          <Sparkles className="mr-2 h-4 w-4" />
+          Copy tonight&apos;s full recall prompt
+        </Button>
+
+        {carriedRecall.length > 0 && (
+          <>
+            <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-amber-400">
+              Blanked on Day {day - 1} — revise first
+            </p>
+            {carriedRecall.map((x) => (
+              <RecallCard
+                key={x.id}
+                topic={x.t}
+                done={isDone(x.id)}
+                fromDay={day - 1}
+                onToggle={() => toggle(x.id)}
+                onCopy={() => copy(recallPrompt(x.t, day))}
+              />
+            ))}
+          </>
+        )}
+
+        <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Day {day}
+        </p>
+        {cur.r.map((topic, i) => {
+          const id = tid(day, "r", i);
+          return (
+            <RecallCard
+              key={id}
+              topic={topic}
+              done={isDone(id)}
+              onToggle={() => toggle(id)}
+              onCopy={() => copy(recallPrompt(topic, day))}
+            />
+          );
+        })}
+        <p className="pt-1 text-xs italic text-muted-foreground">
+          No screen after copying — paste the prompt to Claude, put the phone face-down, and answer out loud.
+        </p>
       </div>
     </div>
   );
