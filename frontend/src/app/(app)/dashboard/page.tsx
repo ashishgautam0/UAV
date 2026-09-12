@@ -62,15 +62,16 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 
-// Tasks per day on the /prep28 page, as [blockA, blockB, recall] — used to
-// read its localStorage progress ("prep28") for the widget below.
-const PREP_COUNTS: [number, number, number][] = [
-  [2,2,3],[2,2,3],[2,2,3],[2,3,3],[1,1,3],[2,2,3],[2,3,2],
-  [1,2,3],[2,2,3],[2,2,3],[1,3,3],[2,3,3],[2,3,3],[2,3,3],
-  [1,2,3],[1,2,3],[1,2,3],[1,2,3],[2,2,3],[2,2,3],[2,3,2],
-  [1,2,3],[2,2,2],[1,2,2],[1,2,2],[1,2,2],[2,2,2],[1,2,2],
+// Tasks per day on the /prep28 page, as [blockB, recall] — used to read its
+// localStorage progress ("prep28") for the widget below. Block A (coding) was
+// removed from the plan, so its counts are gone from here too.
+const PREP_COUNTS: [number, number][] = [
+  [2,3],[2,3],[2,3],[3,3],[1,3],[2,3],[3,2],
+  [2,3],[2,3],[2,3],[3,3],[3,3],[3,3],[3,3],
+  [2,3],[2,3],[2,3],[2,3],[2,3],[2,3],[3,2],
+  [2,3],[2,2],[2,2],[2,2],[2,2],[2,2],[2,2],
 ];
-const PREP_TOTAL = PREP_COUNTS.reduce((s, [a, b, r]) => s + a + b + r, 0);
+const PREP_TOTAL = PREP_COUNTS.reduce((s, [b, r]) => s + b + r, 0);
 
 interface PrepState {
   started: boolean;
@@ -98,11 +99,14 @@ function computePrepState(s: Prep28State | null | undefined): PrepState {
   let todayDone = 0;
   for (const k of Object.keys(done)) {
     if (!done[k]) continue;
+    // Skip leftover Block A ("<day>-a-<i>") ticks from before coding was
+    // dropped, so they don't inflate progress against the smaller plan.
+    if (k.includes("-a-")) continue;
     planDone++;
     if (k.startsWith(day + "-")) todayDone++;
   }
-  const [a, b, r] = PREP_COUNTS[day - 1];
-  return { started: Boolean(s.start), day, planDone, todayDone, todayTotal: a + b + r };
+  const [b, r] = PREP_COUNTS[day - 1];
+  return { started: Boolean(s.start), day, planDone, todayDone, todayTotal: b + r };
 }
 
 const WEEKLY_TARGET = 50;
