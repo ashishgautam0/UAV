@@ -54,6 +54,8 @@ _LINKEDIN_SEARCH_QUERIES = [
     "aws generative ai engineer",
     "mlops engineer aws",
     "mlops engineer",
+    "aiops engineer",
+    "ai ops engineer",
     "sagemaker engineer",
     "aws ml engineer",
     "cloud machine learning engineer",
@@ -78,6 +80,8 @@ _BOARD_SEARCH_QUERIES = [
     "aws ai engineer",
     "mlops engineer aws",
     "mlops engineer",
+    "aiops engineer",
+    "ai ops engineer",
     "aws generative ai",
     "cloud ai engineer",
     "machine learning engineer",
@@ -102,7 +106,7 @@ _TITLE_INCLUDE = [
     "ai automation", "prompt engineer", "ai research", "research intern",
     "large language model", "langchain", "rag", "agentic ai",
     "ai trainee", "deep learning", "computer vision", "data science",
-    "aws", "mlops", "cloud ai", "cloud ml", "sagemaker",
+    "aws", "mlops", "aiops", "ai ops", "cloud ai", "cloud ml", "sagemaker",
     # Research titles. Kept as full phrases, never a bare "research", so
     # market/clinical research postings don't slip through.
     "research engineer", "research scientist", "applied scientist",
