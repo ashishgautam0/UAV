@@ -1,7 +1,6 @@
-// 28-day interview-prep plan data, lifted verbatim from the original
-// standalone prep28.html so the in-app page renders the exact same content.
-// The localStorage schema ("prep28") and task ids (`${day}-${block}-${i}`) are
-// preserved so existing progress and the Dashboard widget keep working.
+// Interview-prep plan data. The syllabus below is authored as themed study
+// days (SOURCE_PLAN); the plan the app renders (PLAN) is derived from it so
+// that every day holds exactly one chapter.
 
 const ML = "https://www.educative.io/courses/grokking-the-machine-learning-interview";
 const GA = "https://www.educative.io/courses/generative-ai-system-design";
@@ -19,7 +18,7 @@ export const SESSION_NAMES: Record<BlockKey, string> = {
   r: "Recall · 22:00–00:00 — eyes closed, no screen",
 };
 
-export const PLAN: PrepDay[] = [
+const SOURCE_PLAN: PrepDay[] = [
   { tag: "Two Pointers", b: [
     { t: "ML Interview Ch.1 — How this course helps", d: "Read the framing lesson first.", u: ML + "/how-does-this-course-help-in-ml-interviews" },
     { t: "Setting Up a Machine Learning System", d: "Memorise the 6-step skeleton: problem → metrics → architecture → data → modelling → evaluation. Write it from memory before closing.", u: ML + "/setting-up-a-machine-learning-system" }],
@@ -167,11 +166,34 @@ export const PLAN: PrepDay[] = [
     r: ["Nothing structured tonight. Rest properly.", "If you want one thing: the 2-minute self-introduction, once. Then sleep."] },
 ];
 
+// One chapter per day: a themed day carrying k chapters becomes k days of one
+// chapter each, with that theme's recall topics split evenly across them.
+function oneChapterPerDay(source: PrepDay[]): PrepDay[] {
+  return source.flatMap((day) =>
+    day.b.map((chapter, i) => ({
+      tag: day.b.length > 1 ? `${day.tag} · ${i + 1}/${day.b.length}` : day.tag,
+      b: [chapter],
+      r: day.r.slice(
+        Math.floor((i * day.r.length) / day.b.length),
+        Math.floor(((i + 1) * day.r.length) / day.b.length)
+      ),
+    }))
+  );
+}
+
+export const PLAN: PrepDay[] = oneChapterPerDay(SOURCE_PLAN);
+export const PLAN_DAYS = PLAN.length;
+
+// Saved progress is keyed by "<day>-<block>-<index>", so any change to how
+// chapters map onto days would leave old ticks pointing at the wrong chapter.
+// Bumping this resets saved progress back to Day 1 instead.
+export const PLAN_VERSION = 2;
+
 // ---- recall-coach prompt builders (kept identical to the original) ----
 export function recallPrompt(topic: string, day: number): string {
-  return `Act as my recall coach for AI/ML interview prep. It's Day ${day} of my 28-day plan, night session — eyes-closed retrieval practice.\n\nTopic: "${topic}"\n\nAsk me one question at a time on this topic and wait for my answer. After each answer: briefly correct anything wrong, then ask one deeper follow-up. Keep your replies to 2–3 sentences — this is spoken-style practice, not an essay. Start now with your first question.`;
+  return `Act as my recall coach for AI/ML interview prep. It's Day ${day} of my ${PLAN_DAYS}-day plan, night session — eyes-closed retrieval practice.\n\nTopic: "${topic}"\n\nAsk me one question at a time on this topic and wait for my answer. After each answer: briefly correct anything wrong, then ask one deeper follow-up. Keep your replies to 2–3 sentences — this is spoken-style practice, not an essay. Start now with your first question.`;
 }
 
 export function recallAll(items: string[], day: number): string {
-  return `Act as my recall coach for AI/ML interview prep. It's Day ${day} of my 28-day plan, night session — eyes-closed retrieval practice before sleep.\n\nRun me through these topics IN ORDER, one at a time:\n${items.map((x, i) => `${i + 1}. ${x}`).join("\n")}\n\nFor each topic: ask me to explain it from memory, wait for my answer, correct briefly, one follow-up, then move to the next topic. Keep every reply to 2–3 sentences. If I blank on something, tell me it goes on tomorrow's revision list and move on. Start with topic 1.`;
+  return `Act as my recall coach for AI/ML interview prep. It's Day ${day} of my ${PLAN_DAYS}-day plan, night session — eyes-closed retrieval practice before sleep.\n\nRun me through these topics IN ORDER, one at a time:\n${items.map((x, i) => `${i + 1}. ${x}`).join("\n")}\n\nFor each topic: ask me to explain it from memory, wait for my answer, correct briefly, one follow-up, then move to the next topic. Keep every reply to 2–3 sentences. If I blank on something, tell me it goes on tomorrow's revision list and move on. Start with topic 1.`;
 }

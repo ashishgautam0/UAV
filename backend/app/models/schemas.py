@@ -128,6 +128,9 @@ class Prep28Request(BaseModel):
     dayOverride: Optional[int] = None
     sess: Optional[str] = None
     done: dict = {}
+    # Plan version the progress was recorded against; the frontend resets
+    # progress when it no longer matches the plan it is rendering.
+    v: Optional[int] = None
 
 
 class Prep28Response(BaseModel):
@@ -135,3 +138,4 @@ class Prep28Response(BaseModel):
     dayOverride: Optional[int] = None
     sess: Optional[str] = None
     done: dict = {}
+    v: Optional[int] = None

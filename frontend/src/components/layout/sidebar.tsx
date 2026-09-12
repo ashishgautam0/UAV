@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tonight", label: "Today Todo", icon: Moon },
   { href: "/tracker", label: "Tracker", icon: ClipboardList },
-  { href: "/prep28", label: "28-Day Prep", icon: GraduationCap },
+  { href: "/prep28", label: "Interview Prep", icon: GraduationCap },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
