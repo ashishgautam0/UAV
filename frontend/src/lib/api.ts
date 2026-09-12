@@ -1,6 +1,5 @@
 import type {
   AddApplicationRequest,
-  AddReferralRequest,
   Application,
   CachedCompanyIntel,
   DashboardStats,
@@ -11,8 +10,6 @@ import type {
   JobMessage,
   LogFollowUpRequest,
   PlatformEffectiveness,
-  Referral,
-  ReferralStats,
   RoleAnalysis,
   ScrapedJob,
   StatusFunnel,
@@ -169,34 +166,6 @@ export async function getJobMessage(
   return apiFetch<JobMessage>(
     `/api/scraped-jobs/${id}/message?type=${encodeURIComponent(type)}`
   );
-}
-
-// ---- Referrals ----
-export async function getReferrals(company?: string): Promise<Referral[]> {
-  const qs = company ? `?company=${encodeURIComponent(company)}` : "";
-  return apiFetch<Referral[]>(`/api/referrals${qs}`);
-}
-
-export async function createReferral(data: AddReferralRequest) {
-  return apiFetch<{ success: boolean }>("/api/referrals", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function updateReferralStatus(id: number, status: string) {
-  return apiFetch<{ success: boolean }>(`/api/referrals/${id}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({ status }),
-  });
-}
-
-export async function getReferralStats(): Promise<ReferralStats> {
-  return apiFetch<ReferralStats>("/api/referrals/stats");
-}
-
-export async function getReferralFollowUps(): Promise<Referral[]> {
-  return apiFetch<Referral[]>("/api/referrals/follow-ups");
 }
 
 // ---- Follow-up History ----

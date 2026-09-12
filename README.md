@@ -16,7 +16,6 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 - **Follow-ups** — Value-add messages, not generic check-ins
 - **Cover Letters** — Under 200 words, personalized
 - **Thank You Notes** — Post-interview, referencing discussion points
-- **Referral Requests** — Templates for warm intros
 - **Demo Outreach** — Messages showcasing custom demo projects
 
 ### Application Tracker
@@ -49,7 +48,6 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 
 ### Additional Tools
 - **Company Research** — Web search with result caching
-- **Referral Manager** — Track referral contacts and follow-ups
 - **Mini Demos** — Track custom demo projects for target companies
 
 ## Tech Stack
@@ -90,7 +88,6 @@ job_search_tool/
 │       │   ├── dashboard/       # Analytics dashboard
 │       │   ├── tonight/         # Tonight's Plan view
 │       │   ├── tracker/         # Application tracker
-│       │   ├── referrals/       # Referral manager
 │       │   ├── prep28/          # 28-day prep plan
 │       │   └── settings/        # Settings
 │       └── page.tsx             # Landing page
@@ -111,8 +108,8 @@ Create a Supabase project, then apply the schema once:
 
 Supabase dashboard -> **SQL Editor** -> **New query** -> paste [`supabase/schema.sql`](supabase/schema.sql) -> **Run**.
 
-That creates all 10 tables the backend expects (`applications`, `scraped_jobs`,
-`referrals`, `follow_up_history`, `company_research_cache`, `mini_demos`,
+That creates the tables the backend expects (`applications`, `scraped_jobs`,
+`follow_up_history`, `company_research_cache`, `mini_demos`,
 `email_logs`, `notifications`, `push_subscriptions`, `user_profile`) with their
 indexes, and enables Row Level Security on each.
 
@@ -238,7 +235,6 @@ GET      /api/scraped-jobs/{id}/message  # Routine-written outreach message
 GET      /api/tonight         # Tonight's Plan jobs
 POST     /api/company-research # Company research
 GET/PUT  /api/prep28          # 28-day prep progress
-GET/POST /api/referrals       # Referral tracking
 GET/POST /api/demos           # Mini demo projects
 GET/PUT  /api/profile         # User profile
 POST     /api/notifications   # Push notifications

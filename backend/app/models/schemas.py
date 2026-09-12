@@ -84,26 +84,10 @@ class CompanyResearchRequest(BaseModel):
     company_name: str
 
 
-# ---- Referrals ----
-
-class AddReferralRequest(BaseModel):
-    contact_name: str
-    company: str
-    contact_role: str = ""
-    relationship: str = ""
-    linkedin_url: str = ""
-    email: str = ""
-    notes: str = ""
-
-
-class UpdateReferralStatusRequest(BaseModel):
-    status: str
-
-
 # ---- Follow-up History ----
 
 class LogFollowUpRequest(BaseModel):
-    entity_type: str   # "application" or "referral"
+    entity_type: str   # "application"
     entity_id: int
     message_content: str = ""
     channel: str = ""

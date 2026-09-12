@@ -18,7 +18,6 @@ from .routers import (
     notifications,
     prep28,
     profile,
-    referrals,
     scraper,
     stats,
     tonight,
@@ -77,7 +76,6 @@ app.include_router(stats.router, prefix="/api/stats", tags=["Stats"])
 app.include_router(scraper.router, prefix="/api/scraped-jobs", tags=["Scraped Jobs"])
 app.include_router(tonight.router, prefix="/api/tonight", tags=["Tonight"])
 app.include_router(company_research.router, prefix="/api/company-research", tags=["Company Research"])
-app.include_router(referrals.router, prefix="/api/referrals", tags=["Referrals"])
 app.include_router(mini_demos.router, prefix="/api/demos", tags=["Mini Demos"])
 app.include_router(profile.router, prefix="/api/profile", tags=["Profile"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])

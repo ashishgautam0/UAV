@@ -14,7 +14,6 @@ import {
   LayoutDashboard,
   Moon,
   ClipboardList,
-  Users,
   GraduationCap,
   Settings,
   Menu,
@@ -29,7 +28,6 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tonight", label: "Today Todo", icon: Moon },
   { href: "/tracker", label: "Tracker", icon: ClipboardList },
-  { href: "/referrals", label: "Referrals", icon: Users },
   { href: "/prep28", label: "28-Day Prep", icon: GraduationCap },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
