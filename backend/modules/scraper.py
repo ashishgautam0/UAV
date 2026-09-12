@@ -102,11 +102,17 @@ _LINKEDIN_LOCATIONS = ["India", "Remote"]
 
 _TITLE_INCLUDE = [
     "gen ai", "genai", "generative ai", "llm", "ai engineer", "ai developer",
-    "nlp engineer", "machine learning engineer", "ml intern", "ai/ml",
+    "nlp engineer", "ml intern", "ai/ml",
     "ai automation", "prompt engineer", "ai research", "research intern",
     "large language model", "langchain", "rag", "agentic ai",
-    "ai trainee", "deep learning", "computer vision", "data science",
+    "ai trainee", "deep learning", "computer vision",
     "aws", "mlops", "aiops", "ai ops", "cloud ai", "cloud ml", "sagemaker",
+    # Domain nouns, not just the "<domain> engineer" form. Without these a
+    # plain "Data Scientist" or "Machine Learning Specialist" was scraped and
+    # then discarded, and any "Associate <domain>" title went with it. The
+    # REJECT list still removes sales/marketing/analyst variants of these.
+    "machine learning", "ml engineer", "artificial intelligence",
+    "data science", "data scientist",
     # Research titles. Kept as full phrases, never a bare "research", so
     # market/clinical research postings don't slip through.
     "research engineer", "research scientist", "applied scientist",
