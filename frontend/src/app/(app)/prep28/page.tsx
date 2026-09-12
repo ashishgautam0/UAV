@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PLAN,
+  PLAN_DAYS,
+  PLAN_VERSION,
   SESSION_NAMES,
   recallPrompt,
   recallAll,
@@ -53,6 +55,7 @@ interface PrepState {
   start?: string | null;
   dayOverride?: number | null;
   done?: Record<string, boolean>;
+  v?: number | null;
 }
 
 function readState(): PrepState {
@@ -72,6 +75,12 @@ function writeState(s: PrepState) {
 
 const tid = (d: number, blk: BlockKey, i: number) => `${d}-${blk}-${i}`;
 
+// Progress saved against an older plan points at chapters that have since moved
+// day, so it is dropped and the plan starts again from Day 1.
+function forCurrentPlan(s: PrepState): PrepState {
+  return s.v === PLAN_VERSION ? s : { v: PLAN_VERSION };
+}
+
 // Does this state hold any real progress worth preserving? Used to decide
 // whether a first-load empty server row should adopt existing local progress.
 function hasProgress(s: PrepState): boolean {
@@ -88,7 +97,7 @@ function computeDay(s: PrepState): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const diff = Math.floor((today.getTime() - new Date(s.start).getTime()) / 86400000) + 1;
-  return Math.min(28, Math.max(1, diff));
+  return Math.min(PLAN_DAYS, Math.max(1, diff));
 }
 
 const BLOCK_ACCENT: Record<BlockKey, string> = {
@@ -172,7 +181,7 @@ export default function Prep28Page() {
 
   useEffect(() => {
     // 1) Paint instantly from the local cache (offline-friendly).
-    const local = readState();
+    const local = forCurrentPlan(readState());
     setState(local);
     setMounted(true);
 
@@ -182,11 +191,12 @@ export default function Prep28Page() {
       try {
         const server = await getPrep28();
         if (cancelled) return;
-        const serverState: PrepState = {
+        const serverState = forCurrentPlan({
           start: server.start ?? null,
           dayOverride: server.dayOverride ?? null,
           done: server.done ?? {},
-        };
+          v: server.v ?? null,
+        });
         if (hasProgress(serverState)) {
           // Server has real data — it wins; refresh the local cache.
           setState(serverState);
@@ -304,6 +314,7 @@ export default function Prep28Page() {
     id: tid(day, "b", i),
   }));
   const bAllDone = todaysB.length > 0 && todaysB.every((t) => isDone(t.id));
+  const hasRecall = cur.r.length > 0 || carriedRecall.length > 0;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -314,7 +325,7 @@ export default function Prep28Page() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <GraduationCap className="h-4 w-4 text-primary" />
-                Start your 28-day plan
+                Start your {PLAN_DAYS}-day plan
               </CardTitle>
               <CardDescription>
                 Pick the day you began (or begin today). Day 1 counts from here.
@@ -342,7 +353,7 @@ export default function Prep28Page() {
             <GraduationCap className="h-6 w-6 text-primary" />
             Day {day}
             <span className="text-muted-foreground text-base font-normal">
-              of 28
+              of {PLAN_DAYS}
             </span>
           </h1>
           <div className="flex gap-2">
@@ -355,7 +366,7 @@ export default function Prep28Page() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="auto">Day: auto</SelectItem>
-                {Array.from({ length: 28 }, (_, i) => (
+                {Array.from({ length: PLAN_DAYS }, (_, i) => (
                   <SelectItem key={i + 1} value={String(i + 1)}>
                     Day {i + 1}
                   </SelectItem>
@@ -436,16 +447,20 @@ export default function Prep28Page() {
           Protect this block — interviews should never eat it.
         </p>
 
-        <p className={cn("pt-3 text-sm font-medium", BLOCK_ACCENT.r)}>{SESSION_NAMES.r}</p>
+        {hasRecall && (
+          <p className={cn("pt-3 text-sm font-medium", BLOCK_ACCENT.r)}>{SESSION_NAMES.r}</p>
+        )}
 
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => copy(recallAll(cur.r, day))}
-        >
-          <Sparkles className="mr-2 h-4 w-4" />
-          Copy tonight&apos;s full recall prompt
-        </Button>
+        {cur.r.length > 0 && (
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => copy(recallAll(cur.r, day))}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Copy tonight&apos;s full recall prompt
+          </Button>
+        )}
 
         {carriedRecall.length > 0 && (
           <>
@@ -465,9 +480,11 @@ export default function Prep28Page() {
           </>
         )}
 
-        <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Day {day}
-        </p>
+        {cur.r.length > 0 && (
+          <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Day {day}
+          </p>
+        )}
         {cur.r.map((topic, i) => {
           const id = tid(day, "r", i);
           return (
@@ -480,9 +497,11 @@ export default function Prep28Page() {
             />
           );
         })}
-        <p className="pt-1 text-xs italic text-muted-foreground">
-          No screen after copying — paste the prompt to Claude, put the phone face-down, and answer out loud.
-        </p>
+        {hasRecall && (
+          <p className="pt-1 text-xs italic text-muted-foreground">
+            No screen after copying — paste the prompt to Claude, put the phone face-down, and answer out loud.
+          </p>
+        )}
       </div>
     </div>
   );

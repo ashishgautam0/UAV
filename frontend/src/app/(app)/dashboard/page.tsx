@@ -24,6 +24,7 @@ import type {
   RoleAnalysis,
   Prep28State,
 } from "@/lib/types";
+import { PLAN, PLAN_DAYS, PLAN_VERSION } from "@/lib/prep28";
 
 import {
   Card,
@@ -63,14 +64,8 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 // Tasks per day on the /prep28 page, as [blockB, recall] — used to read its
-// localStorage progress ("prep28") for the widget below. Block A (coding) was
-// removed from the plan, so its counts are gone from here too.
-const PREP_COUNTS: [number, number][] = [
-  [2,3],[2,3],[2,3],[3,3],[1,3],[2,3],[3,2],
-  [2,3],[2,3],[2,3],[3,3],[3,3],[3,3],[3,3],
-  [2,3],[2,3],[2,3],[2,3],[2,3],[2,3],[3,2],
-  [2,3],[2,2],[2,2],[2,2],[2,2],[2,2],[2,2],
-];
+// localStorage progress ("prep28") for the widget below.
+const PREP_COUNTS: [number, number][] = PLAN.map((d) => [d.b.length, d.r.length]);
 const PREP_TOTAL = PREP_COUNTS.reduce((s, [b, r]) => s + b + r, 0);
 
 interface PrepState {
@@ -84,7 +79,13 @@ interface PrepState {
 // Compute the widget's PrepState from a stored prep28 state object (the same
 // shape used by the /prep28 page and stored in Supabase).
 function computePrepState(s: Prep28State | null | undefined): PrepState {
-  if (!s || (!s.start && !s.dayOverride && !(s.done && Object.keys(s.done).length))) {
+  // Progress recorded against an older plan is dropped by the /prep28 page, so
+  // it must not be counted here either.
+  if (
+    !s ||
+    s.v !== PLAN_VERSION ||
+    (!s.start && !s.dayOverride && !(s.done && Object.keys(s.done).length))
+  ) {
     return { started: false, day: 1, planDone: 0, todayDone: 0, todayTotal: 0 };
   }
   let day = 1;
@@ -92,16 +93,13 @@ function computePrepState(s: Prep28State | null | undefined): PrepState {
   else if (s.start) {
     const t = new Date();
     t.setHours(0, 0, 0, 0);
-    day = Math.min(28, Math.max(1, Math.floor((t.getTime() - new Date(s.start).getTime()) / 86400000) + 1));
+    day = Math.min(PLAN_DAYS, Math.max(1, Math.floor((t.getTime() - new Date(s.start).getTime()) / 86400000) + 1));
   }
   const done = s.done || {};
   let planDone = 0;
   let todayDone = 0;
   for (const k of Object.keys(done)) {
     if (!done[k]) continue;
-    // Skip leftover Block A ("<day>-a-<i>") ticks from before coding was
-    // dropped, so they don't inflate progress against the smaller plan.
-    if (k.includes("-a-")) continue;
     planDone++;
     if (k.startsWith(day + "-")) todayDone++;
   }
@@ -275,17 +273,17 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* ---- 28-Day Interview Prep ---- */}
+      {/* ---- Interview Prep ---- */}
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
           <div>
             <CardTitle className="flex items-center gap-2">
               <GraduationCap className="h-5 w-5 text-sky-400" />
-              28-Day Interview Prep
+              Interview Prep
             </CardTitle>
             <CardDescription>
               {prep?.started
-                ? `Day ${prep.day} of 28 — coding patterns, ML/GenAI depth, night recall`
+                ? `Day ${prep.day} of ${PLAN_DAYS} — one chapter a day, plus night recall`
                 : "Your daily prep plan — pick a Day 1 to start the clock"}
             </CardDescription>
           </div>
