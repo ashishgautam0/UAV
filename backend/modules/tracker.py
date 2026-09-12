@@ -12,7 +12,6 @@ import json
 
 # --- Follow-up cadence (global defaults) ---
 APPLICATION_CADENCE = [7, 14, 21]   # days from date_applied
-REFERRAL_CADENCE = [5, 10, 15]      # days from last_contacted
 INTERVIEW_FOLLOW_UP_DAYS = 3
 TERMINAL_STATUSES = ["Offer", "Rejected", "Ghosted", "Not Interested"]
 
@@ -382,7 +381,7 @@ def get_jobs_needing_messages(limit=20, message_type=DEFAULT_MESSAGE_TYPE):
 
 MESSAGE_REQUEST_TYPES = (
     "cold-dm", "follow-up", "cover-letter",
-    "thank-you", "referral-request", "demo-outreach",
+    "thank-you", "demo-outreach",
 )
 
 
@@ -582,111 +581,6 @@ def get_role_analysis():
         })
 
     return pd.DataFrame(rows)
-
-
-# ===================== REFERRAL FUNCTIONS =====================
-
-def add_referral(contact_name, company, contact_role="", relationship="",
-                 linkedin_url="", email="", notes=""):
-    db = _get_client()
-    today = datetime.now().strftime("%Y-%m-%d")
-    follow_up = (datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d")
-    try:
-        db.table("referrals").insert({
-            "contact_name": contact_name,
-            "company": company,
-            "contact_role": contact_role,
-            "relationship": relationship,
-            "linkedin_url": linkedin_url,
-            "email": email,
-            "status": "Identified",
-            "last_contacted": today,
-            "follow_up_date": follow_up,
-            "notes": notes,
-        }).execute()
-    except Exception:
-        raise RuntimeError("referrals table not found. Create it in Supabase first.")
-
-
-def update_referral_status(referral_id, new_status):
-    db = _get_client()
-    referral_terminal = ["Referral Given", "Applied via Referral", "Interview", "Offer"]
-    update_data = {"status": new_status}
-
-    if new_status in referral_terminal:
-        update_data["follow_up_date"] = None
-    elif new_status == "Contacted":
-        today = datetime.now().strftime("%Y-%m-%d")
-        resp = (db.table("referrals")
-                .select("follow_up_count")
-                .eq("id", referral_id).single().execute())
-        ref = resp.data
-        count = (ref.get("follow_up_count") or 0) + 1
-        update_data["last_contacted"] = today
-        update_data["follow_up_count"] = count
-        if count < len(REFERRAL_CADENCE):
-            next_date = datetime.now() + timedelta(days=REFERRAL_CADENCE[count])
-            update_data["follow_up_date"] = next_date.strftime("%Y-%m-%d")
-        else:
-            # Cadence exhausted — auto-mark as Ghosted
-            update_data["follow_up_date"] = None
-            update_data["status"] = "Ghosted"
-
-    try:
-        db.table("referrals").update(update_data).eq("id", referral_id).execute()
-    except Exception:
-        raise RuntimeError("referrals table not found. Create it in Supabase first.")
-
-
-def get_referral_follow_ups_due():
-    try:
-        db = _get_client()
-        today = datetime.now().strftime("%Y-%m-%d")
-        terminal = ["Referral Given", "Applied via Referral", "Interview", "Offer"]
-        resp = (db.table("referrals")
-                .select("*")
-                .lte("follow_up_date", today)
-                .execute())
-        df = pd.DataFrame(resp.data)
-        if df.empty:
-            return df
-        return df[~df["status"].isin(terminal)]
-    except Exception:
-        return pd.DataFrame()
-
-
-def get_referral_stats():
-    stats = {
-        "total": 0,
-        "by_status": {},
-        "referral_interview_rate": 0,
-    }
-    try:
-        db = _get_client()
-        resp = db.table("referrals").select("status").execute()
-        df = pd.DataFrame(resp.data)
-        if df.empty:
-            return stats
-        stats["total"] = len(df)
-        stats["by_status"] = dict(df["status"].value_counts())
-        referred = len(df[df["status"].isin(["Referral Given", "Applied via Referral", "Interview", "Offer"])])
-        interviews = len(df[df["status"].isin(["Interview", "Offer"])])
-        stats["referral_interview_rate"] = round(interviews / referred * 100, 1) if referred > 0 else 0
-    except Exception:
-        pass
-    return stats
-
-
-def get_referrals_by_company(company):
-    try:
-        db = _get_client()
-        resp = (db.table("referrals")
-                .select("*")
-                .ilike("company", f"%{company}%")
-                .execute())
-        return pd.DataFrame(resp.data)
-    except Exception:
-        return pd.DataFrame()
 
 
 # ===================== FOLLOW-UP HISTORY =====================

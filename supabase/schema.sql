@@ -74,33 +74,9 @@ create index if not exists idx_scraped_jobs_source     on scraped_jobs (source);
 
 
 -- ---------------------------------------------------------------------------
--- referrals — warm contacts and their follow-up cadence
--- ---------------------------------------------------------------------------
-create table if not exists referrals (
-    id               bigserial primary key,
-    contact_name     text        not null,
-    company          text        not null,
-    contact_role     text        not null default '',
-    relationship     text        not null default '',
-    linkedin_url     text        not null default '',
-    email            text        not null default '',
-    status           text        not null default 'Identified',
-    last_contacted   date,
-    follow_up_date   date,
-    follow_up_count  integer     not null default 0,
-    notes            text        not null default '',
-    created_at       timestamptz not null default now()
-);
-
-create index if not exists idx_referrals_status         on referrals (status);
-create index if not exists idx_referrals_follow_up_date on referrals (follow_up_date);
-create index if not exists idx_referrals_company        on referrals (company);
-
-
--- ---------------------------------------------------------------------------
 -- follow_up_history — one row per follow-up message sent
--- entity_type is 'application' or 'referral'; entity_id points at that table.
--- Deliberately not a foreign key: one history table serves two parents.
+-- entity_type is 'application'; entity_id points at that table.
+-- Deliberately not a foreign key.
 -- ---------------------------------------------------------------------------
 create table if not exists follow_up_history (
     id                 bigserial primary key,
@@ -307,7 +283,6 @@ create table if not exists prep28_progress (
 -- ---------------------------------------------------------------------------
 alter table applications           enable row level security;
 alter table scraped_jobs           enable row level security;
-alter table referrals              enable row level security;
 alter table follow_up_history      enable row level security;
 alter table company_research_cache enable row level security;
 alter table mini_demos             enable row level security;

@@ -6,7 +6,7 @@ The follow-up system spans three layers:
 
 | Layer | Technology | Key Files |
 |-------|-----------|-----------|
-| **Database** | Supabase (PostgreSQL) | 3 tables: `applications`, `referrals`, `follow_up_history` |
+| **Database** | Supabase (PostgreSQL) | 2 tables: `applications`, `follow_up_history` |
 | **Backend API** | FastAPI (Python) | `tracker.py`, `message_generator.py`, `follow_ups.py`, `messages.py`, `schemas.py` |
 | **Frontend** | Next.js 16 + React 19 | `dashboard/page.tsx`, `messages/page.tsx`, `tracker/page.tsx`, `api.ts`, `types.ts` |
 | **LLM** | Claude, via the scheduled routine — no API key | `message_generator.py` builds the prompt; `pending_messages.py` is the routine's interface |
@@ -22,17 +22,10 @@ The primary table. Key follow-up columns:
 - `follow_up_date` — The next date a follow-up is due (YYYY-MM-DD, or NULL if no follow-up needed)
 - `follow_up_count` — Integer tracking how many follow-ups have been sent (0, 1, 2, 3...)
 
-### 2b. `referrals` table
-Same pattern for referral contacts:
-- `status` — `Identified`, `Contacted`, `Referral Given`, `Applied via Referral`, `Interview`, `Offer`, `Ghosted`
-- `last_contacted` — When the referral was last contacted
-- `follow_up_date` — Next follow-up date
-- `follow_up_count` — Number of follow-ups sent
-
-### 2c. `follow_up_history` table
+### 2b. `follow_up_history` table
 Granular log of every follow-up message ever sent:
-- `entity_type` — `"application"` or `"referral"` (polymorphic reference)
-- `entity_id` — The ID of the application or referral this follow-up belongs to
+- `entity_type` — `"application"`
+- `entity_id` — The ID of the application this follow-up belongs to
 - `message_content` — The actual text of the message that was sent
 - `channel` — Where it was sent: `"LinkedIn"`, `"Email"`, `"Twitter"`, etc.
 - `follow_up_number` — Sequential counter: 1, 2, 3...
@@ -47,7 +40,6 @@ Defined at the top of `backend/modules/tracker.py`:
 
 ```python
 APPLICATION_CADENCE = [7, 14, 21]   # days from date_applied
-REFERRAL_CADENCE = [5, 10, 15]      # days from last_contacted
 INTERVIEW_FOLLOW_UP_DAYS = 3
 TERMINAL_STATUSES = ["Offer", "Rejected", "Ghosted", "Not Interested"]
 ```
@@ -55,7 +47,6 @@ TERMINAL_STATUSES = ["Offer", "Rejected", "Ghosted", "Not Interested"]
 **How cadence works:**
 - `APPLICATION_CADENCE = [7, 14, 21]` means: follow-up #1 is due 7 days after `date_applied`, follow-up #2 is due 14 days after `date_applied`, follow-up #3 is due 21 days after `date_applied`.
 - These are **absolute offsets from the application date**, not relative to the previous follow-up.
-- `REFERRAL_CADENCE = [5, 10, 15]` works the same way but is relative to `datetime.now()` (i.e., days from the moment the status changes to "Contacted").
 - `INTERVIEW_FOLLOW_UP_DAYS = 3` — After an interview, set a 3-day follow-up for a thank-you/status-check.
 - `TERMINAL_STATUSES` — Once an application reaches any of these, all follow-up dates are cleared and no more follow-ups are surfaced.
 
@@ -257,8 +248,6 @@ Called with `update_status(entity_id, "Follow-up Sent")`. This function handles 
 3. **If the new status is `"Interview"`:**
    - Sets `follow_up_date` to `today + 3 days` (for a post-interview thank-you/check-in)
 
-The same logic exists for referrals in `update_referral_status()` using `REFERRAL_CADENCE = [5, 10, 15]`.
-
 ### Step 8: The Cycle Repeats
 After the follow-up is logged:
 - The application's `follow_up_date` advances to the next cadence step
@@ -450,7 +439,7 @@ User applies to a job
 
 | File | Role | Key Functions |
 |------|------|---------------|
-| `backend/modules/tracker.py` | Database layer (all Supabase CRUD) | `add_application()`, `update_status()`, `get_follow_ups_due()`, `snooze_follow_up()`, `log_follow_up()`, `get_follow_up_history()`, `update_follow_up_outcome()`, `get_follow_up_effectiveness()`, `update_referral_status()` |
+| `backend/modules/tracker.py` | Database layer (all Supabase CRUD) | `add_application()`, `update_status()`, `get_follow_ups_due()`, `snooze_follow_up()`, `log_follow_up()`, `get_follow_up_history()`, `update_follow_up_outcome()`, `get_follow_up_effectiveness()` |
 | `backend/modules/message_generator.py` | LLM prompt construction and API calls | `generate_follow_up()` (+ `generate_cold_dm`, `generate_cover_letter`, etc.) |
 | `backend/app/routers/follow_ups.py` | API endpoints for follow-up history | `POST /log`, `GET /history`, `PATCH /{id}/outcome`, `GET /effectiveness` |
 | `backend/app/routers/messages.py` | API endpoints for message generation | `POST /follow-up` (+ cold-dm, cover-letter, etc.) |

@@ -232,44 +232,6 @@ Generate the thank-you message.
     return {"prompt": prompt, "system": None, "char_limit": 600}
 
 
-def build_referral_request_prompt(contact_name, contact_role, company,
-                              role_applying_for, relationship, profile_text=""):
-    """Generate a referral request message tailored to the relationship type."""
-    sender_profile = profile_text or _get_profile_text()
-
-    if relationship in ("College alumni", "Friend", "Friend of friend"):
-        tone_instruction = "Warm, casual tone — you know this person. Use first name."
-    else:
-        tone_instruction = "Professional but not stiff. Respectful of their time."
-
-    prompt = f"""Write a referral request message.
-
-ABOUT YOU:
-{sender_profile}
-
-TARGET CONTACT:
-- Name: {contact_name}
-- Their role: {contact_role} at {company}
-- Your relationship: {relationship}
-
-ROLE YOU WANT:
-- Position: {role_applying_for} at {company}
-
-RULES:
-1. Under 80 words
-2. {tone_instruction}
-3. Mention something specific about WHY you want to work at {company}
-4. Include a relevant project link (Agentic RAG or PathToPR)
-5. End with a direct ask: "Would you be open to referring me for the {role_applying_for} position?"
-6. Do NOT say "I know this is a big ask"
-7. Do NOT mention immigration or PR goals
-
-Generate 1 message, ready to copy.
-"""
-
-    return {"prompt": prompt, "system": None, "char_limit": 600}
-
-
 def build_demo_outreach_prompt(company, role, demo_url, demo_description,
                            company_desc, profile_text=""):
     """Generate an outreach message that leads with a demo you built."""
@@ -325,6 +287,5 @@ PROMPT_BUILDERS = {
     "follow-up": build_follow_up_prompt,
     "cover-letter": build_cover_letter_prompt,
     "thank-you": build_thank_you_prompt,
-    "referral-request": build_referral_request_prompt,
     "demo-outreach": build_demo_outreach_prompt,
 }

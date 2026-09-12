@@ -59,7 +59,7 @@ export interface FollowUpDraft {
 
 export interface FollowUpHistory {
   id: number;
-  entity_type: "application" | "referral";
+  entity_type: "application";
   entity_id: number;
   message_content: string;
   channel: string;
@@ -197,40 +197,6 @@ export interface RecruiterEmailReport {
   catch_all?: boolean | null;
   email_pattern?: string | null;
   contacts?: RecruiterContact[];
-}
-
-// ---- Referrals ----
-export interface Referral {
-  id: number;
-  contact_name: string;
-  company: string;
-  contact_role: string;
-  relationship: string;
-  linkedin_url: string;
-  email: string;
-  notes: string;
-  status: string;
-  last_contacted?: string;
-  follow_up_date?: string;
-}
-
-export interface AddReferralRequest {
-  contact_name: string;
-  company: string;
-  contact_role?: string;
-  relationship?: string;
-  linkedin_url?: string;
-  email?: string;
-  notes?: string;
-}
-
-export interface ReferralStats {
-  total: number;
-  requested: number;
-  received: number;
-  interview_rate: number;
-  follow_ups_due: number;
-  [key: string]: number;
 }
 
 // ---- Profile ----

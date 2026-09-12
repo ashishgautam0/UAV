@@ -8,7 +8,6 @@ from tracker import (
     get_follow_up_history,
     update_follow_up_outcome,
     update_status,
-    update_referral_status,
     get_follow_up_effectiveness,
 )
 
@@ -25,8 +24,6 @@ def log_follow_up_sent(body: LogFollowUpRequest):
     )
     if body.entity_type == "application":
         update_status(body.entity_id, "Follow-up Sent")
-    elif body.entity_type == "referral":
-        update_referral_status(body.entity_id, "Contacted")
     return {"success": True, "follow_up_number": follow_up_number}
 
 
