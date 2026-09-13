@@ -7,7 +7,6 @@ const CIP = "https://www.educative.io/courses/grokking-coding-interview";
 const GA = "https://www.educative.io/courses/generative-ai-system-design";
 const AI = "https://www.educative.io/courses/ai-engineer-interview-prep";
 const M3 = "https://www.educative.io/module/P1vxGOtNzNBPX5PJY/10370001/4640179653312512";
-const M5 = "https://www.educative.io/module/P1vxGOtNzNBPX5PJY/10370001/4941132913836032";
 
 export type PrepTask = { t: string; d: string; u: string };
 export type PrepDay = { tag: string; a: PrepTask[]; b: PrepTask[]; r: string[] };
@@ -16,7 +15,7 @@ export type BlockKey = "a" | "b" | "r";
 
 export const SESSION_NAMES: Record<BlockKey, string> = {
   a: "Block A · 05:30–08:30 — Coding: three easy problems",
-  b: "Block B · 09:30–12:30 — AI / GenAI depth",
+  b: "Block B · 09:30–12:30 — AI / GenAI study & build",
   r: "Recall · 22:00–00:00 — eyes closed, no screen",
 };
 
@@ -52,16 +51,35 @@ const SYLLABUS: StudyUnit[] = [
     r: ["Free recall the whole week — every pattern, every concept.", "Anything you blank on is tomorrow's first revision item. Say it, then note it."] },
 
   { b: [
-    { t: "GenAI SD Ch.1 — Introduction", d: "Start the system-design course.", u: GA + "/introduction-to-generative-ai-system-design" },
-    { t: "Ch.2 — Fundamental Concepts (5 lessons)", d: "Skim overlaps; the new material is parallelism (data/tensor/pipeline/model) and inference optimisation (quantisation, distillation, KV cache, batching, speculative decoding).", u: GA + "/parallelism-in-genai-models" },
+    { t: "GenAI Ch.2 — Fundamental Concepts (5 lessons)", d: "Parallelism (data/tensor/pipeline/model) and inference optimisation: quantisation, distillation, KV cache, batching, speculative decoding. Fundamentals, not system design — these come up in screens.", u: GA + "/parallelism-in-genai-models" },
     { t: "RAG and Finetuning — Breakout mock", d: "Your single most likely interview question. You should be unusually strong here.", u: GA + "/rag-and-finetuning/mock-interview" }],
     r: ["Four parallelism strategies — one line each.", "RAG or fine-tuning? The decision rule, then three cases where you'd use both.", "Union-Find template from memory."] },
 
   { b: [
-    { t: "GenAI SD Ch.3 + Ch.4 — Back-of-envelope + SCALED", d: "Finish the calculations lessons; memorise the SCALED 6-step framework as your spine.", u: GA },
-    { t: "Ch.11 — RAG System Design (2 lessons)", d: "You know RAG building; add the design layer — sizing, latency budgets, throughput, cost per 1,000 queries, failure modes.", u: GA },
     { t: "Prepare: when does a knowledge graph beat a vector store?", d: "2-minute answer from your Neo4j GraphRAG course. Almost no candidate can answer this.", u: GA }],
-    r: ["Recite SCALED in order, then design a RAG pipeline with it, out loud.", "When does a knowledge graph beat a vector store? Two minutes.", "Estimate the cost of serving 10,000 daily users on a 7B model — rough numbers, out loud."] },
+    r: ["When does a knowledge graph beat a vector store? Two minutes."] },
+
+  // ---- build track: what the practical/take-home round actually tests ----
+  { b: [
+    { t: "Portfolio audit — pick the three projects", d: "List everything you've built. Pick three to show: the RAG app, an end-to-end ML pipeline, and one deployed service. For each, write down what's missing — README, real numbers, a public URL.", u: "" },
+    { t: "RAG app: repo cleanup", d: "README with problem → architecture → results → how to run. Pin requirements, add .env.example, delete dead code and notebooks nobody will read.", u: "https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes" },
+    { t: "RAG app: architecture write-up + diagram", d: "300 words and one diagram: chunking strategy, embedding model, hybrid dense + BM25 with RRF, and why each choice. This is your answer to 'walk me through your project'.", u: "" },
+    { t: "RAG app: put real evaluation numbers in the README", d: "Run RAGAS — faithfulness, answer relevancy, context precision — and publish the scores. Concrete numbers beat 'it works well' in every interview.", u: "https://docs.ragas.io" },
+    { t: "RAG app: deploy to a free tier and link it", d: "Get a public URL (Hugging Face Spaces, Render or Vercel). Put it at the top of the README and on your resume — a live link is the strongest fresher signal there is.", u: "https://huggingface.co/docs/hub/spaces" }],
+    r: ["Walk through your RAG app's retrieval choice out loud — why hybrid, why RRF.", "Describe your chunking strategy, and what you'd change if the documents doubled in size.", "Say your RAGAS numbers from memory, and what each metric actually measures.", "Your live demo is down five minutes before a call. What do you say?", "Pitch the RAG app in 60 seconds: problem, approach, result."] },
+
+  { b: [
+    { t: "End-to-end ML pipeline: scope it", d: "Pick one dataset and define the whole path: ingest → features → train → evaluate → serve. Small and finished beats ambitious and abandoned.", u: "" },
+    { t: "Pipeline: reproducible training + evaluation", d: "One command trains and prints metrics. Fix the seed, log the run, commit the metrics file. Reproducibility is what separates a project from a notebook.", u: "" },
+    { t: "Pipeline: serve it behind FastAPI", d: "A /predict endpoint with request validation and a health check. This shape is exactly what the practical round asks for.", u: "https://fastapi.tiangolo.com" },
+    { t: "Containerise it", d: "A Dockerfile that builds clean from scratch and runs with one command. Be ready to explain the layers and why the build is ordered the way it is.", u: "https://docs.docker.com" },
+    { t: "Add CI and basic monitoring", d: "A GitHub Actions workflow that lints and tests on push. Then log request latency and add one data-quality check — so you can say what you'd monitor in production and what you'd alert on.", u: "https://docs.github.com/en/actions" }],
+    r: ["Walk through your pipeline end to end, out loud, in 90 seconds.", "What makes a training run reproducible? Name every knob you had to pin.", "What breaks first when your API gets 100 requests a second?", "Explain your Dockerfile's layer order and why it caches the way it does.", "What would you monitor in production, and what would you alert on?"] },
+
+  { b: [
+    { t: "GitHub hygiene pass", d: "Pin the three projects. Real commit history, not one 'initial commit' dump. A profile README that says what you build. Unpin tutorial clones — recruiters do look.", u: "" },
+    { t: "Timed take-home dry run (3 hours)", d: "Give yourself a realistic brief — 'build a small RAG over these documents, expose it behind an API' — and ship it in three hours, clock visible. Then review only what slowed you down.", u: "" }],
+    r: ["What slowed you down in the dry run? Name the top two, and fix them tomorrow.", "Pitch your three projects in 60 seconds total — one line each."] },
 
   { b: [
     { t: "Project narrative build (90 min)", d: "Write then rehearse: Bhojpuri STT (data, model choice, 13.70% WER, what broke) · RAG/agent work as design decisions · hindi-form-agent · deal-hunter-india.", u: AI },
@@ -70,24 +88,12 @@ const SYLLABUS: StudyUnit[] = [
     r: ["Deliver the Bhojpuri project narrative, out loud, twice.", "Deliver the paper narrative — 60-second version, then the 5-minute version.", "Free recall the full week."] },
 
   { b: [
-    { t: "GenAI SD Ch.5 — Text-to-Text System (2 lessons)", d: "Training architecture, then deployment. Own the pipeline: pre-training → SFT → RLHF/DPO → serving → safety → feedback loop.", u: GA },
-    { t: "ChatGPT — mock interview", d: "The flagship GenAI design question.", u: GA + "/chatgpt-genai/mock-interview" }],
-    r: ["Design ChatGPT, out loud, using SCALED. Ten minutes, no notes.", "The subsets recursion template from memory.", "SFT vs RLHF vs DPO — one line each."] },
-
-  { b: [
-    { t: "GenAI SD Ch.10 — Automatic Speech Recognition SD", d: "Maps directly onto your internship. Reframe the Bhojpuri pipeline in this design vocabulary — internship work becomes a senior-sounding answer.", u: GA },
-    { t: "Ch.7 — Text-to-Speech + ElevenLabs mock", d: "2 lessons, then the mock.", u: GA + "/elevenlabs/mock-interview" }],
-    r: ["Design an ASR system for a low-resource language, out loud.", "How does your actual Bhojpuri pipeline differ from the reference design — and why?", "Backtracking skeleton from memory."] },
-
-  { b: [
-    { t: "GenAI SD Ch.6 — Text-to-Image + DALL·E mock", d: "2 lessons + mock. Then Ch.12 Conclusion. Skip text-to-video and captioning unless a JD names them. Course complete.", u: GA + "/dall-e/mock-interview" },
     { t: "Agentic AI Expert — Module 3: Agentic Design Patterns", d: "Routing · parallelisation · orchestrator-worker · evaluator-optimiser. You build agents; this gives you the naming. For each pattern, one line on where you've used it.", u: M3 }],
-    r: ["Name the four agentic design patterns and give one use case each.", "Which pattern did your own agent work actually use? Say it in pattern language.", "Diffusion vs autoregressive generation — the tradeoff."] },
+    r: ["Name the four agentic design patterns and give one use case each.", "Which pattern did your own agent work actually use? Say it in pattern language."] },
 
   { b: [
-    { t: "Agentic AI Expert — Module 5: Agentic System Design (~90 min)", d: "Guardrails, failure containment, NVIDIA Eureka. Have a real answer for looping agents, hallucinated tool calls, runaway cost.", u: M5 },
     { t: "Sunday admin", d: "Application review; slots before 14:00.", u: AI }],
-    r: ["Free recall the whole stretch — patterns, GenAI systems, agentic design.", "Whatever you blank on becomes next week's syllabus. Say it, note it."] },
+    r: ["Free recall the whole stretch — every pattern, every concept, every project.", "Whatever you blank on becomes next week's syllabus. Say it, note it."] },
 
   { b: [
     { t: "STAR bank — 6 stories", d: "Conflict, failure, ownership, ambiguity, learning speed, disagreement.", u: AI },
@@ -99,17 +105,11 @@ const SYLLABUS: StudyUnit[] = [
     r: ["Re-answer every rapid-fire question you fumbled.", "Replay your last mock in your head — where did you go quiet? Quiet loses offers."] },
 
   { b: [
-    { t: "Run the skipped GenAI mocks", d: "ChatGPT · RAG and Finetuning · ElevenLabs.", u: GA + "/chatgpt-genai/mock-interview" },
-    { t: "Self-designed: multilingual voice assistant for low-resource Indian languages", d: "Use SCALED. Sits precisely at ASR × RAG × fine-tuning — the single best question you could be asked. Prepare it as a story to steer interviews toward.", u: GA }],
-    r: ["Deliver the multilingual voice assistant design, out loud, end to end.", "Where in that design does your actual internship experience slot in?"] },
-
-  { b: [
     { t: "TADT full defence rehearsal", d: "Why BQPSO over PSO/GA · why a digital twin layer · baselines · significance · limitations · real IoV latency. Name your own limitations — it earns respect. Status: under peer review at Wireless Personal Communications, never 'published'.", u: AI },
     { t: "'Walk me through your M.Tech thesis' — 5-minute answer", d: "Rehearse it twice.", u: AI }],
     r: ["The full paper defence, out loud, including the limitations.", "The 60-second version. Then the 5-minute version."] },
 
   { b: [
-    { t: "Round 3: 45-min GenAI system design, out loud", d: "Full structure: requirements → metrics → design → tradeoffs.", u: GA },
     { t: "Round 4: 30-min behavioural + written self-assessment", d: "STAR stories, resume walkthrough, then: what would have cost you the offer? Fix the top two tomorrow. Prepare 5 questions for the interviewer.", u: AI }],
     r: ["Free recall the whole loop. Where did you lose energy or structure?", "Rehearse your 5 questions for the interviewer."] },
 
@@ -194,7 +194,7 @@ export const PLAN_DAYS = PLAN.length;
 // Saved progress is keyed by "<day>-<block>-<index>", so any change to how
 // chapters and problems map onto days would leave old ticks pointing at the
 // wrong task. Bumping this resets saved progress back to Day 1 instead.
-export const PLAN_VERSION = 3;
+export const PLAN_VERSION = 4;
 
 // ---- recall-coach prompt builders (kept identical to the original) ----
 export function recallPrompt(topic: string, day: number): string {

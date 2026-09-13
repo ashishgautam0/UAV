@@ -614,15 +614,17 @@ function TaskCard({
           </Badge>
         )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <a
-            href={task.u}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-0.5 inline-flex items-center gap-1 text-xs text-sky-400 hover:underline"
-          >
-            Open on Educative
-            <ExternalLink className="h-3 w-3" />
-          </a>
+          {task.u && (
+            <a
+              href={task.u}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-0.5 inline-flex items-center gap-1 text-xs text-sky-400 hover:underline"
+            >
+              {task.u.includes("educative.io") ? "Open on Educative" : "Open reference"}
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
 
           {showPdf && (
             <>
