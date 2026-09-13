@@ -101,6 +101,7 @@ function computeDay(s: PrepState): number {
 }
 
 const BLOCK_ACCENT: Record<BlockKey, string> = {
+  a: "text-sky-400",
   b: "text-emerald-400",
   r: "text-violet-400",
 };
@@ -266,7 +267,7 @@ export default function Prep28Page() {
     let total = 0;
     let tdone = 0;
     PLAN.forEach((p, di) => {
-      (["b", "r"] as BlockKey[]).forEach((b) => {
+      (["a", "b", "r"] as BlockKey[]).forEach((b) => {
         const n = (b === "r" ? p.r : p[b]).length;
         total += n;
         for (let i = 0; i < n; i++) {
@@ -278,7 +279,7 @@ export default function Prep28Page() {
       });
     });
     const cur = PLAN[day - 1];
-    const todayN = cur.b.length + cur.r.length;
+    const todayN = cur.a.length + cur.b.length + cur.r.length;
     return {
       pct: total ? (100 * doneCount) / total : 0,
       doneCount,
@@ -291,6 +292,14 @@ export default function Prep28Page() {
   if (!mounted) return null;
 
   const cur = PLAN[day - 1];
+
+  // carried coding: unchecked problems from the previous day only
+  const carriedA =
+    day > 1
+      ? (PLAN[day - 2]?.a ?? [])
+          .map((t, i) => ({ ...t, day: day - 1, id: tid(day - 1, "a", i) }))
+          .filter((t) => !isDone(t.id))
+      : [];
 
   // carried Block B: unchecked items from the previous day only
   const carriedB =
@@ -314,6 +323,11 @@ export default function Prep28Page() {
     id: tid(day, "b", i),
   }));
   const bAllDone = todaysB.length > 0 && todaysB.every((t) => isDone(t.id));
+  const todaysA = (PLAN[day - 1]?.a ?? []).map((t, i) => ({
+    ...t,
+    day,
+    id: tid(day, "a", i),
+  }));
   const hasRecall = cur.r.length > 0 || carriedRecall.length > 0;
 
   return (
@@ -388,9 +402,43 @@ export default function Prep28Page() {
 
       </div>
 
-      {/* Content — Block B and Recall are both always shown for the selected day */}
+      {/* Content — every block is shown for the selected day */}
       <div className="space-y-3">
-        <p className={cn("text-sm font-medium", BLOCK_ACCENT.b)}>{SESSION_NAMES.b}</p>
+        <p className={cn("text-sm font-medium", BLOCK_ACCENT.a)}>{SESSION_NAMES.a}</p>
+
+        {carriedA.length > 0 && (
+          <>
+            <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-amber-400">
+              Carried over from Day {day - 1}
+            </p>
+            {carriedA.map((t) => (
+              <TaskCard
+                key={t.id}
+                task={t}
+                done={isDone(t.id)}
+                fromDay={t.day}
+                onToggle={() => toggle(t.id)}
+              />
+            ))}
+          </>
+        )}
+
+        <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Day {day}
+        </p>
+        {todaysA.map((t) => (
+          <TaskCard
+            key={t.id}
+            task={t}
+            done={isDone(t.id)}
+            onToggle={() => toggle(t.id)}
+          />
+        ))}
+        <p className="pt-1 text-xs italic text-muted-foreground">
+          Easy problems only — the point is fluency and pattern recognition, not difficulty.
+        </p>
+
+        <p className={cn("pt-3 text-sm font-medium", BLOCK_ACCENT.b)}>{SESSION_NAMES.b}</p>
 
         {carriedB.length > 0 && (
           <>
