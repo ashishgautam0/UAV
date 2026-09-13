@@ -63,10 +63,12 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 
-// Tasks per day on the /prep28 page, as [blockB, recall] — used to read its
-// localStorage progress ("prep28") for the widget below.
-const PREP_COUNTS: [number, number][] = PLAN.map((d) => [d.b.length, d.r.length]);
-const PREP_TOTAL = PREP_COUNTS.reduce((s, [b, r]) => s + b + r, 0);
+// Tasks per day on the /prep28 page — used to read its localStorage progress
+// ("prep28") for the widget below.
+const PREP_COUNTS: number[] = PLAN.map(
+  (d) => d.a.length + d.b.length + d.r.length
+);
+const PREP_TOTAL = PREP_COUNTS.reduce((s, n) => s + n, 0);
 
 interface PrepState {
   started: boolean;
@@ -103,8 +105,13 @@ function computePrepState(s: Prep28State | null | undefined): PrepState {
     planDone++;
     if (k.startsWith(day + "-")) todayDone++;
   }
-  const [b, r] = PREP_COUNTS[day - 1];
-  return { started: Boolean(s.start), day, planDone, todayDone, todayTotal: b + r };
+  return {
+    started: Boolean(s.start),
+    day,
+    planDone,
+    todayDone,
+    todayTotal: PREP_COUNTS[day - 1],
+  };
 }
 
 const WEEKLY_TARGET = 50;
