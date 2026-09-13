@@ -7,6 +7,8 @@ const CIP = "https://www.educative.io/courses/grokking-coding-interview";
 const GA = "https://www.educative.io/courses/generative-ai-system-design";
 const AI = "https://www.educative.io/courses/ai-engineer-interview-prep";
 const M3 = "https://www.educative.io/module/P1vxGOtNzNBPX5PJY/10370001/4640179653312512";
+const SQL = "https://www.educative.io/courses/sql-interview-patterns";
+const MLSD = "https://www.educative.io/courses/machine-learning-system-design";
 
 export type PrepTask = { t: string; d: string; u: string };
 export type PrepDay = { tag: string; a: PrepTask[]; b: PrepTask[]; r: string[] };
@@ -49,6 +51,17 @@ const SYLLABUS: StudyUnit[] = [
   { b: [
     { t: "Consolidation + admin (30 min)", d: "Tune the Educative roadmap from your weak-list; confirm the week's application targets; interview slots before 14:00.", u: AI }],
     r: ["Free recall the whole week — every pattern, every concept.", "Anything you blank on is tomorrow's first revision item. Say it, then note it."] },
+
+  // SQL is a first-round filter at this company size and is not on the resume —
+  // the cheapest gap in the plan to close.
+  { b: [
+    { t: "Grokking SQL Interview Patterns — joins and aggregation", d: "First half: joins, GROUP BY and HAVING, subqueries vs CTEs. Not on your resume and screened for by almost everyone at this company size.", u: SQL },
+    { t: "Grokking SQL Interview Patterns — window functions", d: "ROW_NUMBER, RANK, LAG/LEAD, running totals, then the pattern drills. Write at least five queries from a blank editor with no autocomplete.", u: SQL }],
+    r: ["Write a window-function query from memory — running total by group.", "When does a subquery beat a join, and when does it cost you?", "WHERE vs HAVING, out loud, with an example."] },
+
+  { b: [
+    { t: "ML System Design — the tabular lifecycle", d: "Problem framing → feature engineering → training → inference → metrics, on a classical (non-LLM) problem. Your resume is all LLM/GenAI; this is where an 'AI/ML Engineer' title catches you out. Spend the time on imbalance, leakage and metric choice.", u: MLSD }],
+    r: ["Walk through building a churn model end to end — framing, features, metric, imbalance.", "Your classifier is 95% accurate on 2% positives. What is wrong, and what do you report instead?"] },
 
   { b: [
     { t: "GenAI Ch.2 — Fundamental Concepts (5 lessons)", d: "Parallelism (data/tensor/pipeline/model) and inference optimisation: quantisation, distillation, KV cache, batching, speculative decoding. You already do token-cost work — this is the vocabulary for it.", u: GA + "/parallelism-in-genai-models" },
@@ -103,7 +116,11 @@ const SYLLABUS: StudyUnit[] = [
   { b: [
     { t: "STAR bank — 6 stories", d: "Conflict, failure, ownership, ambiguity, learning speed, disagreement. Draw them from AD & AR and PathToPR, not from college.", u: AI },
     { t: "Resume walkthrough, timed to 3 minutes", d: "B.E. → M.Tech (AI) → PathToPR internship → AI Engineer at AD & AR → AWS MLA-C01 and AIF-C01 → the paper → what you want next. Consistency check: reason-for-moving and 3-year answers must match everywhere.", u: AI }],
-    r: ["The 3-minute resume walkthrough, out loud, twice.", "Two STAR stories, out loud.", "'Why are you moving?' and 'Where in three years?' — smooth, no hesitation."] },
+    r: ["The 3-minute resume walkthrough, out loud, twice.", "Two STAR stories, out loud.", "'Where do you see yourself in three years?' — smooth, no hesitation."] },
+
+  { b: [
+    { t: "'Why are you moving after three months?' + compensation", d: "You joined AD & AR in June; every interviewer will ask, and this question sinks more candidates than any technical round. Write one calm, non-defensive answer about what you are moving toward — never about what you are escaping — and rehearse until it comes out identical twice. Then settle notice period and expected CTC so the numbers never wobble mid-loop.", u: "" }],
+    r: ["'You joined in June — why are you leaving?' Answer it twice. Same answer both times.", "Expected CTC and notice period — say both out loud, without hedging."] },
 
   { b: [
     { t: "Rapid-fire self-quiz, 60 seconds per answer, spoken", d: "Bias-variance · regularisation · precision/recall · ROC vs PR AUC · overfitting fixes · CV · bagging vs boosting · GD variants · attention · tokenisation · quantisation · LoRA vs QLoRA. Over 60s → re-drill tomorrow.", u: AI }],
@@ -171,6 +188,10 @@ const CODING: CodingDay[] = [
   { tag: "Strings · III", d: "Character-level scanning — say the invariant before you code.", easy: ["Valid Palindrome II", "Merge Strings Alternately", "Reverse Vowels of a String"] },
   { tag: "Hash Maps · III", d: "Two-way mapping — check both directions, not just one.", easy: ["Isomorphic Strings", "Word Pattern", "Longest Palindrome"] },
   { tag: "Mixed review", d: "No pattern label. Identify the pattern yourself before writing anything.", easy: ["Third Maximum Number", "Arranging Coins", "Number Complement"] },
+  { tag: "Arrays · Review", d: "Index arithmetic, one pass. Say the complexity before you run it.", easy: ["Concatenation of Array", "Build Array from Permutation", "Shuffle String"] },
+  { tag: "Sorting · II", d: "Sort by a derived key — decide the key before touching the sort.", easy: ["Sort the People", "Sorting the Sentence", "Maximum Product of Two Elements in an Array"] },
+  { tag: "Strings · Review", d: "Slicing and rotation. Watch the boundary cases first, not last.", easy: ["Rotate String", "Reverse Prefix of Word", "Final Value of Variable After Performing Operations"] },
+  { tag: "Simulation · warm-up", d: "Read the statement twice, then implement exactly what it says. Final warm-up.", easy: ["Kids With the Greatest Number of Candies", "Defanging an IP Address", "Number of Good Pairs"] },
 ];
 
 // ---- derived plan ---------------------------------------------------------
@@ -202,7 +223,7 @@ export const PLAN_DAYS = PLAN.length;
 // Saved progress is keyed by "<day>-<block>-<index>", so any change to how
 // chapters and problems map onto days would leave old ticks pointing at the
 // wrong task. Bumping this resets saved progress back to Day 1 instead.
-export const PLAN_VERSION = 5;
+export const PLAN_VERSION = 6;
 
 // ---- recall-coach prompt builders (kept identical to the original) ----
 export function recallPrompt(topic: string, day: number): string {
