@@ -51,61 +51,66 @@ const SYLLABUS: StudyUnit[] = [
     r: ["Free recall the whole week — every pattern, every concept.", "Anything you blank on is tomorrow's first revision item. Say it, then note it."] },
 
   { b: [
-    { t: "GenAI Ch.2 — Fundamental Concepts (5 lessons)", d: "Parallelism (data/tensor/pipeline/model) and inference optimisation: quantisation, distillation, KV cache, batching, speculative decoding. Fundamentals, not system design — these come up in screens.", u: GA + "/parallelism-in-genai-models" },
+    { t: "GenAI Ch.2 — Fundamental Concepts (5 lessons)", d: "Parallelism (data/tensor/pipeline/model) and inference optimisation: quantisation, distillation, KV cache, batching, speculative decoding. You already do token-cost work — this is the vocabulary for it.", u: GA + "/parallelism-in-genai-models" },
     { t: "RAG and Finetuning — Breakout mock", d: "Your single most likely interview question. You should be unusually strong here.", u: GA + "/rag-and-finetuning/mock-interview" }],
     r: ["Four parallelism strategies — one line each.", "RAG or fine-tuning? The decision rule, then three cases where you'd use both.", "Union-Find template from memory."] },
 
+  // Practical system design — the round a ~1 YOE AI engineer does get: sizing,
+  // latency budgets and cost, not consumer-scale design theatre.
   { b: [
+    { t: "GenAI Ch.3 + Ch.4 — Back-of-envelope + SCALED", d: "The calculations lessons, then memorise SCALED as your spine. Cost and latency maths is what this round actually tests.", u: GA },
+    { t: "Ch.11 — RAG System Design (2 lessons)", d: "Sizing, latency budgets, throughput, cost per 1,000 queries, failure modes. This is your day job written as an interview answer.", u: GA },
     { t: "Prepare: when does a knowledge graph beat a vector store?", d: "2-minute answer from your Neo4j GraphRAG course. Almost no candidate can answer this.", u: GA }],
-    r: ["When does a knowledge graph beat a vector store? Two minutes."] },
+    r: ["Recite SCALED in order, then design a RAG pipeline with it, out loud.", "Estimate the cost of serving 10,000 daily users on a 7B model — rough numbers, out loud.", "When does a knowledge graph beat a vector store? Two minutes."] },
 
-  // ---- build track: what the practical/take-home round actually tests ----
+  // ---- harden and defend what you have already shipped ----
   { b: [
-    { t: "Portfolio audit — pick the three projects", d: "List everything you've built. Pick three to show: the RAG app, an end-to-end ML pipeline, and one deployed service. For each, write down what's missing — README, real numbers, a public URL.", u: "" },
-    { t: "RAG app: repo cleanup", d: "README with problem → architecture → results → how to run. Pin requirements, add .env.example, delete dead code and notebooks nobody will read.", u: "https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes" },
-    { t: "RAG app: architecture write-up + diagram", d: "300 words and one diagram: chunking strategy, embedding model, hybrid dense + BM25 with RRF, and why each choice. This is your answer to 'walk me through your project'.", u: "" },
-    { t: "RAG app: put real evaluation numbers in the README", d: "Run RAGAS — faithfulness, answer relevancy, context precision — and publish the scores. Concrete numbers beat 'it works well' in every interview.", u: "https://docs.ragas.io" },
-    { t: "RAG app: deploy to a free tier and link it", d: "Get a public URL (Hugging Face Spaces, Render or Vercel). Put it at the top of the README and on your resume — a live link is the strongest fresher signal there is.", u: "https://huggingface.co/docs/hub/spaces" }],
-    r: ["Walk through your RAG app's retrieval choice out loud — why hybrid, why RRF.", "Describe your chunking strategy, and what you'd change if the documents doubled in size.", "Say your RAGAS numbers from memory, and what each metric actually measures.", "Your live demo is down five minutes before a call. What do you say?", "Pitch the RAG app in 60 seconds: problem, approach, result."] },
-
-  { b: [
-    { t: "End-to-end ML pipeline: scope it", d: "Pick one dataset and define the whole path: ingest → features → train → evaluate → serve. Small and finished beats ambitious and abandoned.", u: "" },
-    { t: "Pipeline: reproducible training + evaluation", d: "One command trains and prints metrics. Fix the seed, log the run, commit the metrics file. Reproducibility is what separates a project from a notebook.", u: "" },
-    { t: "Pipeline: serve it behind FastAPI", d: "A /predict endpoint with request validation and a health check. This shape is exactly what the practical round asks for.", u: "https://fastapi.tiangolo.com" },
-    { t: "Containerise it", d: "A Dockerfile that builds clean from scratch and runs with one command. Be ready to explain the layers and why the build is ordered the way it is.", u: "https://docs.docker.com" },
-    { t: "Add CI and basic monitoring", d: "A GitHub Actions workflow that lints and tests on push. Then log request latency and add one data-quality check — so you can say what you'd monitor in production and what you'd alert on.", u: "https://docs.github.com/en/actions" }],
-    r: ["Walk through your pipeline end to end, out loud, in 90 seconds.", "What makes a training run reproducible? Name every knob you had to pin.", "What breaks first when your API gets 100 requests a second?", "Explain your Dockerfile's layer order and why it caches the way it does.", "What would you monitor in production, and what would you alert on?"] },
+    { t: "Knowledge Base: publish faithfulness + hallucination numbers", d: "Run RAGAS on the live demo — faithfulness, answer relevancy, context precision — and put the scores in the README. Your other projects have hard numbers; this one doesn't, and quantified faithfulness is the green flag at this level.", u: "https://docs.ragas.io" },
+    { t: "Knowledge Base: architecture write-up + diagram", d: "Cohere embed-v3 → Pinecone → rerank-v3 → Groq Llama 3.3 70B over SSE. Write why each choice, and what you'd swap first if cost doubled. One diagram.", u: "" },
+    { t: "Knowledge Base: latency and cost budget", d: "Measure p50/p95 per stage — embed, retrieve, rerank, generate — and cost per 1,000 queries. Know where the time goes and what you would cut first.", u: "" },
+    { t: "Knowledge Base: failure modes", d: "Empty retrieval, provider rate limit, oversized document, EPUB that chunks badly. Document what the system does in each case — and port in the Groq→OpenRouter fallback you already built elsewhere.", u: "" }],
+    r: ["Say your Knowledge Base RAGAS numbers from memory, and what each metric measures.", "Walk the retrieval path out loud — embed, retrieve, rerank, generate — and say where the latency goes.", "Reranking costs you latency. Justify keeping it, then argue the other side.", "Retrieval comes back with nothing relevant. What does the system do, and what does the user see?"] },
 
   { b: [
-    { t: "GitHub hygiene pass", d: "Pin the three projects. Real commit history, not one 'initial commit' dump. A profile README that says what you build. Unpin tutorial clones — recruiters do look.", u: "" },
+    { t: "Reliability patterns as spoken answers", d: "Your Groq→OpenRouter fallback, retry and backoff, duplicate detection, the unattended publishing loop from PathToPR. Write each as a 90-second answer naming the failure it prevents.", u: "" },
+    { t: "AWS deployment talk-track (MLA-C01)", d: "For each project: SageMaker endpoint vs Lambda vs ECS, why, autoscaling policy, and roughly what it costs. You hold the certification — convert it into spoken answers, because nobody will ask you the exam questions.", u: "https://aws.amazon.com/certification/certified-machine-learning-engineer-associate/" },
+    { t: "AWS monitoring + CI/CD talk-track", d: "Model monitoring and data capture, drift detection, CloudWatch alarms, a SageMaker pipeline for retraining. Say what you would alert on and at what threshold.", u: "https://aws.amazon.com/certification/certified-machine-learning-engineer-associate/" },
+    { t: "When would you NOT fine-tune?", d: "Prompt vs RAG vs fine-tune, with the cost, latency and maintenance argument. You are a fine-tuning specialist, so this is exactly where they probe judgment — the wrong answer reads as a hammer looking for nails.", u: "" }],
+    r: ["Your LLM provider rate-limits you mid-request. Walk through the fallback, out loud.", "Deploy the Knowledge Base on AWS: which service, why, and what does it cost?", "What would you monitor on a deployed model, and at what threshold would you alert?", "When would you NOT fine-tune? Give the rule, then a case where you were right to refuse."] },
+
+  { b: [
+    { t: "Portfolio audit + GitHub hygiene", d: "Pin the three projects. Real commit history, a profile README that says what you build, and every live-demo link verified working before you send the resume anywhere.", u: "" },
+    { t: "Hindi Form Agent: defend the eval harness", d: "2,850-entry corpus from 4 sources, 290-entry held-out set, per-field and per-source accuracy. Be ready for 'how do you know 98.1% is real?' — leakage, sample size, and the error breakdown.", u: "" },
+    { t: "Bhojpuri ASR: defend 13.70% WER", d: "Baseline, data volume, augmentation, what 13.70% actually means to a user, and where it still fails. Low-resource Indic ASR is rare on a resume — be able to go three questions deep.", u: "" },
     { t: "Timed take-home dry run (3 hours)", d: "Give yourself a realistic brief — 'build a small RAG over these documents, expose it behind an API' — and ship it in three hours, clock visible. Then review only what slowed you down.", u: "" }],
-    r: ["What slowed you down in the dry run? Name the top two, and fix them tomorrow.", "Pitch your three projects in 60 seconds total — one line each."] },
+    r: ["How do you know 98.1% field accuracy is real? Leakage, sample size, error breakdown.", "What does 13.70% WER actually mean to someone using the Bhojpuri system?", "Pitch your three projects in 60 seconds total — one line each.", "What slowed you down in the dry run? Name the top two, and fix them tomorrow."] },
 
   { b: [
-    { t: "Project narrative build (90 min)", d: "Write then rehearse: Bhojpuri STT (data, model choice, 13.70% WER, what broke) · RAG/agent work as design decisions · hindi-form-agent · deal-hunter-india.", u: AI },
-    { t: "Paper narrative (30 min)", d: "TADT: 60-second and 5-minute versions. Always 'under peer review at Wireless Personal Communications' — never 'published'.", u: AI },
+    { t: "Project narrative: the AD & AR voice pipeline (90 min)", d: "Your strongest asset. Fine-tuned LLM cutting token consumption, 300 ms end to end, prototype → running cloud service. Write it as problem → constraint → what you changed → measured result, then rehearse. Have the latency breakdown ready.", u: AI },
+    { t: "Project narrative: the rest of the portfolio (60 min)", d: "Hindi Form Agent (Sarvam-1, QLoRA on a T4, 98.1% field accuracy) · Multi-Agent Grocery Comparison (CrewAI, 4 agents, ~30s, stealth scraping) · Knowledge Base (Cohere + Pinecone + rerank, SSE). One tight paragraph each — decisions, not features.", u: AI },
+    { t: "Paper narrative (30 min)", d: "TADT: 60-second and 5-minute versions. Under peer review at Wireless Personal Communications, Springer Nature, SCIE-indexed Q2 — say it that precisely, and never 'published'.", u: AI },
     { t: "Weekly application review", d: "Pipeline check; interview slots before 14:00.", u: AI }],
-    r: ["Deliver the Bhojpuri project narrative, out loud, twice.", "Deliver the paper narrative — 60-second version, then the 5-minute version.", "Free recall the full week."] },
+    r: ["Deliver the AD & AR voice pipeline narrative, out loud, twice.", "Where did the 300 ms go, and what did you trade away to get it?", "Deliver the paper narrative — 60-second version, then the 5-minute version.", "Free recall the full week."] },
 
   { b: [
-    { t: "Agentic AI Expert — Module 3: Agentic Design Patterns", d: "Routing · parallelisation · orchestrator-worker · evaluator-optimiser. You build agents; this gives you the naming. For each pattern, one line on where you've used it.", u: M3 }],
-    r: ["Name the four agentic design patterns and give one use case each.", "Which pattern did your own agent work actually use? Say it in pattern language."] },
+    { t: "Agentic AI Expert — Module 3: Agentic Design Patterns", d: "Routing · parallelisation · orchestrator-worker · evaluator-optimiser. You built a 4-agent CrewAI pipeline — this gives you the naming for what you already did.", u: M3 }],
+    r: ["Name the four agentic design patterns and give one use case each.", "Which pattern did your grocery-comparison pipeline actually use? Say it in pattern language."] },
 
   { b: [
     { t: "Sunday admin", d: "Application review; slots before 14:00.", u: AI }],
     r: ["Free recall the whole stretch — every pattern, every concept, every project.", "Whatever you blank on becomes next week's syllabus. Say it, note it."] },
 
   { b: [
-    { t: "STAR bank — 6 stories", d: "Conflict, failure, ownership, ambiguity, learning speed, disagreement.", u: AI },
-    { t: "Resume walkthrough, timed to 3 minutes", d: "M.Tech (AI) → internship work → certifications → paper → what you want next. Consistency check: reason-for-leaving and 3-year answers must match everywhere.", u: AI }],
-    r: ["The 3-minute resume walkthrough, out loud, twice.", "Two STAR stories, out loud.", "'Why are you leaving?' and 'Where in three years?' — smooth, no hesitation."] },
+    { t: "STAR bank — 6 stories", d: "Conflict, failure, ownership, ambiguity, learning speed, disagreement. Draw them from AD & AR and PathToPR, not from college.", u: AI },
+    { t: "Resume walkthrough, timed to 3 minutes", d: "B.E. → M.Tech (AI) → PathToPR internship → AI Engineer at AD & AR → AWS MLA-C01 and AIF-C01 → the paper → what you want next. Consistency check: reason-for-moving and 3-year answers must match everywhere.", u: AI }],
+    r: ["The 3-minute resume walkthrough, out loud, twice.", "Two STAR stories, out loud.", "'Why are you moving?' and 'Where in three years?' — smooth, no hesitation."] },
 
   { b: [
-    { t: "Rapid-fire self-quiz, 60 seconds per answer, spoken", d: "Bias-variance · regularisation · precision/recall · ROC vs PR AUC · overfitting fixes · CV · bagging vs boosting · GD variants · attention · tokenisation · quantisation · LoRA. Over 60s → re-drill tomorrow.", u: AI }],
+    { t: "Rapid-fire self-quiz, 60 seconds per answer, spoken", d: "Bias-variance · regularisation · precision/recall · ROC vs PR AUC · overfitting fixes · CV · bagging vs boosting · GD variants · attention · tokenisation · quantisation · LoRA vs QLoRA. Over 60s → re-drill tomorrow.", u: AI }],
     r: ["Re-answer every rapid-fire question you fumbled.", "Replay your last mock in your head — where did you go quiet? Quiet loses offers."] },
 
   { b: [
-    { t: "TADT full defence rehearsal", d: "Why BQPSO over PSO/GA · why a digital twin layer · baselines · significance · limitations · real IoV latency. Name your own limitations — it earns respect. Status: under peer review at Wireless Personal Communications, never 'published'.", u: AI },
+    { t: "TADT full defence rehearsal", d: "Why BQPSO over PSO/GA · why a digital twin layer · baselines · significance · limitations · real IoV latency. Name your own limitations — it earns respect.", u: AI },
     { t: "'Walk me through your M.Tech thesis' — 5-minute answer", d: "Rehearse it twice.", u: AI }],
     r: ["The full paper defence, out loud, including the limitations.", "The 60-second version. Then the 5-minute version."] },
 
@@ -114,7 +119,7 @@ const SYLLABUS: StudyUnit[] = [
     r: ["Free recall the whole loop. Where did you lose energy or structure?", "Rehearse your 5 questions for the interviewer."] },
 
   { b: [
-    { t: "Final narrative pass", d: "Resume walkthrough · Bhojpuri project · paper · 'why this company' template.", u: AI },
+    { t: "Final narrative pass", d: "Resume walkthrough · the AD & AR voice pipeline · Bhojpuri ASR · the paper · 'why this company' template.", u: AI },
     { t: "Logistics check", d: "Camera, mic, lighting, connection, quiet window before 14:00, IDE set to Python, notes closed. Write one page: what you know now that you didn't on Day 1.", u: AI }],
     r: ["Nothing structured tonight. Rest properly.", "If you want one thing: the 2-minute self-introduction, once. Then sleep."] },
 ];
@@ -163,6 +168,9 @@ const CODING: CodingDay[] = [
   { tag: "Dynamic Programming", d: "Brute force → memoise → tabulate. All three steps, every problem.", easy: ["Min Cost Climbing Stairs", "Best Time to Buy and Sell Stock", "Pascal's Triangle II"] },
   { tag: "Dynamic Programming · II", d: "State the transition out loud before writing the loop.", easy: ["N-th Tribonacci Number", "Divisor Game", "Get Maximum in Generated Array"] },
   { tag: "Greedy", d: "Always be ready to say WHY the greedy choice is safe.", easy: ["Assign Cookies", "Lemonade Change", "Maximum Units on a Truck"] },
+  { tag: "Strings · III", d: "Character-level scanning — say the invariant before you code.", easy: ["Valid Palindrome II", "Merge Strings Alternately", "Reverse Vowels of a String"] },
+  { tag: "Hash Maps · III", d: "Two-way mapping — check both directions, not just one.", easy: ["Isomorphic Strings", "Word Pattern", "Longest Palindrome"] },
+  { tag: "Mixed review", d: "No pattern label. Identify the pattern yourself before writing anything.", easy: ["Third Maximum Number", "Arranging Coins", "Number Complement"] },
 ];
 
 // ---- derived plan ---------------------------------------------------------
@@ -194,7 +202,7 @@ export const PLAN_DAYS = PLAN.length;
 // Saved progress is keyed by "<day>-<block>-<index>", so any change to how
 // chapters and problems map onto days would leave old ticks pointing at the
 // wrong task. Bumping this resets saved progress back to Day 1 instead.
-export const PLAN_VERSION = 4;
+export const PLAN_VERSION = 5;
 
 // ---- recall-coach prompt builders (kept identical to the original) ----
 export function recallPrompt(topic: string, day: number): string {
