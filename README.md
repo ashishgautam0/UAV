@@ -1,6 +1,6 @@
 # Job Search HQ
 
-A full-stack AI-powered job search automation platform for AI/ML roles. Combines intelligent LinkedIn job scraping, LLM-generated personalized outreach, application tracking, and analytics — with hourly automated runs via GitHub Actions.
+A full-stack AI-powered job search automation platform for AI/ML roles. Combines intelligent LinkedIn job scraping, LLM-generated personalized outreach, application tracking, and analytics — with hourly automated runs via a scheduled Claude routine.
 
 ## Features
 
@@ -38,8 +38,8 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 - Sort by relevance score, source, or company
 - Quick-apply button to log applications directly
 
-### Daily Automation
-- A scheduled Claude routine runs the scraper once a day at 18:00 IST
+### Hourly Automation
+- A scheduled Claude routine runs the scraper every hour (`59 * * * *`)
 - Scrapes LinkedIn, filters and deduplicates against previous runs
 - Saves new jobs and a markdown digest to Supabase
 - Writes a cold outreach DM for each new job — the routine session is Claude, so
@@ -60,7 +60,7 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 | AI/LLM | Claude, via the scheduled routine (no API key) |
 | Database | Supabase (PostgreSQL) |
 | Scraping | requests, BeautifulSoup4, python-jobspy |
-| Automation | GitHub Actions (hourly cron) |
+| Automation | Scheduled Claude routine (hourly cron) |
 | Deployment | Vercel (frontend) |
 
 ## Project Structure
@@ -77,7 +77,7 @@ job_search_tool/
 │       ├── scraper.py           # 12+ job source scrapers
 │       ├── message_generator.py # LLM-powered message generation
 │       ├── tracker.py           # Application tracking (Supabase)
-│       ├── hourly.py            # Daily automation script
+│       ├── hourly.py            # Hourly automation script
 │       ├── jd_analyzer.py       # Job description analysis
 │       ├── company_research.py  # Company research & caching
 │       ├── pending_messages.py  # CLI the Claude routine drives to write DMs
@@ -88,7 +88,7 @@ job_search_tool/
 │       │   ├── dashboard/       # Analytics dashboard
 │       │   ├── tonight/         # Tonight's Plan view
 │       │   ├── tracker/         # Application tracker
-│       │   ├── prep28/          # 28-day prep plan
+│       │   ├── prep28/          # Interview prep plan
 │       │   └── settings/        # Settings
 │       └── page.tsx             # Landing page
 └── supabase/
@@ -186,9 +186,8 @@ Environment variables:
 
 The scraper is not triggered by the deployed API — a full run makes 48 LinkedIn
 queries with pauses between them, far longer than a serverless function may run.
-It is instead executed once a day at 18:00 IST (12:30 UTC) by a scheduled
-Claude routine, which
-checks out this repository, installs `backend/requirements.txt`, and runs:
+It is instead executed every hour by a scheduled Claude routine (`59 * * * *`),
+which checks out this repository, installs `backend/requirements.txt`, and runs:
 
 ```bash
 cd backend/modules && python hourly.py
