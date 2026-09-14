@@ -263,5 +263,6 @@ export interface Prep28State {
   dayOverride?: number | null;
   sess?: string | null;
   done?: Record<string, boolean>;
+  review?: Record<string, { due: number; step: number }>;
   v?: number | null;
 }
