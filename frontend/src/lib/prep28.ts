@@ -225,6 +225,29 @@ export const PLAN_DAYS = PLAN.length;
 // wrong task. Bumping this resets saved progress back to Day 1 instead.
 export const PLAN_VERSION = 6;
 
+// ---- spaced repetition for missed coding problems -------------------------
+// A compressed 1-3-7-14 ladder, measured in plan days. That is the schedule
+// recommended when the exam is four to six weeks out, which is this plan's
+// length — the textbook "double until 256 days" ladder is built for retention
+// far beyond the window here. Only missed problems enter it: re-solving what
+// you already know is the main way this kind of practice gets wasted.
+export const REVIEW_INTERVALS = [1, 3, 7, 14];
+
+export type ReviewEntry = { due: number; step: number };
+
+// A miss restarts the ladder from the first interval.
+export function reviewAfterMiss(day: number): ReviewEntry {
+  return { due: day + REVIEW_INTERVALS[0], step: 0 };
+}
+
+// Solving it on a review day advances one rung; clearing the last rung retires
+// the problem, by which point it has survived a fortnight.
+export function reviewAfterClear(day: number, step: number): ReviewEntry | null {
+  const next = step + 1;
+  if (next >= REVIEW_INTERVALS.length) return null;
+  return { due: day + REVIEW_INTERVALS[next], step: next };
+}
+
 // ---- recall-coach prompt builders (kept identical to the original) ----
 export function recallPrompt(topic: string, day: number): string {
   return `Act as my recall coach for AI/ML interview prep. It's Day ${day} of my ${PLAN_DAYS}-day plan, night session — eyes-closed retrieval practice.\n\nTopic: "${topic}"\n\nAsk me one question at a time on this topic and wait for my answer. After each answer: briefly correct anything wrong, then ask one deeper follow-up. Keep your replies to 2–3 sentences — this is spoken-style practice, not an essay. Start now with your first question.`;
