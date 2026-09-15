@@ -39,7 +39,7 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 - Quick-apply button to log applications directly
 
 ### Hourly Automation
-- The proposed ChatGPT Work replacement preserves the documented hourly minute (`59 * * * *`) after validation
+- The proposed ChatGPT Work replacement runs hourly at minute 59 after validation
 - Scrapes LinkedIn, filters and deduplicates against previous runs
 - Saves new jobs and a markdown digest to Supabase
 - Writes a cold outreach DM for each new job — the scheduled session composes
@@ -186,8 +186,8 @@ Environment variables:
 
 The scraper is not triggered by the deployed API — a full run makes 48 LinkedIn
 queries with pauses between them, far longer than a serverless function may run.
-The proposed replacement is a ChatGPT Work scheduled task at the documented
-minute (`59 * * * *`). It checks out this repository in cloud compute, installs
+The proposed replacement is a ChatGPT Work scheduled task that runs hourly at
+minute 59. It checks out this repository in cloud compute, installs
 `backend/requirements.txt`, and runs the same Python scraping and filtering.
 This describes the target migration; it does not assert that the replacement
 schedule is active. Until cutover is validated, the old Claude routine remains
