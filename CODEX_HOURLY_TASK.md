@@ -14,8 +14,8 @@ Setup command:
 python -m pip install --disable-pip-version-check -r backend/requirements.txt
 ```
 
-Configure these under **Codex cloud -> Settings -> Environments -> UAV ->
-Environment variables**:
+For a Codex cloud run, configure these under **Codex cloud -> Settings ->
+Environments -> UAV -> Environment variables**:
 
 - `SUPABASE_URL` (required)
 - `SUPABASE_KEY` (required service-role key)
@@ -25,6 +25,14 @@ Environment variables**:
 Do not put values in this file, the repository, logs, or the task prompt. Allow
 outbound HTTPS to the configured Supabase host and the public job sources used
 by `backend/modules/scraper.py`.
+
+This location configures the selected Codex cloud environment only. A ChatGPT
+Work scheduled task can execute in a different hosted runtime and must not be
+assumed to inherit these values or the Codex environment's network allowlist.
+Before activation, run the complete prompt in the exact runtime the scheduler
+will use and prove variable presence, Supabase access, and source reachability.
+If the scheduling surface cannot bind the task to the tested Codex environment
+or provide a supported secure credential connection, do not activate it.
 
 ## Saved task prompt
 
