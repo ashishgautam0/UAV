@@ -1,6 +1,6 @@
 # Job Search HQ
 
-A full-stack AI-powered job search automation platform for AI/ML roles. Combines intelligent LinkedIn job scraping, LLM-generated personalized outreach, application tracking, and analytics — with hourly automated runs via a scheduled Claude routine.
+A full-stack AI-powered job search automation platform for AI/ML roles. Combines intelligent LinkedIn job scraping, session-generated personalized outreach, application tracking, and analytics — with hourly automated runs via a scheduled ChatGPT/Codex cloud task.
 
 ## Features
 
@@ -10,7 +10,7 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 - Deduplication and company blacklist filtering
 
 ### AI Message Generator
-- No LLM API key: every message is written by the scheduled Claude routine
+- No LLM API key: every message is written by the scheduled ChatGPT session
 - Requests queued from the UI are fulfilled on the next hourly run
 - **Cold DMs** — 2 variants per company (direct + curiosity-driven)
 - **Follow-ups** — Value-add messages, not generic check-ins
@@ -39,11 +39,11 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 - Quick-apply button to log applications directly
 
 ### Hourly Automation
-- A scheduled Claude routine runs the scraper every hour (`59 * * * *`)
+- A scheduled ChatGPT/Codex cloud task runs the scraper every hour (`59 * * * *`)
 - Scrapes LinkedIn, filters and deduplicates against previous runs
 - Saves new jobs and a markdown digest to Supabase
-- Writes a cold outreach DM for each new job — the routine session is Claude, so
-  it composes them itself and stores them in `job_messages`. No LLM API key.
+- Writes a cold outreach DM for each new job — the scheduled session composes
+  it and stores it in `job_messages`. No LLM API key.
 - Raises an in-app notification and a web push
 
 ### Additional Tools
@@ -57,10 +57,10 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 | Frontend | Next.js 16, React 19, TypeScript |
 | Styling | Tailwind CSS 4, shadcn/ui, Lucide icons |
 | Backend | FastAPI, Uvicorn |
-| AI/LLM | Claude, via the scheduled routine (no API key) |
+| AI/LLM | ChatGPT, via the scheduled cloud task (no API key) |
 | Database | Supabase (PostgreSQL) |
 | Scraping | requests, BeautifulSoup4, python-jobspy |
-| Automation | Scheduled Claude routine (hourly cron) |
+| Automation | Scheduled ChatGPT/Codex cloud task (hourly cron) |
 | Deployment | Vercel (frontend) |
 
 ## Project Structure
@@ -80,7 +80,7 @@ job_search_tool/
 │       ├── hourly.py            # Hourly automation script
 │       ├── jd_analyzer.py       # Job description analysis
 │       ├── company_research.py  # Company research & caching
-│       ├── pending_messages.py  # CLI the Claude routine drives to write DMs
+│       ├── pending_messages.py  # CLI the scheduled session drives to write DMs
 │       └── digest.py            # Markdown digest builder
 ├── frontend/
 │   └── src/app/
@@ -186,7 +186,8 @@ Environment variables:
 
 The scraper is not triggered by the deployed API — a full run makes 48 LinkedIn
 queries with pauses between them, far longer than a serverless function may run.
-It is instead executed every hour by a scheduled Claude routine (`59 * * * *`),
+It is instead executed every hour by a scheduled ChatGPT/Codex cloud task
+(`59 * * * *`),
 which checks out this repository, installs `backend/requirements.txt`, and runs:
 
 ```bash
@@ -222,7 +223,16 @@ environment, and `VAPID_PUBLIC_KEY` on the API project (the bell icon in the
 app uses it to subscribe the device). Without them the push is skipped and the
 in-app notification still lands.
 
-That environment needs `SUPABASE_URL` and `SUPABASE_KEY` only.
+That environment needs `SUPABASE_URL` and `SUPABASE_KEY` only. Configure them
+in **Codex cloud -> Settings -> Environments -> UAV -> Environment variables**.
+Use the environment's network allowlist for the project Supabase host and the
+public job sources. Optional push also needs `VAPID_PRIVATE_KEY` and
+`VAPID_CLAIM_EMAIL`. Never put credential values in the task prompt or repo.
+
+The complete reusable runbook and saved task prompt are in
+[`CODEX_HOURLY_TASK.md`](CODEX_HOURLY_TASK.md). Validate one manual cloud run
+before enabling the schedule, and disable the old Claude routine only after
+that run succeeds.
 
 ## API Routes
 
