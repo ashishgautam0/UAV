@@ -1,7 +1,7 @@
 """
-Outreach messages for scraped jobs, written by the scheduled Claude routine.
+Outreach messages for scraped jobs, written by the scheduled ChatGPT session.
 
-There is no hosted LLM call here. The routine session *is* Claude: it lists the
+There is no hosted LLM API call here. The scheduled session composes the text: it lists the
 jobs that still need a message, writes each one itself, and saves it back. This
 script is the interface it drives.
 
@@ -399,7 +399,7 @@ def cmd_intel(args):
 
 def cmd_screen_list(args):
     """Visible scraped jobs not yet screened against the resume, newest first,
-    with the candidate's profile. Claude reads each and decides fit + level."""
+    with the candidate's profile. The scheduled session decides fit + level."""
     from tracker import get_scraped_jobs, get_job_message
 
     df = get_scraped_jobs()
