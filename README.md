@@ -1,6 +1,6 @@
 # Job Search HQ
 
-A full-stack AI-powered job search automation platform for AI/ML roles. Combines intelligent LinkedIn job scraping, session-generated personalized outreach, application tracking, and analytics — with hourly automated runs via a scheduled ChatGPT/Codex cloud task.
+A full-stack AI-powered job search automation platform for AI/ML roles. Combines intelligent LinkedIn job scraping, session-generated personalized outreach, application tracking, and analytics. A migration to hourly ChatGPT Work scheduled runs is prepared but is not active until its Supabase connector is validated.
 
 ## Features
 
@@ -39,7 +39,7 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 - Quick-apply button to log applications directly
 
 ### Hourly Automation
-- A scheduled ChatGPT/Codex cloud task runs the scraper every hour (`59 * * * *`)
+- The proposed ChatGPT Work replacement preserves the documented hourly minute (`59 * * * *`) after validation
 - Scrapes LinkedIn, filters and deduplicates against previous runs
 - Saves new jobs and a markdown digest to Supabase
 - Writes a cold outreach DM for each new job — the scheduled session composes
@@ -60,7 +60,7 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 | AI/LLM | ChatGPT, via the scheduled cloud task (no API key) |
 | Database | Supabase (PostgreSQL) |
 | Scraping | requests, BeautifulSoup4, python-jobspy |
-| Automation | Scheduled ChatGPT/Codex cloud task (hourly cron) |
+| Automation | Proposed ChatGPT Work scheduled task; activate only after connector validation |
 | Deployment | Vercel (frontend) |
 
 ## Project Structure
@@ -186,9 +186,12 @@ Environment variables:
 
 The scraper is not triggered by the deployed API — a full run makes 48 LinkedIn
 queries with pauses between them, far longer than a serverless function may run.
-It is instead executed every hour by a scheduled ChatGPT/Codex cloud task
-(`59 * * * *`),
-which checks out this repository, installs `backend/requirements.txt`, and runs:
+The proposed replacement is a ChatGPT Work scheduled task at the documented
+minute (`59 * * * *`). It checks out this repository in cloud compute, installs
+`backend/requirements.txt`, and runs the same Python scraping and filtering.
+This describes the target migration; it does not assert that the replacement
+schedule is active. Until cutover is validated, the old Claude routine remains
+the production scheduler.
 
 ```bash
 cd backend/modules && python hourly.py
@@ -223,14 +226,18 @@ environment, and `VAPID_PUBLIC_KEY` on the API project (the bell icon in the
 app uses it to subscribe the device). Without them the push is skipped and the
 in-app notification still lands.
 
-That execution runtime needs `SUPABASE_URL` and `SUPABASE_KEY`. A Codex cloud
-environment can store them under **Codex cloud -> Settings -> Environments ->
-UAV -> Environment variables**, but ChatGPT Work scheduled tasks use a separate
-runtime and must not be assumed to inherit Codex environment settings. Activate
-the schedule only after a manual run in the exact scheduled-task runtime proves
-that both variables and required network access are present. Optional push also
-needs `VAPID_PRIVATE_KEY` and `VAPID_CLAIM_EMAIL`. Never put credential values
-in the task prompt or repo.
+The ChatGPT Work path uses the connected Supabase plugin for database reads and
+writes; Vercel variables and Codex cloud environment variables are not inherited
+by a web scheduled task. `backend/modules/cloud_connector.py` provides the
+credential-free JSON/SQL boundary: Python performs scraping, filtering, scoring,
+and prompt preparation, while the plugin executes the bounded database plans.
+Never put credential values in the task prompt or repository.
+
+Web push still requires `VAPID_PRIVATE_KEY` and `VAPID_CLAIM_EMAIL` in the
+process that signs push messages. The Supabase connector alone does not expose
+those values, so connector-mode runs preserve the in-app notification but must
+report web push as unavailable unless a separately tested supported tool is
+added. They must not silently claim push delivery.
 
 The complete reusable runbook and saved task prompt are in
 [`CODEX_HOURLY_TASK.md`](CODEX_HOURLY_TASK.md). Validate one manual cloud run
