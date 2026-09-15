@@ -223,11 +223,14 @@ environment, and `VAPID_PUBLIC_KEY` on the API project (the bell icon in the
 app uses it to subscribe the device). Without them the push is skipped and the
 in-app notification still lands.
 
-That environment needs `SUPABASE_URL` and `SUPABASE_KEY` only. Configure them
-in **Codex cloud -> Settings -> Environments -> UAV -> Environment variables**.
-Use the environment's network allowlist for the project Supabase host and the
-public job sources. Optional push also needs `VAPID_PRIVATE_KEY` and
-`VAPID_CLAIM_EMAIL`. Never put credential values in the task prompt or repo.
+That execution runtime needs `SUPABASE_URL` and `SUPABASE_KEY`. A Codex cloud
+environment can store them under **Codex cloud -> Settings -> Environments ->
+UAV -> Environment variables**, but ChatGPT Work scheduled tasks use a separate
+runtime and must not be assumed to inherit Codex environment settings. Activate
+the schedule only after a manual run in the exact scheduled-task runtime proves
+that both variables and required network access are present. Optional push also
+needs `VAPID_PRIVATE_KEY` and `VAPID_CLAIM_EMAIL`. Never put credential values
+in the task prompt or repo.
 
 The complete reusable runbook and saved task prompt are in
 [`CODEX_HOURLY_TASK.md`](CODEX_HOURLY_TASK.md). Validate one manual cloud run
