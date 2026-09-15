@@ -7,6 +7,15 @@ build/
 
 # Generated files
 job_applications.db
+scrape-context.json
+scrape-plan.json
+scrape-mutations.sql
+task-context.json
+task-items.json
+followup-mutations.sql
+actions.json
+validated-actions.json
+action-mutations.sql
 
 # Environment
 .env
