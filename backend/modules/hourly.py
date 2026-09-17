@@ -279,7 +279,7 @@ def _nationality_ok(description):
     return not _NATIONALITY_BLOCK_RE.search(text)
 
 
-def _resume_fit_filter(jobs):
+def _resume_fit_filter(jobs, resume_text=None):
     """Coarse resume pre-net — NOT the real decision.
 
     This only drops jobs that share almost nothing with the resume, purely to
@@ -290,11 +290,16 @@ def _resume_fit_filter(jobs):
     """
     try:
         from ranking import _tokens
-        from message_generator import _get_profile_text
     except Exception:
         return jobs, "skipped (ranking/profile unavailable)"
 
-    resume = (_get_profile_text() or "").strip()
+    if resume_text is None:
+        try:
+            from message_generator import _get_profile_text
+            resume_text = _get_profile_text()
+        except Exception:
+            resume_text = ""
+    resume = (resume_text or "").strip()
     if len(resume) < 120:
         return jobs, "skipped (no resume uploaded yet)"
 
