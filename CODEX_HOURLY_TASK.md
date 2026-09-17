@@ -23,9 +23,16 @@ reads, reuses the Python filters and prompt builders, validates composed actions
 and renders mutation SQL whose values are base64-encoded JSON. Identifiers and
 operations are allowlisted; generated prose never becomes SQL syntax.
 
-## Manual validation gate
+## One-time activation gate
 
-In the exact ChatGPT Work cloud chat that will own the schedule:
+The connector entry point can be merged after code review and the cloud unit
+and PostgreSQL integration checks pass. Merging does not enable a schedule or
+change the existing Claude routine. Live validation below is required before
+activation.
+
+Perform this section once during migration, in the exact ChatGPT Work cloud
+chat that will own the schedule. Scheduled runs follow the file boundary and
+saved prompt below; they must not create, update, or disable schedules.
 
 1. Confirm GitHub and Supabase tools are callable. List Supabase projects using
    the connector's actual exposed project-list action. Do not infer tool names.
@@ -46,16 +53,16 @@ In the exact ChatGPT Work cloud chat that will own the schedule:
 
    Compare the result with `supabase/schema.sql`. Stop without reading task data
    if the fingerprint does not match.
-3. Before merge, check out the candidate PR commit in cloud compute (not
-   `main`) and run
+3. Check out current `main` in cloud compute and record its commit. If testing
+   an unmerged change, use that candidate commit, then repeat the checks from
+   the resulting `main` before activation. Run
    `python -m pip install --disable-pip-version-check -r backend/requirements.txt`.
 4. Export only the bounded context described below, run the Python commands,
    apply the generated SQL through the authenticated connector, then verify the
    written rows with read-only connector queries.
 5. Confirm the scraper can reach its public sources in this same runtime. The
    scheduler must use the same connected GitHub and Supabase tools.
-6. After the candidate commit passes, merge the PR, check out the resulting
-   `main`, and repeat the non-mutating checks plus one controlled workflow run.
+6. Complete and verify one controlled workflow run from current `main`.
 7. Only after all checks pass, inspect Scheduled again, create exactly one task,
    run it once, verify the next run and its plugin access, then disable the old
    Claude routine.
@@ -152,9 +159,10 @@ connected GitHub and Supabase plugins and current main of
 https://github.com/ashishgautam0/UAV. Never use a desktop checkout. Generate one
 stable run ID at the start and carry it unchanged through every context, plan,
 action, mutation and notification for this run. First check
-that no other run of this task is active. Follow CODEX_HOURLY_TASK.md exactly,
-including its schema fingerprint, bounded connector exports, cloud_connector.py
-file boundary, read-back verification, and stop conditions.
+that no other run of this task is active. Follow the per-run file boundary in
+CODEX_HOURLY_TASK.md, including its schema fingerprint, bounded connector
+exports, cloud_connector.py commands, read-back verification, and stop
+conditions. Do not repeat the one-time activation procedure or change schedules.
 
 Install backend/requirements.txt in the fresh cloud checkout. Preserve the
 existing scraper, title/experience/nationality/resume filters, scoring, 14-day
