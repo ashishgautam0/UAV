@@ -10,7 +10,6 @@ import {
   getStatusFunnel,
   getRoleAnalysis,
   getFollowUpEffectiveness,
-  snoozeFollowUp,
   getPrep28,
 } from "@/lib/api";
 import type {
@@ -61,6 +60,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 // Tasks per day on the /prep28 page — used to read its localStorage progress
@@ -115,8 +115,12 @@ function computePrepState(s: Prep28State | null | undefined): PrepState {
 }
 
 const WEEKLY_TARGET = 50;
+const indiaToday = () => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+}).format(new Date());
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
@@ -184,6 +188,7 @@ export default function DashboardPage() {
   const [statusFunnel, setStatusFunnel] = useState<StatusFunnel | null>(null);
   const [roleAnalysis, setRoleAnalysis] = useState<RoleAnalysis[]>([]);
   const [effectiveness, setEffectiveness] = useState<FollowUpEffectiveness | null>(null);
+  const [dataErrors, setDataErrors] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function fetchAll() {
@@ -213,6 +218,8 @@ export default function DashboardPage() {
         if (statusFunnelRes.status === "fulfilled" && statusFunnelRes.value && typeof statusFunnelRes.value === "object") setStatusFunnel(statusFunnelRes.value);
         if (roleAnalysisRes.status === "fulfilled") setRoleAnalysis(Array.isArray(roleAnalysisRes.value) ? roleAnalysisRes.value : []);
         if (effectivenessRes.status === "fulfilled") setEffectiveness(effectivenessRes.value);
+        const named = [["weekly trend", weeklyTrendRes], ["platform effectiveness", platformRes], ["status breakdown", statusFunnelRes], ["role analysis", roleAnalysisRes]] as const;
+        setDataErrors(new Set(named.filter(([, result]) => result.status === "rejected").map(([name]) => name)));
       } catch (err) {
         console.error("Failed to load dashboard data", err);
       } finally {
@@ -230,6 +237,8 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  const weeklyMax = Math.max(...weeklyTrend.map((row) => row.total), 1);
 
   const statCards = [
     {
@@ -393,7 +402,7 @@ export default function DashboardPage() {
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {followUps.map((fu) => {
-                const today = new Date().toISOString().split("T")[0];
+                const today = indiaToday();
                 const isOverdue = fu.follow_up_date < today;
                 const isDueToday = fu.follow_up_date === today;
                 const borderClass = isOverdue
@@ -409,7 +418,11 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={fu.id}
-                    className={`rounded-lg border p-4 space-y-1 ${borderClass}`}
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => fu.scraped_job_id ? router.push(`/jobs/${fu.scraped_job_id}`) : toast.info("This tracker record has no matching scraped-job detail page.")}
+                    onKeyDown={(e) => { if (e.target === e.currentTarget && e.key === "Enter") { if (fu.scraped_job_id) router.push(`/jobs/${fu.scraped_job_id}`); else toast.info("This tracker record has no matching scraped-job detail page."); } }}
+                    className={`rounded-lg border p-4 space-y-1 ${borderClass} cursor-pointer hover:border-primary/60`}
                   >
                     <div className="flex items-center justify-between">
                       <p className="font-semibold">{fu.company}</p>
@@ -437,21 +450,6 @@ export default function DashboardPage() {
                         {fu.follow_up_date}
                       </span>
                       <div className="flex items-center gap-2">
-                        <input
-                          type="date"
-                          className="h-6 w-[120px] rounded border border-border bg-background px-1 text-[10px] text-muted-foreground cursor-pointer"
-                          min={new Date().toISOString().split("T")[0]}
-                          onChange={async (e) => {
-                            if (!e.target.value) return;
-                            await snoozeFollowUp(fu.id, e.target.value);
-                            setFollowUps((prev) =>
-                              prev.map((f) =>
-                                f.id === fu.id ? { ...f, follow_up_date: e.target.value } : f
-                              )
-                            );
-                          }}
-                          title="Snooze to a different date"
-                        />
                         <span className="text-muted-foreground text-xs capitalize">
                           {fu.status}
                         </span>
@@ -468,7 +466,8 @@ export default function DashboardPage() {
                             variant="ghost"
                             size="sm"
                             className="h-6 px-2 text-xs"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               navigator.clipboard.writeText(
                                 fuDrafts[fu.id]?.content || ""
                               );
@@ -490,7 +489,7 @@ export default function DashboardPage() {
                         size="sm"
                         className="flex-1"
                         disabled={fuLoading === fu.id}
-                        onClick={() => toggleFuDraft(fu)}
+                        onClick={(e) => { e.stopPropagation(); toggleFuDraft(fu); }}
                       >
                         {fuLoading === fu.id ? (
                           <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -578,11 +577,11 @@ export default function DashboardPage() {
         <CardHeader>
           <CardTitle>Platform Effectiveness</CardTitle>
           <CardDescription>
-            Response rates across different application platforms.
+            Positive response rate = Interview or Offer ÷ all persisted applications on each platform.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {platformData.length === 0 ? (
+          {dataErrors.has("platform effectiveness") ? <p className="text-sm text-red-400">Platform data could not be loaded.</p> : platformData.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               No platform data available yet.
             </p>
@@ -632,7 +631,7 @@ export default function DashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!statusFunnel || Object.keys(statusFunnel).length === 0 ? (
+          {dataErrors.has("status breakdown") ? <p className="text-sm text-red-400">Status data could not be loaded.</p> : !statusFunnel || Object.keys(statusFunnel).length === 0 ? (
             <p className="text-muted-foreground text-sm">
               No status data available yet.
             </p>
@@ -668,27 +667,23 @@ export default function DashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {weeklyTrend.length === 0 ? (
+          {dataErrors.has("weekly trend") ? <p className="text-sm text-red-400">Weekly trend could not be loaded.</p> : weeklyTrend.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               No weekly trend data available yet.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Week</TableHead>
-                  <TableHead className="text-right">Applications</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {weeklyTrend.map((w) => (
-                  <TableRow key={w.week}>
-                    <TableCell className="font-medium">{w.week}</TableCell>
-                    <TableCell className="text-right">{w.total}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="space-y-3" aria-label="Weekly application trend graph">
+              {weeklyTrend.map((w) => {
+                return <div key={w.week} className="grid grid-cols-[7rem_1fr_2rem] items-center gap-3 text-sm">
+                  <span className="text-muted-foreground">{w.week}</span>
+                  <div className="flex h-6 overflow-hidden rounded bg-muted" title={`${w.total} applications: ${w.Job || 0} jobs, ${w.Internship || 0} internships`}>
+                    <div className="bg-sky-500" style={{ width: `${((w.Job || 0) / weeklyMax) * 100}%` }} />
+                    <div className="bg-violet-500" style={{ width: `${((w.Internship || 0) / weeklyMax) * 100}%` }} />
+                  </div><strong className="text-right">{w.total}</strong>
+                </div>;
+              })}
+              <p className="text-xs text-muted-foreground"><span className="text-sky-400">■</span> Jobs · <span className="text-violet-400">■</span> Internships · weeks start Monday</p>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -698,11 +693,11 @@ export default function DashboardPage() {
         <CardHeader>
           <CardTitle>Role Analysis</CardTitle>
           <CardDescription>
-            How different role keywords perform in your applications.
+            Mutually exclusive role families from persisted job titles, with observed positive responses.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {roleAnalysis.length === 0 ? (
+          {dataErrors.has("role analysis") ? <p className="text-sm text-red-400">Role analysis could not be loaded.</p> : roleAnalysis.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               No role analysis data available yet.
             </p>
@@ -720,7 +715,7 @@ export default function DashboardPage() {
                 {roleAnalysis.map((r) => (
                   <TableRow key={r.role_keyword}>
                     <TableCell className="font-medium">
-                      {r.role_keyword}
+                      <div>{r.role_keyword}</div>{r.example_roles?.length ? <div className="text-xs font-normal text-muted-foreground">{r.example_roles.join(" · ")}</div> : null}
                     </TableCell>
                     <TableCell className="text-right">{r.applied}</TableCell>
                     <TableCell className="text-right">{r.responses}</TableCell>

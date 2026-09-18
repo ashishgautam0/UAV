@@ -20,9 +20,17 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 
 ### Application Tracker
 - Log applications with metadata: company, role, platform, status, date, follow-up reminders
-- Track job type, platform source, NOC compatibility, conversion potential, salary
+- Track job type, platform source, regional annotations, conversion potential, salary
+- PDF-only, versioned resume profiles with reviewed facts and evidence
+- Separate document readability, mandatory eligibility, resume–JD match, and application priority
+- Audited cover-letter drafts for explicitly eligible high-match jobs (configurable, default 90)
 - Auto-set 7-day follow-up reminders
 - Filter by status, type, and platform
+
+Matching is deterministic and evidence-oriented, not a universal ATS
+certification or a claim of market superiority. Scanned/image-only PDFs are
+rejected because OCR is not available; incomplete extraction, ambiguous dates,
+and unknown mandatory criteria are surfaced for review rather than guessed.
 
 ### Analytics Dashboard
 - Weekly progress tracking (target: 50 applications/week)
@@ -39,7 +47,7 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 - Quick-apply button to log applications directly
 
 ### Hourly Automation
-- The proposed ChatGPT Work replacement runs hourly at minute 59 after validation
+- The proposed ChatGPT cloud replacement runs once an hour after validation; its phase/timezone must be verified at cutover
 - Scrapes LinkedIn, filters and deduplicates against previous runs
 - Saves new jobs and a markdown digest to Supabase
 - Writes a cold outreach DM for each new job — the scheduled session composes
@@ -186,8 +194,8 @@ Environment variables:
 
 The scraper is not triggered by the deployed API — a full run makes 48 LinkedIn
 queries with pauses between them, far longer than a serverless function may run.
-The proposed replacement is a ChatGPT Work scheduled task that runs hourly at
-minute 59. It checks out this repository in cloud compute, installs
+The proposed replacement is a ChatGPT cloud scheduled task that runs once an
+hour. It checks out this repository in cloud compute, installs
 `backend/requirements.txt`, and runs the same Python scraping and filtering.
 This describes the target migration; it does not assert that the replacement
 schedule is active. Until cutover is validated, the old Claude routine remains

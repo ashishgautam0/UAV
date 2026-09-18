@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import os
 import re
@@ -23,12 +24,19 @@ from pathlib import Path
 SCHEMA_VERSION = 1
 MAX_EXISTING_URLS = 20_000
 MAX_SCREEN = 100
+MAX_RESCORE = 100
 MAX_OUTREACH = 10
 MAX_REQUESTS = 20
 MAX_DUE_APPLICATIONS = 100
 MAX_HISTORY = 500
 MAX_ACTIVE_REQUESTS = 200
+MAX_COVER_LETTERS = 20
+COVER_LETTER_RULES_VERSION = "grounded-cover-letter-v1"
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:+-]{7,127}$")
+
+
+def _jd_hash(text):
+    return hashlib.sha256((text or "").strip().encode("utf-8")).hexdigest()
 
 
 def _read(path):
@@ -109,29 +117,45 @@ def _allowed_id_set(allowed, name):
     return _unique_ids(rows, f"allowed_ids.{name}", "id")
 
 
+def _validate_cover_grounding(content, profile, job_description):
+    """Reject high-confidence invented claims; the session remains responsible
+    for semantic grounding that a deterministic checker cannot prove."""
+    sources = f"{profile}\n{job_description}"
+    source_numbers = set(re.findall(r"(?<!\w)\d+(?:[.,]\d+)?%?(?!\w)", sources))
+    draft_numbers = set(re.findall(r"(?<!\w)\d+(?:[.,]\d+)?%?(?!\w)", content))
+    unsupported_numbers = sorted(draft_numbers - source_numbers)
+    if unsupported_numbers:
+        raise ValueError(
+            "cover letter contains numeric claims absent from its resume/JD evidence: "
+            + ", ".join(unsupported_numbers)
+        )
+
+    from resume_profile import SKILL_ALIASES, phrase_present
+    claim_markers = re.compile(
+        r"\b(?:i (?:have|built|used|developed|implemented|led|hold|earned)|"
+        r"my (?:experience|expertise|skills?|certification|degree)|proficient in)\b",
+        re.IGNORECASE,
+    )
+    for sentence in re.split(r"(?<=[.!?])\s+", content):
+        if not claim_markers.search(sentence):
+            continue
+        for skill, aliases in SKILL_ALIASES.items():
+            if any(phrase_present(sentence, alias) for alias in aliases) and not any(
+                phrase_present(profile, alias) for alias in aliases
+            ):
+                raise ValueError(
+                    f"cover letter claims {skill!r} without active-profile evidence"
+                )
+
+
 def profile_text(row):
-    """Mirror profile.py/message_generator.py without opening a DB connection."""
+    """Render only a reviewed active PDF snapshot; never use legacy defaults."""
     row = row or {}
-    resume = (row.get("resume_text") or "").strip()
-    if len(resume) >= 200:
-        return resume
-    lines = []
-    for exp in row.get("experience") or []:
-        lines.append(f"- {exp.get('role', '')} at {exp.get('company', '')} ({exp.get('period', '')}): {exp.get('description', '')}")
-    if row.get("education"):
-        lines.append(f"- {row['education']}")
-    for project in row.get("projects") or []:
-        lines.append(f"- Built {project.get('name', '')}: {project.get('description', '')}")
-    if row.get("skills"):
-        lines.append(f"- Tech stack: {', '.join(row['skills'])}")
-    if row.get("location_preference"):
-        lines.append(f"- Location preference: {row['location_preference']}")
-    if row.get("target_roles"):
-        lines.append(f"- Looking for: {', '.join(row['target_roles'])}")
-    if lines:
-        return "\n".join(lines)
-    from message_generator import SUBIDH_PROFILE
-    return SUBIDH_PROFILE
+    if row.get("status") != "active" or row.get("source_kind") != "pdf":
+        return ""
+    from resume_profile import profile_text as render_profile
+    resume = render_profile(row).strip()
+    return resume if len((row.get("raw_text") or "").strip()) >= 100 else ""
 
 
 def _next_alert(subject):
@@ -146,32 +170,53 @@ def scrape_plan(context):
     if not isinstance(urls, list) or len(urls) > MAX_EXISTING_URLS:
         raise ValueError(f"existing_job_urls must contain at most {MAX_EXISTING_URLS} values")
     existing = {url for url in urls if isinstance(url, str) and url}
+    existing_rows = context.get("existing_jobs", [])
+    if not isinstance(existing_rows, list) or len(existing_rows) > MAX_EXISTING_URLS:
+        raise ValueError(f"existing_jobs must contain at most {MAX_EXISTING_URLS} values")
+    existing_hashes = {}
+    for row in existing_rows:
+        if not isinstance(row, dict) or not isinstance(row.get("url"), str):
+            raise ValueError("every existing_jobs item needs a text url")
+        existing_hashes[row["url"]] = row.get("jd_hash")
 
     from digest import build_email_content
-    from hourly import _experience_ok, _matches_desired_title, _nationality_ok, _resume_fit_filter
+    from hourly import _experience_ok, _matches_desired_title, _resume_fit_filter
     from scraper import check_apply_type, run_all_scrapers
 
-    resume = profile_text(context.get("user_profile"))
+    profile_snapshot = context.get("active_profile") or {}
+    resume = profile_text(profile_snapshot)
     jobs, sources_status, sources_errors = run_all_scrapers()
-    new_jobs = [job for job in jobs if job.get("url", "") not in existing]
-    counts = {"found": len(jobs), "after_dedup": len(new_jobs)}
+    new_jobs = []
+    changed_jobs = 0
+    for job in jobs:
+        url = job.get("url", "")
+        digest = _jd_hash(job.get("description"))
+        if url in existing_hashes:
+            if existing_hashes[url] == digest:
+                continue
+            changed_jobs += 1
+        elif url in existing:
+            continue
+        new_jobs.append(job)
+    counts = {"found": len(jobs), "after_dedup": len(new_jobs), "changed_jd": changed_jobs}
     new_jobs = [job for job in new_jobs if _matches_desired_title(job.get("title", ""))]
     counts["after_title"] = len(new_jobs)
-    new_jobs = [job for job in new_jobs if _experience_ok(job.get("description", ""))]
+    new_jobs = [job for job in new_jobs if _experience_ok(job.get("description", ""), profile_snapshot)]
     counts["after_experience"] = len(new_jobs)
-    new_jobs = [job for job in new_jobs if _nationality_ok(job.get("description", ""))]
-    counts["after_nationality"] = len(new_jobs)
-    new_jobs, resume_note = _resume_fit_filter(new_jobs, resume)
+    new_jobs, resume_note = _resume_fit_filter(new_jobs, resume, profile_snapshot)
     counts["after_resume_net"] = len(new_jobs)
 
     try:
         from jd_analyzer import full_analyze, quick_ats
         for job in new_jobs[:15]:
             try:
-                result = full_analyze(job.get("title", ""), job.get("description", ""))
-                job["ats_score"] = quick_ats(job.get("description", ""), resume)
-                job["skill_match"] = result.get("skills", {}).get("match_percentage", 0)
-                job["noc_verdict"] = result.get("noc", {}).get("confidence", "")
+                result = full_analyze(job.get("title", ""), job.get("description", ""), profile_snapshot, job.get("location", ""))
+                job["ats_score"] = quick_ats(job.get("description", ""), profile_snapshot)
+                job["skill_match"] = result.get("skills", {}).get("match_percentage")
+                job["noc_verdict"] = (result.get("noc") or {}).get("confidence", "")
+                job["analysis_details"] = result
+                job["analysis_version"] = result.get("analysis_version")
+                job["profile_version"] = profile_snapshot.get("version")
             except Exception:
                 pass
     except ImportError:
@@ -184,9 +229,14 @@ def scrape_plan(context):
             time.sleep(delay)
 
     allowed = ("title", "company", "location", "source", "url", "description",
-               "score", "noc_verdict", "skill_match", "verdict", "ats_score")
-    db_jobs = [{key: job.get(key, "" if key not in {"score", "skill_match", "ats_score"} else 0)
-                for key in allowed} for job in new_jobs]
+               "score", "noc_verdict", "skill_match", "verdict", "ats_score",
+               "analysis_details", "analysis_version", "profile_version")
+    db_jobs = []
+    for job in new_jobs:
+        row = {key: job.get(key) for key in allowed}
+        row["score"] = row.get("score") or 0
+        row["jd_hash"] = _jd_hash(row.get("description"))
+        db_jobs.append(row)
     alert = _next_alert(context.get("last_email_subject", ""))
     email_log = None
     notification = None
@@ -223,17 +273,48 @@ def prepare_items(context):
     for name in ("follow_up_history", "active_followup_requests"):
         if completeness.get(name) is not True:
             raise ValueError(f"{name} export is not explicitly complete")
-    profile = profile_text(context.get("user_profile"))
+    profile_snapshot = context.get("active_profile") or {}
+    profile = profile_text(profile_snapshot)
+    rescore = _rows(context, "rescore_jobs", MAX_RESCORE)
     screen = _rows(context, "screen_jobs", MAX_SCREEN)
     outreach = _rows(context, "outreach_jobs", MAX_OUTREACH)
     pending = _rows(context, "pending_requests", MAX_REQUESTS)
     due = _rows(context, "due_applications", MAX_DUE_APPLICATIONS)
     history = _rows(context, "follow_up_history", MAX_HISTORY)
     active = _rows(context, "active_followup_requests", MAX_ACTIVE_REQUESTS)
+    cover_candidates = _rows(context, "cover_letter_jobs", MAX_COVER_LETTERS)
+    _unique_ids(rescore, "rescore_jobs", "id")
     _unique_ids(screen, "screen_jobs", "id")
     _unique_ids(outreach, "outreach_jobs", "id")
     _unique_ids(pending, "pending_requests", "id")
     _unique_ids(due, "due_applications", "id")
+    _unique_ids(cover_candidates, "cover_letter_jobs", "id")
+
+    rescored_jobs = []
+    if rescore and not profile:
+        raise ValueError("rescore_jobs require one active reviewed PDF profile")
+    if rescore:
+        from jd_analyzer import full_analyze, quick_ats
+        profile_version = _id(profile_snapshot, "version")
+        for row in rescore:
+            description = _text(row, "description", 100_000, required=False)
+            jd_hash = _jd_hash(description)
+            if row.get("jd_hash") != jd_hash:
+                raise ValueError(f"rescore job {row['id']} JD hash does not match its description")
+            analysis = full_analyze(
+                row.get("title") or "", description, profile_snapshot,
+                row.get("location") or "",
+            )
+            rescored_jobs.append({
+                "job_id": row["id"], "jd_hash": jd_hash,
+                "jd_version": _id(row, "jd_version"),
+                "profile_version": profile_version,
+                "ats_score": quick_ats(description, profile_snapshot),
+                "skill_match": (analysis.get("skills") or {}).get("match_percentage"),
+                "noc_verdict": (analysis.get("noc") or {}).get("confidence") or "",
+                "analysis_version": analysis.get("analysis_version"),
+                "analysis_details": analysis,
+            })
 
     existing = set()
     for request in active:
@@ -279,8 +360,55 @@ def prepare_items(context):
         except TypeError as exc:
             requests.append({"request_id": row.get("id"), "error": f"params do not match builder: {exc}"})
     outreach_items = [{**row, "char_limit": 600} for row in outreach]
+    try:
+        threshold = int(context.get("cover_letter_threshold", 90))
+    except (TypeError, ValueError):
+        raise ValueError("cover_letter_threshold must be an integer")
+    if not 0 <= threshold <= 100:
+        raise ValueError("cover_letter_threshold must be between 0 and 100")
+    from message_generator import build_cover_letter_prompt
+    cover_letters = []
+    if cover_candidates:
+        profile_id = _id(profile_snapshot, "id")
+        profile_version = _id(profile_snapshot, "version")
+    for row in cover_candidates:
+        details = row.get("analysis_details") or {}
+        eligibility = details.get("mandatory_eligibility") or {}
+        score = row.get("ats_score")
+        if row.get("analysis_stale") is not False or row.get("screen_decision") != "pass":
+            continue
+        if type(score) is not int or not 0 <= score <= 100:
+            raise ValueError("cover letter match score must be an integer from 0 to 100")
+        if score < threshold or eligibility.get("overall") != "passed":
+            continue
+        if row.get("profile_version") != profile_version or not profile:
+            continue
+        jd_version = row.get("jd_version")
+        if type(jd_version) is not int or jd_version <= 0:
+            raise ValueError("cover letter jd_version must be a positive integer")
+        analysis_version = _text(row, "analysis_version", 200)
+        if details.get("analysis_version") != analysis_version:
+            raise ValueError("cover letter analysis version does not match its analysis details")
+        detail_score = (details.get("resume_jd_match") or {}).get("score")
+        if type(detail_score) is not int or detail_score != score:
+            raise ValueError("cover letter score does not match its analysis details")
+        jd = _text(row, "description", 100_000)
+        jd_hash = _jd_hash(jd)
+        if row.get("jd_hash") != jd_hash:
+            continue
+        spec = build_cover_letter_prompt(row.get("company") or "Unknown", row.get("title") or "Role", jd, profile_text=profile)
+        cover_letters.append({
+            "job_id": row["id"], "resume_profile_id": profile_id,
+            "resume_version": profile_version,
+            "jd_version": jd_version, "jd_hash": jd_hash,
+            "match_score": score, "analysis_version": analysis_version,
+            "rules_version": COVER_LETTER_RULES_VERSION,
+            "grounding_profile": profile, "job_description": jd, **spec,
+        })
     return {"schema_version": SCHEMA_VERSION, "run_id": run_id, "kind": "items", "profile": profile,
-            "screen_jobs": screen, "outreach_jobs": outreach_items, "requests": requests,
+            "rescored_jobs": rescored_jobs, "screen_jobs": screen,
+            "outreach_jobs": outreach_items, "requests": requests,
+            "cover_letters": cover_letters, "cover_letter_threshold": threshold,
             "followup_requests": followups}
 
 
@@ -294,9 +422,11 @@ def validate_actions(prepared, actions):
     screens = _rows(actions, "screens", MAX_SCREEN)
     outreach = _rows(actions, "outreach_drafts", MAX_OUTREACH)
     results = _rows(actions, "request_results", MAX_REQUESTS)
+    letters = _rows(actions, "cover_letter_drafts", MAX_COVER_LETTERS)
     screen_ids = _unique_ids(screens, "screens", "job_id")
     outreach_ids = _unique_ids(outreach, "outreach_drafts", "job_id")
     request_ids = _unique_ids(results, "request_results", "request_id")
+    letter_ids = _unique_ids(letters, "cover_letter_drafts", "job_id")
     prepared_screen = _rows(prepared, "screen_jobs", MAX_SCREEN)
     _unique_ids(prepared_screen, "prepared screen_jobs", "id")
     allowed_screen = {_id(row, "id") for row in prepared_screen}
@@ -306,19 +436,26 @@ def validate_actions(prepared, actions):
     allowed_request_rows = _rows(prepared, "requests", MAX_REQUESTS)
     _unique_ids(allowed_request_rows, "prepared requests", "request_id")
     allowed_requests = {_id(row, "request_id"): row for row in allowed_request_rows}
+    allowed_letter_rows = _rows(prepared, "cover_letters", MAX_COVER_LETTERS)
+    _unique_ids(allowed_letter_rows, "prepared cover_letters", "job_id")
+    allowed_letters = {_id(row, "job_id"): row for row in allowed_letter_rows}
     if not screen_ids <= allowed_screen:
         raise ValueError("screen job_id is outside the exported batch")
     if not outreach_ids <= set(allowed_outreach):
         raise ValueError("outreach job_id is outside the exported batch")
     if not request_ids <= set(allowed_requests):
         raise ValueError("request_id is outside the exported batch")
+    if not letter_ids <= set(allowed_letters):
+        raise ValueError("cover-letter job_id is outside the exported batch")
 
     from message_generator import enforce_char_limit
     clean_screens = []
     for row in screens:
-        if row.get("decision") not in ("pass", "fail"):
-            raise ValueError("each screen needs integer job_id and pass/fail decision")
+        if row.get("decision") not in ("pass", "fail", "review"):
+            raise ValueError("each screen needs integer job_id and pass/fail/review decision")
+        prepared_row = next(item for item in prepared_screen if item["id"] == row["job_id"])
         clean_screens.append({"job_id": row["job_id"], "decision": row["decision"],
+                              "profile_version": prepared_row.get("profile_version"),
                               "reason": _text(row, "reason", 2_000)})
     clean_outreach = []
     for row in outreach:
@@ -334,7 +471,8 @@ def validate_actions(prepared, actions):
         content = enforce_char_limit(content, outreach_limit).strip()
         if not content:
             raise ValueError("outreach content became empty after limit enforcement")
-        clean_outreach.append({"job_id": row["job_id"], "content": content})
+        clean_outreach.append({"job_id": row["job_id"], "content": content,
+                               "profile_version": allowed_outreach[row["job_id"]].get("profile_version")})
     clean_results = []
     for row in results:
         if row.get("status") not in ("ready", "failed"):
@@ -354,6 +492,21 @@ def validate_actions(prepared, actions):
             clean_results.append({"request_id": row["request_id"], "status": "ready", "content": content})
         else:
             clean_results.append({"request_id": row["request_id"], "status": "failed", "error": content})
+    clean_letters = []
+    for row in letters:
+        spec = allowed_letters[row["job_id"]]
+        content = enforce_char_limit(_text(row, "content", 20_000), _char_limit(spec.get("char_limit"), "cover letter char_limit")).strip()
+        if not content:
+            raise ValueError("cover letter became empty after limit enforcement")
+        _validate_cover_grounding(
+            content,
+            _text(spec, "grounding_profile", 100_000),
+            _text(spec, "job_description", 100_000),
+        )
+        clean_letters.append({key: spec[key] for key in (
+            "job_id", "resume_profile_id", "resume_version", "jd_version", "jd_hash",
+            "match_score", "analysis_version", "rules_version"
+        )} | {"content": content})
     notification = actions.get("notification")
     if not isinstance(notification, dict):
         raise ValueError("a final notification object is required")
@@ -365,10 +518,12 @@ def validate_actions(prepared, actions):
     }
     return {"schema_version": SCHEMA_VERSION, "run_id": run_id, "kind": "actions",
             "screens": clean_screens, "outreach_drafts": clean_outreach,
-            "request_results": clean_results, "notification": clean_notification,
+            "request_results": clean_results, "cover_letter_drafts": clean_letters,
+            "notification": clean_notification,
             "allowed_ids": {"screen": sorted(allowed_screen),
                             "outreach": sorted(allowed_outreach),
-                            "requests": sorted(allowed_requests)}}
+                            "requests": sorted(allowed_requests),
+                            "cover_letters": sorted(allowed_letters)}}
 
 
 def _json_sql(value):
@@ -408,18 +563,51 @@ def render_sql(plan):
     statements = ["BEGIN;"]
     if kind == "scrape":
         jobs = _rows(plan, "jobs", 500)
+        seen_urls = set()
+        for row in jobs:
+            url = _text(row, "url", 10_000)
+            if url in seen_urls:
+                raise ValueError(f"duplicate job url {url!r} in scrape plan")
+            seen_urls.add(url)
+            description = _text(row, "description", 100_000, required=False)
+            if row.get("jd_hash") != _jd_hash(description):
+                raise ValueError(f"scrape job {url!r} JD hash does not match its description")
         if jobs:
             payload = _json_sql(jobs)
             statements.append(f"""
-WITH p AS (SELECT jsonb_array_elements({payload}) AS j)
+WITH p AS (SELECT jsonb_array_elements({payload}) AS j),
+changed AS MATERIALIZED (
+  SELECT s.id FROM public.scraped_jobs s JOIN p ON s.url = p.j->>'url'
+  WHERE s.jd_hash IS DISTINCT FROM p.j->>'jd_hash'
+), upserted AS (
 INSERT INTO public.scraped_jobs
-  (title, company, location, source, url, description, score, noc_verdict, skill_match, verdict, ats_score)
+  (title, company, location, source, url, description, score, noc_verdict, skill_match, verdict,
+   ats_score, profile_version, analysis_version, analysis_details, analysis_stale, analyzed_at,
+   jd_hash, jd_version)
 SELECT j->>'title', j->>'company', j->>'location', j->>'source', j->>'url',
        j->>'description', coalesce((j->>'score')::integer, 0), coalesce(j->>'noc_verdict', ''),
-       coalesce((j->>'skill_match')::integer, 0), coalesce(j->>'verdict', ''),
-       coalesce((j->>'ats_score')::integer, 0)
+       (j->>'skill_match')::integer, coalesce(j->>'verdict', ''),
+       (j->>'ats_score')::integer, (j->>'profile_version')::integer,
+       j->>'analysis_version', coalesce(j->'analysis_details', '{{}}'::jsonb),
+       (j->>'profile_version') IS NULL, CASE WHEN j->>'analysis_version' IS NULL THEN NULL ELSE now() END,
+       j->>'jd_hash', 1
 FROM p WHERE nullif(j->>'url', '') IS NOT NULL
-ON CONFLICT (url) DO NOTHING;""")
+ON CONFLICT (url) DO UPDATE SET
+  title = excluded.title, company = excluded.company, location = excluded.location,
+  source = excluded.source, description = excluded.description,
+  jd_version = CASE WHEN scraped_jobs.jd_hash IS DISTINCT FROM excluded.jd_hash
+                    THEN scraped_jobs.jd_version + 1 ELSE scraped_jobs.jd_version END,
+  jd_hash = excluded.jd_hash,
+  ats_score = excluded.ats_score, skill_match = excluded.skill_match,
+  noc_verdict = excluded.noc_verdict, profile_version = excluded.profile_version,
+  analysis_version = excluded.analysis_version,
+  analysis_details = excluded.analysis_details,
+  analysis_stale = excluded.analysis_stale,
+  analyzed_at = excluded.analyzed_at
+  RETURNING id
+)
+UPDATE public.cover_letter_drafts d SET is_outdated = true
+FROM changed WHERE d.scraped_job_id = changed.id AND d.is_outdated = false;""")
         email = plan.get("email_log")
         if email:
             payload = _json_sql(email)
@@ -433,6 +621,26 @@ FROM p WHERE NOT EXISTS (SELECT 1 FROM public.email_logs e WHERE e.subject = p.j
         statements.append(_notification_sql(plan.get("notification"), run_id, "job_alert", "job_alert"))
         statements.append(_notification_sql(plan.get("health_notification"), run_id, "health_check", "health_check"))
     elif kind == "items":
+        rescores = _rows(plan, "rescored_jobs", MAX_RESCORE)
+        _unique_ids(rescores, "rescored_jobs", "job_id")
+        if rescores:
+            payload = _json_sql(rescores)
+            statements.append(f"""
+WITH p AS (SELECT jsonb_array_elements({payload}) AS j)
+UPDATE public.scraped_jobs s
+SET ats_score = (p.j->>'ats_score')::integer,
+    skill_match = (p.j->>'skill_match')::integer,
+    noc_verdict = coalesce(p.j->>'noc_verdict', ''),
+    profile_version = (p.j->>'profile_version')::integer,
+    analysis_version = p.j->>'analysis_version',
+    analysis_details = coalesce(p.j->'analysis_details', '{{}}'::jsonb),
+    analysis_stale = false,
+    analyzed_at = now()
+FROM p
+WHERE s.id = (p.j->>'job_id')::bigint
+  AND s.analysis_stale = true
+  AND s.jd_version = (p.j->>'jd_version')::integer
+  AND s.jd_hash = p.j->>'jd_hash';""")
         rows = _rows(plan, "followup_requests", MAX_DUE_APPLICATIONS)
         if rows:
             payload = _json_sql(rows)
@@ -461,12 +669,15 @@ WHERE NOT EXISTS (
             payload = _json_sql(screens)
             statements.append(f"""
 WITH p AS (SELECT jsonb_array_elements({payload}) AS j)
-INSERT INTO public.job_messages (scraped_job_id, message_type, content, generated_by, generated_at)
+INSERT INTO public.job_messages (scraped_job_id, message_type, content, generated_by, generated_at, profile_version, is_stale)
 SELECT (j->>'job_id')::bigint, 'screen',
-       (CASE WHEN j->>'decision' = 'pass' THEN 'PASS: ' ELSE 'FAIL: ' END) || coalesce(j->>'reason', ''),
-       'chatgpt-scheduled-task', now() FROM p
+       (CASE j->>'decision' WHEN 'pass' THEN 'PASS: ' WHEN 'fail' THEN 'FAIL: ' ELSE 'REVIEW: ' END) || coalesce(j->>'reason', ''),
+       'chatgpt-scheduled-task', now(), (j->>'profile_version')::integer,
+       (j->>'profile_version') IS NULL FROM p
 ON CONFLICT (scraped_job_id, message_type) DO UPDATE
-SET content = excluded.content, generated_by = excluded.generated_by, generated_at = excluded.generated_at;
+SET content = excluded.content, generated_by = excluded.generated_by,
+    generated_at = excluded.generated_at, profile_version = excluded.profile_version,
+    is_stale = excluded.is_stale;
 WITH p AS (SELECT jsonb_array_elements({payload}) AS j)
 UPDATE public.scraped_jobs s SET dismissed = CASE WHEN p.j->>'decision' = 'fail' THEN 1 ELSE 0 END
 FROM p WHERE s.id = (p.j->>'job_id')::bigint;""")
@@ -477,11 +688,14 @@ FROM p WHERE s.id = (p.j->>'job_id')::bigint;""")
             payload = _json_sql(outreach)
             statements.append(f"""
 WITH p AS (SELECT jsonb_array_elements({payload}) AS j)
-INSERT INTO public.job_messages (scraped_job_id, message_type, content, generated_by, generated_at)
+INSERT INTO public.job_messages (scraped_job_id, message_type, content, generated_by, generated_at, profile_version, is_stale)
 SELECT (j->>'job_id')::bigint, 'cold_dm', j->>'content',
-       'chatgpt-scheduled-task', now() FROM p
+       'chatgpt-scheduled-task', now(), (j->>'profile_version')::integer,
+       (j->>'profile_version') IS NULL FROM p
 ON CONFLICT (scraped_job_id, message_type) DO UPDATE
-SET content = excluded.content, generated_by = excluded.generated_by, generated_at = excluded.generated_at;""")
+SET content = excluded.content, generated_by = excluded.generated_by,
+    generated_at = excluded.generated_at, profile_version = excluded.profile_version,
+    is_stale = excluded.is_stale;""")
         results = _rows(actions, "request_results", MAX_REQUESTS)
         if not _unique_ids(results, "request_results", "request_id") <= allowed_requests:
             raise ValueError("request_id is outside validated allowed_ids")
@@ -495,6 +709,34 @@ SET status = p.j->>'status',
     error = CASE WHEN p.j->>'status' = 'failed' THEN p.j->>'error' ELSE NULL END,
     completed_at = now()
 FROM p WHERE r.id = (p.j->>'request_id')::bigint AND r.status = 'pending';""")
+        letters = _rows(actions, "cover_letter_drafts", MAX_COVER_LETTERS)
+        allowed_letters = _allowed_id_set(allowed, "cover_letters")
+        if not _unique_ids(letters, "cover_letter_drafts", "job_id") <= allowed_letters:
+            raise ValueError("cover-letter job_id is outside validated allowed_ids")
+        if letters:
+            payload = _json_sql(letters)
+            statements.append(f"""
+WITH p AS (SELECT jsonb_array_elements({payload}) AS j),
+stale AS (
+  UPDATE public.cover_letter_drafts d SET is_outdated = true
+  FROM p WHERE d.scraped_job_id = (p.j->>'job_id')::bigint
+    AND (d.resume_version IS DISTINCT FROM (p.j->>'resume_version')::integer
+      OR d.jd_hash IS DISTINCT FROM p.j->>'jd_hash'
+      OR d.generation_rules_version IS DISTINCT FROM p.j->>'rules_version')
+  RETURNING d.id
+)
+INSERT INTO public.cover_letter_drafts
+  (scraped_job_id, resume_profile_id, resume_version, jd_version, jd_hash,
+   match_score, analysis_version, generation_rules_version, run_id, content,
+   generated_by, generated_at, is_outdated)
+SELECT (j->>'job_id')::bigint, (j->>'resume_profile_id')::bigint,
+       (j->>'resume_version')::integer, (j->>'jd_version')::integer,
+       j->>'jd_hash', (j->>'match_score')::integer, j->>'analysis_version',
+       j->>'rules_version', '{run_id}', j->>'content',
+       'chatgpt-scheduled-task', now(), false
+FROM p
+ON CONFLICT (scraped_job_id, resume_version, jd_hash, generation_rules_version)
+DO NOTHING;""")
         statements.append(_notification_sql(actions.get("notification"), run_id, "run_summary", "run_summary"))
     else:
         raise ValueError("kind must be scrape, items, or actions")

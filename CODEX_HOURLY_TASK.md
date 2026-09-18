@@ -1,101 +1,87 @@
-# ChatGPT Work hourly migration runbook
+# ChatGPT cloud hourly migration runbook
 
-## Status and invariants
+## Current status
 
-This is a **proposed replacement**, not proof of an active schedule. The old
-Claude routine stays enabled until one complete run succeeds in the same
-ChatGPT Work runtime and exactly one replacement appears in Scheduled.
+This repository contains the candidate implementation, not an active schedule.
+Merging code does not activate ChatGPT Scheduled or disable Claude. Cut over
+only after a manual end-to-end run succeeds in the same ChatGPT cloud runtime.
+Then make disabling Claude and enabling one replacement a coordinated cutover;
+observe a scheduled run before declaring the migration complete. Inspect
+schedules first and never leave two hourly routines enabled.
 
-The repository documents an hourly run at minute 59, but the original
-scheduler's timezone has not been verified. Inspect the old scheduler before
-claiming that its phase was preserved. If its timezone cannot be recovered,
-activate the replacement hourly at minute 59 in `Asia/Kolkata` as the user's
-new default, clearly labelled as a new default rather than a legacy setting.
+The established documentation says the job runs once an hour near minute 59,
+but the old scheduler timezone/phase has not been verified. Preserve it only
+when the old scheduler proves it. Otherwise, use once an hour near minute 59 in
+`Asia/Kolkata` as a newly selected default and report that distinction.
 
-The database credential boundary is the connected Supabase plugin. Vercel and
-Codex cloud environment variables do not flow into ChatGPT Work scheduled
-tasks. Never request, retrieve, print, persist, or put a Supabase key in a
-prompt, file, log, or repository. The scheduled session itself supplies the LLM
-work; no additional LLM API is used.
-
-`backend/modules/cloud_connector.py` accepts bounded JSON exported by connector
-reads, reuses the Python filters and prompt builders, validates composed actions,
-and renders mutation SQL whose values are base64-encoded JSON. Identifiers and
-operations are allowlisted; generated prose never becomes SQL syntax.
+The connected Supabase tool owns database authentication. Vercel and Codex
+environment variables are not inherited by ChatGPT Scheduled. Never retrieve,
+print, prompt for, or persist a service-role key. The scheduled ChatGPT session
+does the language work; there is no external LLM API dependency.
 
 ## One-time activation gate
 
-The connector entry point can be merged after code review and the cloud unit
-and PostgreSQL integration checks pass. Merging does not enable a schedule or
-change the existing Claude routine. Live validation below is required before
-activation.
+1. List accessible Supabase projects using tools actually callable in this
+   chat. Identify UAV by this schema before reading application data:
+   `applications`, `scraped_jobs`, `resume_profiles`, `job_messages`,
+   `cover_letter_drafts`, `message_requests`, `follow_up_history`, `email_logs`,
+   `notifications`, and `push_subscriptions`. Do not restore or select a project
+   based only on its name.
+2. Check out the candidate PR commit in cloud compute, install
+   `backend/requirements.txt`, run all Python/frontend/PostgreSQL checks, then
+   repeat from the resulting `main` commit before activation.
+3. Confirm public scraper sources are reachable in this exact runtime and the
+   future scheduled task exposes the same GitHub and Supabase connections.
+4. Execute one bounded workflow below. Verify inserted jobs, screening states,
+   outreach drafts, queued request results, cover-letter drafts, and the final
+   in-app notification by ID and provenance.
+5. The live cover-letter gate requires either a real job whose explicit
+   mandatory eligibility is `passed` and resume–JD score meets the configured
+   threshold (default 90), or an honest report that no live job qualified. Use
+   isolated test fixtures for threshold boundaries; never alter a real score.
+   For a qualifying live job, verify the saved letter is visible on its tracker
+   detail page and copy/download work; verify below-threshold, failed, and review
+   jobs have no current letter. Record IDs/timestamps, not resume contents.
+6. Inspect schedules again. Only after the manual run succeeds, disable the old
+   Claude routine and verify its disabled state as the first half of a
+   coordinated cutover; then create exactly one hourly ChatGPT task. Observe one
+   real run and verify its timestamps, writes, plugin access, and next run. If
+   this chat cannot inspect and disable Claude, stop before enabling the
+   competitor and report the exact user action required. Never claim Claude is
+   disabled without evidence.
 
-Perform this section once during migration, in the exact ChatGPT Work cloud
-chat that will own the schedule. Scheduled runs follow the file boundary and
-saved prompt below; they must not create, update, or disable schedules.
+The Supabase connector can preserve in-app notifications. It cannot sign Web
+Push without a separately supported and tested VAPID signing capability, so
+report push as unavailable rather than silently dropping or claiming it.
 
-1. Confirm GitHub and Supabase tools are callable. List Supabase projects using
-   the connector's actual exposed project-list action. Do not infer tool names.
-2. Identify the UAV project by schema, not by a guessed project name. Before
-   reading application data, execute this read-only query on each candidate:
+## Cloud checks
 
-   ```sql
-   select table_name, column_name, data_type
-   from information_schema.columns
-   where table_schema = 'public'
-     and table_name in (
-       'applications', 'scraped_jobs', 'email_logs', 'notifications',
-       'user_profile', 'job_messages', 'message_requests',
-       'follow_up_history', 'push_subscriptions'
-     )
-   order by table_name, ordinal_position;
-   ```
+```bash
+python -m pip install --disable-pip-version-check -r backend/requirements.txt
+python -m unittest discover -s backend/tests -p 'test_*.py' -v
+npm ci --prefix frontend
+npm run build --prefix frontend
+```
 
-   Compare the result with `supabase/schema.sql`. Stop without reading task data
-   if the fingerprint does not match.
-3. Check out current `main` in cloud compute and record its commit. If testing
-   an unmerged change, use that candidate commit, then repeat the checks from
-   the resulting `main` before activation. Run
-   `python -m pip install --disable-pip-version-check -r backend/requirements.txt`.
-4. Export only the bounded context described below, run the Python commands,
-   apply the generated SQL through the authenticated connector, then verify the
-   written rows with read-only connector queries.
-5. Confirm the scraper can reach its public sources in this same runtime. The
-   scheduler must use the same connected GitHub and Supabase tools.
-6. Complete and verify one controlled workflow run from current `main`.
-7. Only after all checks pass, inspect Scheduled again, create exactly one task,
-   run it once, verify the next run and its plugin access, then disable the old
-   Claude routine.
-
-Before live validation, exercise the generated SQL against an ephemeral
-PostgreSQL engine in cloud compute. This test applies `supabase/schema.sql` and
-checks retries, queue state transitions, Unicode/quoting, per-run notifications,
-and transaction rollback:
+Exercise generated SQL against ephemeral PostgreSQL in cloud compute:
 
 ```bash
 connector_test_dir=$(mktemp -d)
 npm install --prefix "$connector_test_dir" @electric-sql/pglite
 node backend/tests/postgres_integration.mjs \
-  "$connector_test_dir/node_modules/@electric-sql/pglite/dist/index.js" \
-  python
+  "$connector_test_dir/node_modules/@electric-sql/pglite/dist/index.js" python
 ```
 
-## File boundary
+## Per-run file boundary
 
-Create `scrape-context.json` (never commit it) with schema version 1:
+Generate one stable run ID and reuse it in every file and notification. Export
+bounded database context through Supabase; never put credentials in these files.
 
-```json
-{
-  "schema_version": 1,
-  "run_id": "one stable identifier generated once for this run and reused in every file",
-  "existing_job_urls": ["URLs scraped during the last 14 days"],
-  "user_profile": {"the single username=subidh row, or an empty object"},
-  "last_email_subject": "the newest email_logs.subject, or an empty string"
-}
-```
-
-Fetch the URL window in pages of at most 1000 until a short page is returned;
-abort if it exceeds the module's 20,000-URL safety bound. Then run:
+`scrape-context.json` contains schema version 1, the run ID, the single reviewed
+`resume_profiles` row whose status is `active`, the newest email subject, and up
+to 20,000 recent `existing_jobs` rows with `url`, `jd_hash`, and `jd_version`.
+Paginate until a short page; stop if truncated. Legacy `existing_job_urls` may
+also be supplied, but fingerprints are required to detect a changed JD.
 
 ```bash
 cd backend/modules
@@ -103,91 +89,78 @@ python cloud_connector.py scrape ../../scrape-context.json ../../scrape-plan.jso
 python cloud_connector.py sql ../../scrape-plan.json ../../scrape-mutations.sql
 ```
 
-Apply the entire generated transaction through the Supabase connector. The job
-insert is `ON CONFLICT (url) DO NOTHING`; digest and notification inserts have
-duplicate guards.
+Apply the complete transaction through Supabase and read it back. A repeated
+URL+JD is ignored; a changed JD increments its version, marks analysis/drafts
+outdated, and is reprocessed. Values are base64 JSON, never model-written SQL.
 
-Afterward export `task-context.json` with these bounded arrays:
+Then export `task-context.json` with:
 
-- `screen_jobs` (100): `scraped_jobs` filtered with `dismissed=0` and
-  `applied=0`, with no `job_messages` row whose `message_type='screen'`, newest
-  first. These predicates intentionally match `tracker.get_scraped_jobs()`.
-- `outreach_jobs` (10): `scraped_jobs` whose URL appears in a non-terminal
-  `applications` row and which have no `cold_dm` message, newest first. Terminal
-  statuses are `Offer`, `Rejected`, `Ghosted`, and `Not Interested`.
-- `pending_requests` (20): pending `message_requests`, newest first.
-- `due_applications` (100): non-terminal applications with non-null
-  `follow_up_date <= current_date`, most overdue first.
-- `follow_up_history` (500): history for those due application IDs.
-- `active_followup_requests` (200): pending or ready follow-up requests.
-- `user_profile`: the same single profile row.
-- `run_id`: exactly the same stable value used in `scrape-context.json`.
-- `completeness`: set `follow_up_history` and `active_followup_requests` to
-  `true` only after complete pagination. If either result was truncated, keep
-  it false and stop; `cloud_connector.py` refuses to calculate follow-up numbers
-  from incomplete context.
-
-Run:
+- the same active PDF profile snapshot and run ID;
+- `rescore_jobs` (100), the next bounded batch with `analysis_stale=true`,
+  including each exact JD, hash and version. Each cycle updates only rows whose
+  hash/version still match, so a new profile drains stale scores safely over
+  repeated hourly runs;
+- `screen_jobs` (100), filtered `dismissed=0 AND applied=0`, with no current
+  screen for the active profile version;
+- `outreach_jobs` (10) missing a current `cold_dm` for that profile version;
+- `cover_letter_jobs` (20), filtered `dismissed=0 AND applied=0`, current
+  non-stale analysis/profile version and a current `pass` screen decision,
+  plus exact JD/hash/version and analysis. Export both the stored score and the
+  score inside `analysis_details`; the adapter rejects any mismatch;
+- `cover_letter_threshold` (default 90);
+- pending requests (20), due applications (100), complete follow-up history
+  (500), and active follow-up requests (200);
+- completeness flags set true only after full pagination. Truncation stops the
+  run because it can change follow-up numbering.
 
 ```bash
 python cloud_connector.py prepare ../../task-context.json ../../task-items.json
 python cloud_connector.py sql ../../task-items.json ../../followup-mutations.sql
 ```
 
-Apply `followup-mutations.sql`, re-export pending requests so newly queued
-follow-ups are included, and rerun `prepare`. Compose every screen decision,
-outreach draft, and queued response in the ChatGPT session using
-`.claude/agents` and the prompts in `task-items.json`. Do not send anything.
-Write `actions.json` with `schema_version: 1`, the unchanged `run_id`, bounded `screens`,
-`outreach_drafts`, `request_results`, and one accurate final in-app
-`notification`. Validate and render it:
+Apply the rescores and follow-up inserts, then re-export the complete task
+context (including newly current analyses, screen decisions, and pending
+requests) and prepare again.
+Compose screen decisions (`pass`, `fail`, or `review`), cold DMs, queued
+responses, and every emitted `cover_letters` prompt in the ChatGPT session.
+Unknown mandatory eligibility must be `review`, not pass. Cover letters are
+emitted only for explicit eligibility `passed` and score at or above threshold.
+Ground them only in the exact JD and active reviewed PDF facts; never invent or
+inflate anything, promise ATS acceptance, send, email, submit, or apply.
+
+Write `actions.json` with the unchanged run ID, bounded `screens`,
+`outreach_drafts`, `request_results`, `cover_letter_drafts`, and one accurate
+final in-app notification. Then validate, render, apply, and read back:
 
 ```bash
 python cloud_connector.py validate-actions ../../task-items.json ../../actions.json ../../validated-actions.json
 python cloud_connector.py sql ../../validated-actions.json ../../action-mutations.sql
 ```
 
-Apply the transaction through Supabase, then read back the affected IDs and the
-new notification. Request updates only affect rows still pending; job messages
-upsert on `(scraped_job_id, message_type)`, so retrying does not duplicate them.
+Retries are idempotent. Cover letters are keyed by job, resume version, JD hash,
+and generation-rules version; a changed resume or JD marks older drafts
+outdated. Saved rows also carry match/analysis versions, run ID, generator, and
+timestamp. Outreach and cover letters remain drafts in the app.
 
-## Durable scheduled-task prompt
+## Durable recurring prompt
 
 ```text
-Run one UAV job-search cycle entirely in ChatGPT Work cloud compute. Use the
-connected GitHub and Supabase plugins and current main of
-https://github.com/ashishgautam0/UAV. Never use a desktop checkout. Generate one
-stable run ID at the start and carry it unchanged through every context, plan,
-action, mutation and notification for this run. First check
-that no other run of this task is active. Follow the per-run file boundary in
-CODEX_HOURLY_TASK.md, including its schema fingerprint, bounded connector
-exports, cloud_connector.py commands, read-back verification, and stop
-conditions. Do not repeat the one-time activation procedure or change schedules.
+Run one UAV cycle entirely in ChatGPT cloud compute from current main of
+https://github.com/ashishgautam0/UAV using only the connected GitHub and
+Supabase tools actually exposed in this run. Do not use a desktop checkout,
+manage schedules, request credentials, call an external LLM API, send outreach,
+or submit applications. Generate one stable run ID and follow the per-run
+boundary, bounds, stop conditions, matching/profile invariants, cover-letter
+threshold, SQL validation, and read-back checks in CODEX_HOURLY_TASK.md.
 
-Install backend/requirements.txt in the fresh cloud checkout. Preserve the
-existing scraper, title/experience/nationality/resume filters, scoring, 14-day
-URL deduplication, Supabase tables, tracked-job-only outreach, follow-up rules,
-and message_requests queue. Compose screening decisions and drafts yourself
-from the stored profile and repository instructions. Store drafts only. Never
-send outreach, email, LinkedIn messages, or applications, and never call an
-external LLM API.
-
-Use only Supabase actions actually exposed in this run. Identify the UAV project
-by schema before reading task data. Never request, reveal, or store credentials.
-Apply only SQL generated by cloud_connector.py and verify affected rows by ID.
-Always create the final in-app summary notification. Report web push as
-unavailable unless this exact scheduled runtime has a separately verified,
-supported signing capability for VAPID; do not claim it ran merely because
-VAPID variables exist in Vercel.
-
-Report source counts/errors, new and deduplicated jobs, filter counts,
-screen pass/fail counts, stored drafts, fulfilled/failed requests, in-app
-notification verification, database read-back results, and push status without
-including secrets or full profile text. On any connector, schema, network,
-checkout, dependency, SQL, or verification failure, stop before later writes
-and report the exact stage.
+Identify UAV by schema before data access. Install backend/requirements.txt in
+the fresh checkout. Use one active reviewed PDF profile snapshot throughout.
+Preserve scraping, filtering, deduplication, persistence, message queues, draft-
+only outreach, and the final in-app summary. Flag unknown mandatory eligibility
+for review. Compose only emitted requests and eligible cover-letter drafts;
+ground every claim in supplied evidence. Report counts, source failures,
+screen pass/fail/review, scores and threshold decisions, saved draft IDs and
+provenance, queue outcomes, notification read-back, and push availability. Stop
+before later writes on any schema, connection, checkout, network, truncation,
+validation, SQL, or read-back failure.
 ```
-
-Activation cadence: hourly at minute 59. Preserve the old scheduler timezone
-only if it is verified. Otherwise use `Asia/Kolkata` as a newly selected default
-and report that distinction when activating.

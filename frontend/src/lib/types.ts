@@ -47,6 +47,7 @@ export interface FollowUp {
   status: string;
   platform?: string;
   follow_up_count?: number;
+  scraped_job_id?: number | null;
 }
 
 export interface FollowUpDraft {
@@ -83,6 +84,7 @@ export interface LogFollowUpRequest {
 
 export interface WeeklyTrend {
   week: string;
+  week_end?: string;
   Job?: number;
   Internship?: number;
   total: number;
@@ -105,6 +107,7 @@ export interface RoleAnalysis {
   applied: number;
   responses: number;
   response_rate: number;
+  example_roles?: string[];
 }
 
 // ---- Scraped Jobs ----
@@ -120,11 +123,11 @@ export interface ScrapedJob {
   work_mode?: string;
   llm_reason?: string;
   verdict?: string;
-  ats_score?: number;
-  skill_match?: number;
+  ats_score?: number | null;
+  skill_match?: number | null;
   noc_verdict?: string;
   applied?: number;
-  bestscore?: number;
+  bestscore?: number | null;
   bestscore_breakdown?: {
     fit: number;
     fit_source: string;
@@ -141,6 +144,14 @@ export interface JobMessage {
   content: string | null;
   generated_by?: string;
   generated_at?: string;
+  is_outdated?: boolean;
+  resume_version?: number;
+  jd_version?: number;
+  jd_hash?: string;
+  match_score?: number;
+  analysis_version?: string;
+  generation_rules_version?: string;
+  run_id?: string;
 }
 
 // ---- Company Research ----
@@ -238,8 +249,65 @@ export interface UserProfileUpdate {
   education?: string;
   location_preference?: string;
   target_roles?: string[];
-  resume_text?: string;
   scoring_weights?: Record<string, unknown>;
+}
+
+export interface EvidenceExcerpt {
+  source?: string;
+  line?: number | null;
+  excerpt?: string;
+}
+
+export interface ResumeFact {
+  id?: string;
+  name?: string;
+  label?: string;
+  role?: string;
+  company?: string;
+  start?: string;
+  end?: string;
+  level?: string;
+  credential?: string;
+  field?: string;
+  institution?: string;
+  evidence?: EvidenceExcerpt[];
+}
+
+export interface ResumeProfile {
+  id: number;
+  username: string;
+  version: number;
+  source_kind: "pdf";
+  source_filename: string;
+  source_sha256: string;
+  extraction_method: string;
+  facts: {
+    skills?: ResumeFact[];
+    experience?: ResumeFact[];
+    education?: ResumeFact[];
+    certifications?: ResumeFact[];
+    total_experience_months?: number | null;
+  };
+  extracted_facts: Record<string, unknown>;
+  evidence: Record<string, unknown>;
+  readability: { status?: string; warnings?: string[]; [key: string]: unknown };
+  status: "pending_review" | "active" | "superseded";
+  created_at?: string;
+  reviewed_at?: string;
+  activated_at?: string;
+}
+
+export interface ResumeProfileStatus {
+  active: ResumeProfile | null;
+  latest: ResumeProfile | null;
+}
+
+export interface ResumeProfileReview {
+  skills: string[];
+  experience: Array<{ id?: string; label?: string; role?: string; company?: string; start?: string; end?: string }>;
+  education: Array<{ id?: string; level: string; credential: string; field?: string; institution?: string }>;
+  certifications: string[];
+  review_notes?: string;
 }
 
 // ---- Notifications ----

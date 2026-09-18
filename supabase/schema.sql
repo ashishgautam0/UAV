@@ -58,9 +58,16 @@ create table if not exists scraped_jobs (
     description  text        not null default '',
     score        integer     not null default 0,
     verdict      text        not null default '',
-    ats_score    integer     not null default 0,
-    skill_match  integer     not null default 0,
+    ats_score    integer,
+    skill_match  integer,
     noc_verdict  text        not null default '',
+    profile_version integer,
+    analysis_version text,
+    analysis_stale boolean not null default true,
+    analysis_details jsonb not null default '{}'::jsonb,
+    analyzed_at timestamptz,
+    jd_version integer not null default 1,
+    jd_hash text,
     work_mode    text,   -- rendered by the Tonight page; no writer yet
     llm_reason   text,   -- rendered by the Tonight page; no writer yet
     dismissed    smallint    not null default 0,   -- 0/1, not boolean: code filters .eq("dismissed", 0)
@@ -71,6 +78,20 @@ create table if not exists scraped_jobs (
 create index if not exists idx_scraped_jobs_inbox      on scraped_jobs (dismissed, applied);
 create index if not exists idx_scraped_jobs_scraped_at on scraped_jobs (scraped_at desc);
 create index if not exists idx_scraped_jobs_source     on scraped_jobs (source);
+
+-- Upgrade existing deployments created before profile-scoped analysis.
+alter table scraped_jobs add column if not exists profile_version integer;
+alter table scraped_jobs add column if not exists analysis_version text;
+alter table scraped_jobs add column if not exists analysis_stale boolean not null default true;
+alter table scraped_jobs add column if not exists analysis_details jsonb not null default '{}'::jsonb;
+alter table scraped_jobs add column if not exists analyzed_at timestamptz;
+alter table scraped_jobs add column if not exists jd_version integer not null default 1;
+alter table scraped_jobs add column if not exists jd_hash text;
+alter table scraped_jobs alter column ats_score drop not null;
+alter table scraped_jobs alter column ats_score drop default;
+alter table scraped_jobs alter column skill_match drop not null;
+alter table scraped_jobs alter column skill_match drop default;
+create index if not exists idx_scraped_jobs_analysis on scraped_jobs (analysis_stale, profile_version);
 
 
 -- ---------------------------------------------------------------------------
@@ -223,6 +244,41 @@ create table if not exists user_profile (
 
 
 -- ---------------------------------------------------------------------------
+-- resume_profiles — immutable PDF extraction + separately reviewed facts.
+-- Exactly one reviewed version may be active for a username. Raw PDF bytes are
+-- not stored; the SHA-256 identifies the source without exposing the document.
+-- ---------------------------------------------------------------------------
+create table if not exists resume_profiles (
+    id                  bigserial primary key,
+    username            text        not null,
+    version             integer     not null,
+    source_kind         text        not null default 'pdf'
+        check (source_kind = 'pdf'),
+    source_filename     text        not null,
+    source_sha256       text        not null,
+    extraction_method   text        not null,
+    raw_text            text        not null,
+    extracted_facts     jsonb       not null default '{}'::jsonb,
+    corrections         jsonb       not null default '{}'::jsonb,
+    evidence            jsonb       not null default '{}'::jsonb,
+    readability         jsonb       not null default '{}'::jsonb,
+    review_notes        text        not null default '',
+    status              text        not null default 'pending_review'
+        check (status in ('pending_review', 'active', 'superseded')),
+    created_at          timestamptz not null default now(),
+    reviewed_at         timestamptz,
+    activated_at        timestamptz,
+    unique (username, version),
+    unique (username, source_sha256)
+);
+
+create unique index if not exists idx_resume_profiles_one_active
+    on resume_profiles (username) where status = 'active';
+create index if not exists idx_resume_profiles_versions
+    on resume_profiles (username, version desc);
+
+
+-- ---------------------------------------------------------------------------
 -- job_messages — outreach messages written by the scheduled Claude routine
 -- Deliberately not columns on scraped_jobs: get_scraped_jobs() does select("*")
 -- over thousands of rows, and inlining message bodies would bloat every listing.
@@ -234,10 +290,98 @@ create table if not exists job_messages (
     content         text        not null,
     generated_by    text        not null default 'claude-routine',
     generated_at    timestamptz not null default now(),
+    profile_version integer,
+    is_stale        boolean     not null default true,
     unique (scraped_job_id, message_type)
 );
 
 create index if not exists idx_job_messages_job on job_messages (scraped_job_id);
+alter table job_messages add column if not exists profile_version integer;
+alter table job_messages add column if not exists is_stale boolean not null default true;
+create index if not exists idx_job_messages_profile on job_messages (is_stale, profile_version);
+
+
+-- ---------------------------------------------------------------------------
+-- cover_letter_drafts — scheduled, grounded drafts for explicitly eligible
+-- high-match jobs. Each source tuple is immutable and retry-idempotent.
+-- ---------------------------------------------------------------------------
+create table if not exists cover_letter_drafts (
+    id                  bigserial primary key,
+    scraped_job_id      bigint      not null references scraped_jobs(id) on delete cascade,
+    resume_profile_id   bigint      not null references resume_profiles(id),
+    resume_version      integer     not null,
+    jd_version          integer     not null,
+    jd_hash             text        not null,
+    match_score         integer     not null check (match_score between 0 and 100),
+    analysis_version    text        not null,
+    generation_rules_version text   not null,
+    run_id              text        not null,
+    content             text        not null,
+    generated_by        text        not null default 'chatgpt-scheduled-task',
+    generated_at        timestamptz not null default now(),
+    is_outdated         boolean     not null default false,
+    unique (scraped_job_id, resume_version, jd_hash, generation_rules_version)
+);
+
+create index if not exists idx_cover_letter_current
+    on cover_letter_drafts (scraped_job_id, is_outdated, generated_at desc);
+
+
+-- Atomically activate one reviewed PDF version and mark profile-dependent
+-- analysis/drafts stale. SECURITY INVOKER keeps the caller's permissions.
+create or replace function activate_resume_profile(
+    p_profile_id bigint,
+    p_username text,
+    p_corrections jsonb default '{}'::jsonb,
+    p_review_notes text default ''
+) returns setof resume_profiles
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+    target_version integer;
+begin
+    select version into target_version
+    from resume_profiles
+    where id = p_profile_id and username = p_username
+    for update;
+
+    if target_version is null then
+        raise exception 'resume profile not found';
+    end if;
+
+    update resume_profiles
+       set status = 'superseded'
+     where username = p_username and status = 'active' and id <> p_profile_id;
+
+    update resume_profiles
+       set corrections = coalesce(p_corrections, '{}'::jsonb),
+           review_notes = coalesce(p_review_notes, ''),
+           status = 'active', reviewed_at = now(), activated_at = now()
+     where id = p_profile_id and username = p_username;
+
+    update scraped_jobs
+       set analysis_stale = true
+     where profile_version is distinct from target_version;
+
+    update job_messages
+       set is_stale = true
+     where message_type in ('screen', 'cold_dm', 'hr_email', 'resume_points', 'evaluation')
+       and profile_version is distinct from target_version;
+
+    update cover_letter_drafts
+       set is_outdated = true
+     where resume_version is distinct from target_version;
+
+    return query select * from resume_profiles where id = p_profile_id;
+end;
+$$;
+
+revoke all on function activate_resume_profile(bigint, text, jsonb, text) from public, anon, authenticated;
+grant execute on function activate_resume_profile(bigint, text, jsonb, text) to service_role;
+grant all on table resume_profiles to service_role;
+grant usage, select on sequence resume_profiles_id_seq to service_role;
 
 
 -- ---------------------------------------------------------------------------
@@ -290,6 +434,12 @@ alter table email_logs             enable row level security;
 alter table notifications          enable row level security;
 alter table push_subscriptions     enable row level security;
 alter table user_profile           enable row level security;
+alter table resume_profiles        enable row level security;
 alter table job_messages           enable row level security;
+alter table cover_letter_drafts    enable row level security;
 alter table message_requests       enable row level security;
 alter table prep28_progress        enable row level security;
+
+revoke all on table resume_profiles, cover_letter_drafts from anon, authenticated;
+grant all on table resume_profiles, cover_letter_drafts to service_role;
+grant usage, select on sequence resume_profiles_id_seq, cover_letter_drafts_id_seq to service_role;

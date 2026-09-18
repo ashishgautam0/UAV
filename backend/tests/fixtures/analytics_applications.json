@@ -1,0 +1,7 @@
+[
+  {"role":"Generative AI Engineer","platform":"LinkedIn","status":"Interview","type":"Job","date_applied":"2026-09-14"},
+  {"role":"ML Engineer","platform":"LinkedIn","status":"Rejected","type":"Job","date_applied":"2026-09-15"},
+  {"role":"Backend Python Developer","platform":"Referral","status":"Offer","type":"Job","date_applied":"2026-09-07"},
+  {"role":"Mystery Role","platform":"Referral","status":"Assignment Submitted","type":"Internship","date_applied":"2026-09-08"},
+  {"role":"NLP Researcher","platform":"Wellfound","status":"Ghosted","type":"Job","date_applied":"bad-date"}
+]

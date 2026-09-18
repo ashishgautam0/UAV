@@ -33,9 +33,8 @@ only if a domain exists; otherwise note that no address could be determined.
 - Name the exact role; lead with one concrete, real hook from `profile`; if a
   `DEMO` URL exists, mention it as attached proof ("I built a short working
   demo for this role: <url>"); close asking to be considered / for next steps.
-- If the profile lists an AWS certification and the JD touches AWS / cloud (or
-  asks for a certification), foreground it — few candidates hold it, so name
-  the exact certification early as a concrete qualification.
+- Select the strongest relevant qualification actually evidenced in this
+  profile snapshot. Never assume a certification, degree, or project exists.
 - Grounding: only real items from `profile`; never invent anything. Avoid the
   clichés ("I hope this finds you well", "circling back", etc.).
 

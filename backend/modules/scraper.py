@@ -34,8 +34,7 @@ _LINKEDIN_SEARCH_QUERIES = [
     "ai research engineer",
     "research engineer ai",
     "applied scientist",
-    # Research roles — Subidh holds an M.Tech, which these postings usually
-    # ask for explicitly, so the degree is a real differentiator here.
+    # Research roles remain part of the general search taxonomy.
     "research engineer",
     "research scientist",
     "machine learning research engineer",
@@ -47,8 +46,7 @@ _LINKEDIN_SEARCH_QUERIES = [
     "full stack ai",
     "ai ml engineer",
     "artificial intelligence engineer",
-    # AWS-focused — Subidh is AWS certified (rare), so prioritise roles that
-    # want AWS/cloud skills where that certification is a real differentiator.
+    # General cloud and MLOps roles; no candidate qualification is assumed.
     "aws machine learning engineer",
     "aws ai engineer",
     "aws generative ai engineer",
@@ -60,21 +58,11 @@ _LINKEDIN_SEARCH_QUERIES = [
     "aws ml engineer",
     "cloud machine learning engineer",
     "cloud ai engineer",
-    "machine learning engineer aws certified",
     "ai engineer cloud",
-    # AWS-certified roles — Subidh holds AWS certifications, so surface postings
-    # that explicitly ask for them (a genuine differentiator).
-    "aws certified engineer",
-    "aws certified developer",
-    "aws certified solutions architect",
-    "aws certified machine learning engineer",
-    "aws certified data engineer",
-    "aws certified devops engineer",
-    "aws certified cloud engineer",
 ]
 
 # Focused query set for the additional boards (Naukri / Indeed / Google Jobs):
-# AWS-first, then the core field, to keep per-board runtime bounded.
+# General cloud and core AI/ML roles, kept bounded for each board.
 _BOARD_SEARCH_QUERIES = [
     "aws machine learning engineer",
     "aws ai engineer",
@@ -87,12 +75,7 @@ _BOARD_SEARCH_QUERIES = [
     "machine learning engineer",
     "ai engineer",
     "generative ai engineer",
-    # AWS-certified roles across every board.
-    "aws certified engineer",
-    "aws certified developer",
-    "aws certified solutions architect",
-    "aws certified machine learning engineer",
-    # Research roles (M.Tech is a stated requirement in most of these).
+    # Research roles.
     "research engineer",
     "research scientist",
     "applied scientist",
@@ -118,8 +101,8 @@ _TITLE_INCLUDE = [
     "research engineer", "research scientist", "applied scientist",
 ]
 
-# "cloud" and "devops" removed from rejects: AWS/cloud roles (incl. AWS DevOps)
-# are now a priority target. A title still needs an _TITLE_INCLUDE keyword to
+# "cloud" and "devops" are not rejected. A title still needs an
+# _TITLE_INCLUDE keyword to
 # pass, so a bare "DevOps Engineer" (no aws/ml signal) is still dropped.
 _TITLE_REJECT = [
     "frontend", "react", "angular", "ui/ux", "data analyst",
@@ -291,8 +274,8 @@ def scrape_linkedin():
                 hours_old=24,
                 results_wanted=results_wanted,
                 # Fetch each posting's full JD text. Without this JobSpy returns
-                # empty descriptions, so the experience (0-1 years) filter and
-                # Claude's resume-screener have nothing to read.
+                # empty descriptions, so evidence-based eligibility and match
+                # analysis have nothing to read.
                 linkedin_fetch_description=True,
             )
 

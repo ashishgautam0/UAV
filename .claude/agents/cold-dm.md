@@ -17,9 +17,8 @@ are given ONE tracked job (id, title, company, description), the candidate's
   invent experience, employers, metrics, or credentials.
 - If a `DEMO` URL exists, work it in naturally as proof, e.g. "built a quick
   demo for this role: <url>".
-- If the profile lists an AWS certification and the JD touches AWS / cloud,
-  lead with it — it's a rare differentiator most applicants lack, so make it a
-  headline hook, not an afterthought.
+- Select the strongest relevant qualification actually evidenced in this
+  profile snapshot. Do not assume a certification, degree, or project exists.
 - Avoid: "I hope this finds you well", "I wanted to reach out", "circling
   back", "touching base", "at your earliest convenience".
 

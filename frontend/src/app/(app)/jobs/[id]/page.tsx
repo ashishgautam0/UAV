@@ -8,12 +8,15 @@ import {
   getJobMessage,
   getCachedCompanyIntel,
   findRecruiterEmails,
-  createApplication,
-  markScrapedJob,
-  getProfile,
+  lookupApplication,
+  snoozeFollowUp,
+  getFollowUpHistory,
 } from "@/lib/api";
 import type {
+  Application,
   CachedCompanyIntel,
+  FollowUpHistory,
+  JobMessage,
   RecruiterEmailReport,
   ScrapedJob,
 } from "@/lib/types";
@@ -33,23 +36,25 @@ import {
   Gauge,
   Landmark,
   Check,
-  ClipboardPlus,
   Copy,
   Download,
   ExternalLink,
   FileText,
   Loader2,
-  MapPin,
   MessageSquareText,
   Mail,
-  Rocket,
-  XCircle,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const SECTIONS = [
+  {
+    type: "cover_letter",
+    title: "Cover letter draft",
+    description: "Generated only for a verified eligible job with a 90+ resume match.",
+    icon: FileText,
+  },
   {
     type: "cold_dm",
     title: "Cold DM",
@@ -95,13 +100,14 @@ export default function JobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [messages, setMessages] = useState<Record<string, string | null>>({});
+  const [messageRows, setMessageRows] = useState<Record<string, JobMessage>>({});
   const [intel, setIntel] = useState<CachedCompanyIntel | null>(null);
   const [evaluation, setEvaluation] = useState<string | null>(null);
   const [demoReady, setDemoReady] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const [resumeDownloading, setResumeDownloading] = useState(false);
-  const [logged, setLogged] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [application, setApplication] = useState<Application | null>(null);
+  const [history, setHistory] = useState<FollowUpHistory[]>([]);
+  const [dateSaving, setDateSaving] = useState(false);
   const [emailReport, setEmailReport] = useState<RecruiterEmailReport | null>(
     null
   );
@@ -110,30 +116,41 @@ export default function JobDetailPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setNotFound(false);
+    setHistory([]);
     try {
-      const j = await getScrapedJob(jobId);
-      setJob(j);
-      const results = await Promise.all(
+      const messagesPromise = Promise.all(
         SECTIONS.map((s) =>
           getJobMessage(jobId, s.type).catch(() => ({ content: null }))
         )
       );
-      const next: Record<string, string | null> = {};
-      SECTIONS.forEach((s, i) => {
-        next[s.type] = results[i]?.content ?? null;
-      });
-      setMessages(next);
+      const evaluationPromise = getJobMessage(jobId, "evaluation").catch(() => ({ content: null }));
+      const demoPromise = getJobMessage(jobId, "demo_html").catch(() => ({ content: null }));
+      const j = await getScrapedJob(jobId);
+      setJob(j);
+      const trackedPromise = lookupApplication(j.url).catch(() => null);
       if (j.company) {
         getCachedCompanyIntel(j.company)
           .then(setIntel)
           .catch(() => setIntel({ found: false }));
       }
-      getJobMessage(jobId, "evaluation")
-        .then((r) => setEvaluation(r.content))
-        .catch(() => setEvaluation(null));
-      getJobMessage(jobId, "demo_html")
-        .then((r) => setDemoReady(Boolean(r.content)))
-        .catch(() => setDemoReady(false));
+      const [tracked, results, evaluationRow, demoRow] = await Promise.all([
+        trackedPromise, messagesPromise, evaluationPromise, demoPromise,
+      ]);
+      setApplication(tracked);
+      if (tracked) {
+        setHistory(await getFollowUpHistory("application", tracked.id).catch(() => []));
+      }
+      const next: Record<string, string | null> = {};
+      const rows: Record<string, JobMessage> = {};
+      SECTIONS.forEach((s, i) => {
+        next[s.type] = results[i]?.content ?? null;
+        rows[s.type] = results[i] as JobMessage;
+      });
+      setMessages(next);
+      setMessageRows(rows);
+      setEvaluation(evaluationRow.content);
+      setDemoReady(Boolean(demoRow.content));
     } catch {
       setNotFound(true);
     } finally {
@@ -153,43 +170,16 @@ export default function JobDetailPage() {
     setTimeout(() => setCopied(null), 2000);
   }
 
-  // Download the latest resume as a PDF (generated in-browser) to attach while applying.
-  async function handleDownloadResume() {
-    setResumeDownloading(true);
-    try {
-      const profile = await getProfile();
-      const tex = profile.resume_text ?? "";
-      if (!tex.trim()) {
-        toast.error("No resume saved yet — add it in Settings.");
-        return;
-      }
-      const { downloadResumePdf } = await import("@/lib/resumePdf");
-      downloadResumePdf(tex, "Subidh Khanal Resume.pdf");
-    } catch {
-      toast.error("Failed to download resume");
-    } finally {
-      setResumeDownloading(false);
-    }
-  }
-
-  async function handleLog() {
-    if (!job) return;
-    setBusy(true);
-    try {
-      await createApplication({
-        company: job.company,
-        role: job.title,
-        platform: job.source,
-        url: job.url,
-      });
-      await markScrapedJob(jobId, "applied");
-      setLogged(true);
-      toast.success(`Logged ${job.company} — ${job.title} to tracker`);
-    } catch {
-      toast.error("Failed to log application");
-    } finally {
-      setBusy(false);
-    }
+  function downloadCoverLetter() {
+    const content = messages.cover_letter;
+    if (!content) return;
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${job?.company || "company"}-${job?.title || "role"}-cover-letter.txt`.replace(/[^a-z0-9.-]+/gi, "-");
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   async function handleFindEmails() {
@@ -213,20 +203,6 @@ export default function JobDetailPage() {
     setCopied(key);
     toast.success("Copied");
     setTimeout(() => setCopied(null), 2000);
-  }
-
-  async function handleDismiss() {
-    setBusy(true);
-    try {
-      // Mark dismissed (not delete) so the scraper's URL dedup keeps the row
-      // and never re-adds this job on a later run.
-      await markScrapedJob(jobId, "dismissed");
-      toast.success("Job dismissed");
-      router.push("/tonight");
-    } catch {
-      toast.error("Failed to dismiss job");
-      setBusy(false);
-    }
   }
 
   if (loading) {
@@ -274,27 +250,8 @@ export default function JobDetailPage() {
             <Building2 className="h-4 w-4" />
             {job.company}
           </span>
-          <span className="flex items-center gap-1.5">
-            <MapPin className="h-4 w-4" />
-            {job.location || "Not specified"}
-          </span>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {job.verdict === "EASY_APPLY" && (
-            <Badge className="text-xs bg-emerald-600/15 text-emerald-400 border-emerald-600/30">
-              <Zap className="mr-1 h-3 w-3" />
-              Easy Apply
-            </Badge>
-          )}
-          {job.verdict === "EXTERNAL" && (
-            <Badge
-              variant="outline"
-              className="text-xs text-sky-400 border-sky-500/30"
-            >
-              <ExternalLink className="mr-1 h-3 w-3" />
-              External apply
-            </Badge>
-          )}
           {job.work_mode && (
             <Badge variant="outline" className="text-xs">
               {job.work_mode}
@@ -304,144 +261,33 @@ export default function JobDetailPage() {
             {job.source}
           </Badge>
         </div>
-
-        {/* Primary actions */}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button size="sm" asChild>
-            <a href={job.url} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-              Apply
-            </a>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy || logged}
-            onClick={handleLog}
-          >
-            {logged ? (
-              <Check className="mr-1.5 h-3.5 w-3.5" />
-            ) : (
-              <ClipboardPlus className="mr-1.5 h-3.5 w-3.5" />
-            )}
-            {logged ? "Logged" : "Log to Tracker"}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-red-400"
-            disabled={busy}
-            onClick={handleDismiss}
-          >
-            <XCircle className="mr-1.5 h-3.5 w-3.5" />
-            Dismiss
-          </Button>
-        </div>
       </div>
 
-      {/* Apply Kit — everything needed to apply, in one place */}
-      {(() => {
-        const kit = [
-          { key: "cold_dm", label: "Cold DM", ready: Boolean(messages["cold_dm"]) },
-          { key: "hr_email", label: "Email + recipient", ready: Boolean(messages["hr_email"]) },
-          { key: "resume_points", label: "Tailored resume notes", ready: Boolean(messages["resume_points"]) },
-          { key: "demo", label: "Live demo", ready: demoReady },
-        ];
-        const readyCount = kit.filter((k) => k.ready).length;
-        return (
-          <Card className="border-primary/30">
-            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Rocket className="h-4 w-4 text-primary" />
-                  Apply Kit
-                </CardTitle>
-                <CardDescription>
-                  Apply in ~30 seconds — grab each piece, then hit apply.
-                </CardDescription>
-              </div>
-              <Badge variant="outline" className="tabular-nums">
-                {readyCount}/{kit.length} ready
-              </Badge>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" asChild>
-                  <a href={job.url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                    Apply on {job.source || "LinkedIn"}
-                  </a>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadResume}
-                  disabled={resumeDownloading}
-                >
-                  {resumeDownloading ? (
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Download className="mr-1.5 h-3.5 w-3.5" />
-                  )}
-                  Download résumé
-                </Button>
-                {messages["cold_dm"] && (
-                  <Button variant="outline" size="sm" onClick={() => handleCopy("cold_dm")}>
-                    {copied === "cold_dm" ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <MessageSquareText className="mr-1.5 h-3.5 w-3.5" />}
-                    Copy DM
-                  </Button>
-                )}
-                {messages["hr_email"] && (
-                  <Button variant="outline" size="sm" onClick={() => handleCopy("hr_email")}>
-                    {copied === "hr_email" ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Mail className="mr-1.5 h-3.5 w-3.5" />}
-                    Copy email
-                  </Button>
-                )}
-                {messages["resume_points"] && (
-                  <Button variant="outline" size="sm" onClick={() => handleCopy("resume_points")}>
-                    {copied === "resume_points" ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <FileText className="mr-1.5 h-3.5 w-3.5" />}
-                    Copy resume notes
-                  </Button>
-                )}
-                {demoReady && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${API_URL}/api/demo/${jobId}`);
-                      toast.success("Demo link copied");
-                    }}
-                  >
-                    <Copy className="mr-1.5 h-3.5 w-3.5" />
-                    Copy demo link
-                  </Button>
-                )}
-              </div>
-              {readyCount < kit.length && (
-                <p className="text-xs text-muted-foreground">
-                  {job.applied
-                    ? "Remaining pieces are written by the hourly routine — check back shortly."
-                    : "Log this job to the tracker and the next hourly run writes the rest."}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })()}
-
-      {/* Description */}
-      {job.description && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Job Description</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-muted-foreground">
-              {job.description}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader><CardTitle className="text-base">Follow-up schedule and recorded history</CardTitle><CardDescription>Scheduled dates are plans; the graph below contains only completed follow-ups recorded in the tracker.</CardDescription></CardHeader>
+        <CardContent className="space-y-5">
+          {application ? <>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="space-y-1 text-sm"><span className="text-muted-foreground">Next scheduled follow-up</span><input type="date" value={application.follow_up_date || ""} disabled={dateSaving} className="block h-9 rounded border bg-background px-3" onChange={async (e) => {
+                const value = e.target.value; if (!value) return; setDateSaving(true);
+                try { await snoozeFollowUp(application.id, value); setApplication({ ...application, follow_up_date: value }); toast.success("Follow-up date saved"); }
+                catch { toast.error("Failed to save follow-up date"); }
+                finally { setDateSaving(false); }
+              }} /></label>
+              {dateSaving && <Loader2 className="mb-2 h-4 w-4 animate-spin" />}
+              <span className="mb-2 text-xs text-muted-foreground">Applied {application.date_applied || "date unknown"}</span>
+            </div>
+            {history.length ? <div className="space-y-3" aria-label="Recorded follow-up history graph">
+              {history.map((event) => <div key={event.id} className="grid grid-cols-[11rem_1fr_6rem] items-center gap-3 text-sm">
+                <span className="text-muted-foreground">{new Date(event.sent_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}</span>
+                <div className="h-3 rounded bg-sky-500" title={`Follow-up #${event.follow_up_number} sent via ${event.channel || "unspecified channel"}`} />
+                <Badge variant="outline" className="justify-center">{event.follow_up_outcome.replace("_", " ")}</Badge>
+              </div>)}
+              <p className="text-xs text-muted-foreground">Each bar is one recorded send event; bar length does not imply performance.</p>
+            </div> : <p className="rounded border border-dashed p-4 text-sm text-muted-foreground">No completed follow-ups have been recorded for this tracker record.</p>}
+          </> : <p className="text-sm text-muted-foreground">No tracker record matches this job URL, so there is no persisted follow-up schedule or history to display.</p>}
+        </CardContent>
+      </Card>
 
       {/* Company Intel */}
       <Card>
@@ -565,9 +411,7 @@ export default function JobDetailPage() {
             </p>
           ) : (
             <p className="text-sm italic text-muted-foreground">
-              Scored only for jobs you&apos;ve logged to the tracker — hit
-              &quot;Log to Tracker&quot; above and the next hourly run will
-              evaluate it.
+              No current evaluation is stored for this job.
             </p>
           )}
         </CardContent>
@@ -585,35 +429,29 @@ export default function JobDetailPage() {
               <CardDescription>{s.description}</CardDescription>
             </div>
             {messages[s.type] && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleCopy(s.type)}
-              >
+              <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => handleCopy(s.type)}>
                 {copied === s.type ? (
                   <Check className="mr-1.5 h-3.5 w-3.5" />
                 ) : (
                   <Copy className="mr-1.5 h-3.5 w-3.5" />
                 )}
                 {copied === s.type ? "Copied" : "Copy"}
-              </Button>
+              </Button>{s.type === "cover_letter" && <Button variant="outline" size="sm" onClick={downloadCoverLetter}><Download className="mr-1.5 h-3.5 w-3.5" />Download</Button>}</div>
             )}
           </CardHeader>
           <CardContent>
             {messages[s.type] ? (
-              <p className="rounded-md border bg-muted/40 p-3 text-sm leading-relaxed whitespace-pre-wrap break-words">
-                {messages[s.type]}
-              </p>
+              <div className="space-y-2"><p className="rounded-md border bg-muted/40 p-3 text-sm leading-relaxed whitespace-pre-wrap break-words">{messages[s.type]}</p>
+                {s.type === "cover_letter" && <p className="text-xs text-muted-foreground">Resume v{messageRows[s.type]?.resume_version} · JD v{messageRows[s.type]?.jd_version} · match {messageRows[s.type]?.match_score}/100 · generated {messageRows[s.type]?.generated_at ? new Date(messageRows[s.type].generated_at!).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "time unavailable"}</p>}
+              </div>
             ) : job.applied ? (
               <p className="text-sm italic text-muted-foreground">
-                Not written yet — this job is in your tracker, so the hourly
-                routine will write it on an upcoming run.
+                No current draft is stored for this job. The hourly routine
+                only creates eligible, profile-current drafts.
               </p>
             ) : (
               <p className="text-sm italic text-muted-foreground">
-                Written only for jobs you&apos;ve logged to the tracker — hit
-                &quot;Log to Tracker&quot; above and the next hourly run will
-                write it.
+                No current draft is stored for this job.
               </p>
             )}
           </CardContent>
@@ -673,9 +511,7 @@ export default function JobDetailPage() {
             </p>
           ) : (
             <p className="text-sm italic text-muted-foreground">
-              Demos are built only for jobs you&apos;ve logged to the
-              tracker — hit &quot;Log to Tracker&quot; above and the next
-              hourly run will build one for this job.
+              No demo is stored for this job.
             </p>
           )}
         </CardContent>

@@ -1,0 +1,5 @@
+[
+  {"name":"substring-boundaries","resume":"MongoDB object storage NoSQL","jd":"Go, RAG and SQL","expected_score":0},
+  {"name":"empty-jd","resume":"Python FastAPI","jd":"","expected_score":null},
+  {"name":"exact-skills","resume":"Python FastAPI PostgreSQL Docker","jd":"Required: Python, FastAPI, PostgreSQL and Docker.","expected_score":100}
+]

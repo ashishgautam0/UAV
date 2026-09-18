@@ -38,7 +38,7 @@ from tracker import save_notification, send_push_notifications
 
 
 def _profile_text():
-    """Profile context for writing the message, from the DB or the fallback."""
+    """Profile context from the reviewed active PDF; empty if unavailable."""
     try:
         from message_generator import _get_profile_text
         return _get_profile_text()

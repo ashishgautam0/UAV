@@ -19,6 +19,9 @@ import type {
   AppNotification,
   UnreadCountResponse,
   Prep28State,
+  ResumeProfile,
+  ResumeProfileReview,
+  ResumeProfileStatus,
 } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -51,6 +54,10 @@ export async function getApplications(filters?: {
   if (filters?.platform) params.set("platform", filters.platform);
   const qs = params.toString();
   return apiFetch<Application[]>(`/api/applications${qs ? `?${qs}` : ""}`);
+}
+
+export async function lookupApplication(url: string): Promise<Application | null> {
+  return apiFetch<Application | null>(`/api/applications/lookup?url=${encodeURIComponent(url)}`);
 }
 
 export async function createApplication(data: AddApplicationRequest) {
@@ -208,7 +215,11 @@ export async function updateProfile(data: UserProfileUpdate): Promise<UserProfil
   });
 }
 
-export async function uploadResumePdf(file: File): Promise<UserProfile> {
+export async function getResumeProfileStatus(): Promise<ResumeProfileStatus> {
+  return apiFetch<ResumeProfileStatus>("/api/profile/resume");
+}
+
+export async function uploadResumePdf(file: File): Promise<ResumeProfile> {
   const form = new FormData();
   form.append("file", file);
 
@@ -230,6 +241,16 @@ export async function uploadResumePdf(file: File): Promise<UserProfile> {
   }
 
   return res.json();
+}
+
+export async function activateResumeProfile(
+  profileId: number,
+  review: ResumeProfileReview,
+): Promise<ResumeProfile> {
+  return apiFetch<ResumeProfile>(`/api/profile/resume/${profileId}/activate`, {
+    method: "PUT",
+    body: JSON.stringify(review),
+  });
 }
 
 // ---- Notifications ----

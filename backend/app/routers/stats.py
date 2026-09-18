@@ -20,7 +20,7 @@ def dashboard_stats():
 @router.get("/follow-ups")
 def follow_ups():
     df = get_follow_ups_due()
-    return df.to_dict("records") if not df.empty else []
+    return df.astype(object).where(df.notna(), None).to_dict("records") if not df.empty else []
 
 
 @router.get("/weekly-trend")

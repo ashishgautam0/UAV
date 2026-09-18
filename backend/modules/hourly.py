@@ -88,8 +88,7 @@ DESIRED_TITLES = [
     "AI/ML Research and Development Engineer",
     "AI Engineer",
     "Artificial Intelligence (AI) Engineer",
-    # AWS / cloud roles — Subidh holds an AWS certification (rare edge), so
-    # these are first-class targets, not afterthoughts.
+    # Cloud roles remain discoverable, but receive no profile-independent boost.
     "AWS Machine Learning Engineer",
     "AWS AI Engineer",
     "AWS Data Engineer",
@@ -131,9 +130,8 @@ _DOMAIN_KEYWORDS = {
     "iot", "robotics", "uav", "digital twin", "edge computing", "simulation",
     "ocr", "document ai", "speech recognition", "predictive modeling",
     "optimization algorithm", "multimodal",
-    # AWS / cloud vocabulary — Subidh's AWS certification is the edge we're
-    # leaning into, so cloud roles must clear the coarse title gate and reach
-    # the session's resume-screener rather than being pre-rejected here.
+    # General cloud vocabulary. Candidate qualifications are considered only
+    # when they are present in the reviewed active profile.
     "aws", "amazon web services", "cloud", "sagemaker", "bedrock",
     "solutions architect", "cloud architect", "data engineer",
     "platform engineer", "devops", "mlops", "sre", "site reliability",
@@ -212,74 +210,27 @@ def _matches_desired_title(job_title, threshold=60):
     return best >= threshold
 
 
-# Entry-level signals: if the JD says any of these, it is treating the role as
-# 0-1 years / fresher, so keep it regardless of any other number it mentions.
-_ENTRY_SIGNAL_RE = re.compile(
-    r"(0\s*[-–to]{1,3}\s*1\s*years?|0\s*[-–to]{1,3}\s*2\s*years?|"
-    r"fresher|entry[\s-]?level|new\s*grad|recent\s+graduate|"
-    r"up\s+to\s+1\s+year|less\s+than\s+(?:1|one)\s+year|no\s+experience|"
-    r"\b1\s*\+?\s*years?\b)",
-    re.IGNORECASE,
-)
-# Any experience phrase whose LOWER bound is a number — used to read the minimum
-# years a JD asks for. Matches "5 years", "3-5 years", "6-8 years", "2+ years",
-# "3 to 5 years" and (with backslashes stripped first) markdown-escaped forms
-# like "6\-8 years".
-_YEARS_PHRASE_RE = re.compile(r"(\d+)\s*(?:[-–+]|to)?\s*\d*\s*\+?\s*years?", re.IGNORECASE)
+def _experience_ok(description, profile_snapshot=None):
+    """Reject only a proven mandatory experience mismatch.
 
-
-def _experience_ok(description):
-    """Coarse 0-1-years pre-net on the JD text.
-
-    Keeps a job when its stated experience requirement is entry-level (0-1
-    years / fresher) OR no years are stated at all; drops a job whose minimum
-    stated experience is 2+ years. The session's resume-screener makes the final call.
-
-    JD text scraped from LinkedIn/Indeed is markdown, so hyphens arrive escaped
-    ("6\\-8 years"); strip backslashes before matching so ranges are read.
+    Missing profile duration or an incomplete JD is unknown and therefore kept.
+    This replaces the old fixed 0-1-year assumption and date-span heuristic.
     """
     text = (description or "").replace("\\", "")
-    if _ENTRY_SIGNAL_RE.search(text):
+    try:
+        from jd_analyzer import _extract_experience_requirement, _resume_has_experience
+        requirements = [item for item in _extract_experience_requirement(text)
+                        if item.get("required")]
+    except Exception:
         return True
-    # Drop if any experience phrase's lower bound is >= 2 years.
-    for m in _YEARS_PHRASE_RE.finditer(text):
-        try:
-            if int(m.group(1)) >= 2:
-                return False
-        except (ValueError, TypeError):
-            continue
-    return True  # no explicit years stated — let the session decide
+    if not requirements:
+        return True
+    decisions = [_resume_has_experience(profile_snapshot, item["years"])
+                 for item in requirements]
+    return not any(decision is False for decision in decisions)
 
 
-# Gulf JDs sometimes restrict to local/GCC nationals (Saudization etc.).
-# Subidh is a Nepalese national needing visa sponsorship, so drop postings that
-# clearly require a nationality/citizenship he does not hold. Expat-open roles
-# (the default in Gulf private-sector tech) are kept.
-_NATIONALITY_BLOCK_RE = re.compile(
-    r"(gcc\s+nationals?\s+only|"
-    r"(?:saudi|emirati|qatari|kuwaiti|bahraini|omani|uae)\s+nationals?\s+only|"
-    r"(?:saudi|emirati|qatari)\s+nationals?\s+(?:are\s+)?(?:preferred|required)|"
-    r"only\s+(?:for\s+)?(?:saudi|emirati|qatari|kuwaiti|gcc)\s+nationals?|"
-    r"nationals?\s+only|citizens?\s+only|"
-    r"saudi(?:s)?ation|saudization|emirati(?:s)?ation|emiratization|qatarization|"
-    r"must\s+be\s+a\s+(?:saudi|emirati|uae|qatari|kuwaiti|bahraini|omani|gcc|local)\s+(?:national|citizen)|"
-    # Explicit sponsorship exclusions (worldwide) — unambiguous only.
-    r"no\s+visa\s+sponsorship|visa\s+sponsorship\s+(?:is\s+)?not\s+(?:available|provided|offered)|"
-    r"(?:not\s+able|unable|cannot|can'?t|do\s+not|does\s+not|will\s+not)\s+(?:to\s+)?sponsor|"
-    r"without\s+(?:visa\s+)?sponsorship|us\s+citizens?\s+only|security\s+clearance\s+required)",
-    re.IGNORECASE,
-)
-
-
-def _nationality_ok(description):
-    """Drop a JD that explicitly restricts to a nationality/citizenship Subidh
-    (Nepalese) does not hold. Everything else is kept — the session makes the final
-    call on sponsorship."""
-    text = (description or "").replace("\\", "")
-    return not _NATIONALITY_BLOCK_RE.search(text)
-
-
-def _resume_fit_filter(jobs, resume_text=None):
+def _resume_fit_filter(jobs, resume_text=None, profile_snapshot=None):
     """Coarse resume pre-net — NOT the real decision.
 
     This only drops jobs that share almost nothing with the resume, purely to
@@ -293,10 +244,13 @@ def _resume_fit_filter(jobs, resume_text=None):
     except Exception:
         return jobs, "skipped (ranking/profile unavailable)"
 
+    if resume_text is None and profile_snapshot:
+        resume_text = profile_snapshot.get("raw_text", "")
     if resume_text is None:
         try:
-            from message_generator import _get_profile_text
-            resume_text = _get_profile_text()
+            from profile import get_active_profile_snapshot
+            profile_snapshot = get_active_profile_snapshot()
+            resume_text = (profile_snapshot or {}).get("raw_text", "")
         except Exception:
             resume_text = ""
     resume = (resume_text or "").strip()
@@ -342,6 +296,15 @@ def main():
     init_db()
     init_notifications_table()
 
+    # Freeze one reviewed profile version for the entire run. A new upload can
+    # activate later without mixing facts inside this scrape/evaluation cycle.
+    try:
+        from profile import get_active_profile_snapshot
+        profile_snapshot = get_active_profile_snapshot()
+    except Exception:
+        profile_snapshot = None
+    profile_version = (profile_snapshot or {}).get("version")
+
     # Run all automated scrapers
     print("Running scrapers...")
     jobs, sources_status, sources_errors = run_all_scrapers()
@@ -370,19 +333,14 @@ def main():
     # Keep only entry-level roles: JD requires 0-1 years (or states no years).
     # Drops anything clearly asking for 2+ years before session screening.
     before_exp = len(new_jobs)
-    new_jobs = [j for j in new_jobs if _experience_ok(j.get("description", ""))]
-    print(f"After experience filter (0-1 yrs): {len(new_jobs)} "
-          f"(dropped {before_exp - len(new_jobs)} needing 2+ yrs)")
-
-    # Drop Gulf/other postings restricted to nationalities Subidh doesn't hold.
-    before_nat = len(new_jobs)
-    new_jobs = [j for j in new_jobs if _nationality_ok(j.get("description", ""))]
-    print(f"After nationality filter: {len(new_jobs)} "
-          f"(dropped {before_nat - len(new_jobs)} nationals-only)")
+    new_jobs = [j for j in new_jobs
+                if _experience_ok(j.get("description", ""), profile_snapshot)]
+    print(f"After mandatory experience filter: {len(new_jobs)} "
+          f"(dropped {before_exp - len(new_jobs)} proven mismatches)")
 
     # Coarse resume pre-net (the routine's resume-screener agent is the real
     # fit + experience-level decision — the session, not keywords).
-    new_jobs, resume_note = _resume_fit_filter(new_jobs)
+    new_jobs, resume_note = _resume_fit_filter(new_jobs, profile_snapshot=profile_snapshot)
     print(f"After resume pre-net: {resume_note}")
 
     # Health check: if LinkedIn scraper returned 0 results, flag it
@@ -406,10 +364,16 @@ def main():
             from jd_analyzer import full_analyze, quick_ats
             for job in new_jobs[:15]:
                 try:
-                    result = full_analyze(job.get("title", ""), job.get("description", ""))
-                    job["ats_score"] = quick_ats(job.get("description", ""))
-                    job["skill_match"] = result.get("skills", {}).get("match_percentage", 0)
-                    job["noc_verdict"] = result.get("noc", {}).get("confidence", "")
+                    result = full_analyze(
+                        job.get("title", ""), job.get("description", ""),
+                        profile_snapshot, job.get("location", ""),
+                    )
+                    job["ats_score"] = quick_ats(job.get("description", ""), profile_snapshot)
+                    job["skill_match"] = result.get("skills", {}).get("match_percentage")
+                    job["noc_verdict"] = (result.get("noc") or {}).get("confidence", "")
+                    job["analysis_details"] = result
+                    job["analysis_version"] = result.get("analysis_version")
+                    job["profile_version"] = profile_version
                 except Exception:
                     pass
             print(f"Auto-analysis complete for top {min(15, len(new_jobs))} jobs.")
@@ -441,7 +405,11 @@ def main():
                 description=job.get("description", ""),
                 score=job.get("score", 0),
                 verdict=job.get("verdict", ""),
-                ats_score=job.get("ats_score", 0),
+                ats_score=job.get("ats_score"),
+                skill_match=job.get("skill_match"),
+                analysis_details=job.get("analysis_details") or {},
+                analysis_version=job.get("analysis_version"),
+                profile_version=job.get("profile_version"),
             )
         except Exception:
             pass

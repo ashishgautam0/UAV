@@ -6,12 +6,18 @@ from tracker import (
     add_application,
     delete_application,
     get_all_applications,
+    find_application_by_url,
     update_status,
     update_notes,
     snooze_follow_up,
 )
 
 router = APIRouter()
+
+
+@router.get("/lookup")
+def lookup_application(url: str = Query(...)):
+    return find_application_by_url(url)
 
 
 @router.get("")
@@ -74,7 +80,7 @@ def patch_notes(
 
 @router.patch("/{app_id}/snooze")
 def snooze(app_id: int, body: SnoozeRequest):
-    snooze_follow_up(app_id, body.new_date)
+    snooze_follow_up(app_id, body.new_date.isoformat())
     return {"success": True}
 
 
