@@ -28,6 +28,7 @@ import {
   RefreshCw,
   Trash2,
   Zap,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -219,6 +220,7 @@ function SwipeableCard({
 // ---------------------------------------------------------------------------
 export default function TonightPage() {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [jobs, setJobs] = useState<ScrapedJob[]>([]);
   const [filterMode, setFilterMode] = useState<"all" | "remote" | "hybrid" | "onsite">("all");
 
@@ -233,10 +235,12 @@ export default function TonightPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       // Ranked best-first by BestScore (fit × freshness × ease).
       setJobs(await getRankedScrapedJobs());
     } catch {
+      setLoadError(true);
       toast.error("Failed to load data");
     } finally {
       setLoading(false);
@@ -346,7 +350,17 @@ export default function TonightPage() {
                 </div>
               )}
             </div>
-            {jobs.length === 0 ? (
+            {loadError ? (
+              <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                <div>
+                  <p className="font-medium">Could not load scraped jobs</p>
+                  <p className="mt-1 text-muted-foreground">
+                    The saved jobs were not deleted. Retry the request when the API is available.
+                  </p>
+                </div>
+              </div>
+            ) : jobs.length === 0 ? (
               <p className="text-muted-foreground text-sm">
                 No scraped jobs yet. Jobs are fetched automatically every hour
                 by the scheduled Claude routine.
