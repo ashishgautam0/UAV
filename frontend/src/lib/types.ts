@@ -130,8 +130,11 @@ export interface ScrapedJob {
   applied?: number;
   bestscore?: number | null;
   bestscore_breakdown?: {
-    fit: number;
-    fit_source: string;
+    match?: number | null;
+    eligibility?: string;
+    reason?: string;
+    fit?: number;
+    fit_source?: string;
     freshness: number;
     ease: number;
     aws?: number;
