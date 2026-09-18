@@ -49,6 +49,27 @@ function workModeBadgeColor(mode: string | undefined) {
   return "bg-orange-600/15 text-orange-400 border-orange-600/30";
 }
 
+function bestScoreTitle(
+  breakdown: NonNullable<ScrapedJob["bestscore_breakdown"]>
+) {
+  const details: string[] = [];
+  if (typeof breakdown.match === "number") {
+    details.push(`resume-JD match ${Math.round(breakdown.match)}%`);
+  } else if (typeof breakdown.fit === "number") {
+    details.push(
+      `fit ${Math.round(breakdown.fit * 100)}%${
+        breakdown.fit_source ? ` (${breakdown.fit_source})` : ""
+      }`
+    );
+  }
+  if (breakdown.eligibility) {
+    details.push(`eligibility ${breakdown.eligibility.replaceAll("_", " ")}`);
+  }
+  details.push(`freshness ${Math.round(breakdown.freshness * 100)}%`);
+  if (breakdown.reason) details.push(breakdown.reason);
+  return details.join(" · ");
+}
+
 // ---------------------------------------------------------------------------
 // SwipeableCard — gestures over a scraped-job card:
 //   • tap / click            → onTap   (apply)
@@ -391,7 +412,7 @@ export default function TonightPage() {
                               <Badge
                                 title={
                                   job.bestscore_breakdown
-                                    ? `fit ${Math.round(job.bestscore_breakdown.fit * 100)}% (${job.bestscore_breakdown.fit_source}) · freshness ${Math.round(job.bestscore_breakdown.freshness * 100)}%${job.bestscore_breakdown.aws ? ` · AWS ${Math.round(job.bestscore_breakdown.aws * 100)}%` : ""}`
+                                    ? bestScoreTitle(job.bestscore_breakdown)
                                     : "BestScore"
                                 }
                                 className={cn(
