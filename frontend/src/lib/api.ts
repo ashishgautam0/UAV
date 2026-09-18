@@ -208,6 +208,30 @@ export async function updateProfile(data: UserProfileUpdate): Promise<UserProfil
   });
 }
 
+export async function uploadResumePdf(file: File): Promise<UserProfile> {
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch(`${API_URL}/api/profile/resume`, {
+    method: "POST",
+    body: form,
+  });
+
+  if (!res.ok) {
+    let message = `Upload failed: ${res.status}`;
+    try {
+      const body = await res.json();
+      if (typeof body.detail === "string") message = body.detail;
+    } catch {
+      const body = await res.text();
+      if (body) message = body;
+    }
+    throw new Error(message);
+  }
+
+  return res.json();
+}
+
 // ---- Notifications ----
 export async function getNotifications(unreadOnly = false): Promise<AppNotification[]> {
   const qs = unreadOnly ? "?unread_only=true" : "";
