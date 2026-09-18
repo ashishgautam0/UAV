@@ -317,7 +317,7 @@ create table if not exists cover_letter_drafts (
     generation_rules_version text   not null,
     run_id              text        not null,
     content             text        not null,
-    generated_by        text        not null default 'chatgpt-scheduled-task',
+    generated_by        text        not null default 'claude',
     generated_at        timestamptz not null default now(),
     is_outdated         boolean     not null default false,
     unique (scraped_job_id, resume_version, jd_hash, generation_rules_version)

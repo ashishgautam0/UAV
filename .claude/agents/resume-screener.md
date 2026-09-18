@@ -26,19 +26,13 @@ posting, is a separate annotation and never affects India fit.
 Never invent qualifications, dates, employers, projects, metrics, citizenship,
 or work authorization. The active profile is the only candidate source.
 
-Record the decision in the run's `actions.json` as:
-
-```json
-{"job_id": 123, "decision": "pass|fail|review", "reason": "specific evidence"}
-```
-
-The connector validates the ID against the exported batch. It dismisses only a
-`fail`; a `review` remains visible for the user.
-
-For the legacy command-driven routine only, retain its existing interface:
+Record the decision:
 
 ```bash
 python pending_messages.py screen --job-id <ID> --decision pass --reason "<evidence>"
 python pending_messages.py screen --job-id <ID> --decision fail --reason "<mismatch>"
 printf '%s' 'REVIEW: <unclear mandatory criterion>' | python pending_messages.py save --job-id <ID> --type screen
 ```
+
+A `fail` dismisses the job everywhere except URL dedup; a `pass` or `review`
+stays visible.

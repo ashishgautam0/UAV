@@ -1,7 +1,7 @@
 """
 Hourly Job Search Automation
 Runs the LinkedIn scraper, filters jobs, and saves them to Supabase along with
-a markdown digest. Invoked by a scheduled cloud session.
+a markdown digest. Invoked by a scheduled Claude routine.
 """
 
 import os
@@ -202,7 +202,7 @@ def _matches_desired_title(job_title, threshold=60):
     # Learning Engineer, Amazon Music - Catalog Quality" or "AI Engineer - FDE
     # (Forward Deployed Engineer)" match their base title instead of being
     # penalized to death by the extra words. The domain-keyword gate above still
-    # blocks off-domain noise; the session's resume-screener is the real filter.
+    # blocks off-domain noise, and Claude's resume-screener is the real filter.
     best = max(
         fuzz.token_set_ratio(normalized, desired)
         for desired in _DESIRED_TITLES_LOWER
@@ -234,9 +234,9 @@ def _resume_fit_filter(jobs, resume_text=None, profile_snapshot=None):
     """Coarse resume pre-net — NOT the real decision.
 
     This only drops jobs that share almost nothing with the resume, purely to
-    cap volume before the routine's resume-screener agent makes the
+    cap volume before the routine's resume-screener agent (Claude) makes the
     real fit + experience-level decision on each survivor. Keep the bar low
-    (RESUME_MIN_SKILL_HITS, default 2) so the session — not keywords — decides.
+    (RESUME_MIN_SKILL_HITS, default 2) so Claude — not keywords — decides.
     If no real resume is stored yet, the net is skipped so nothing is lost.
     """
     try:
@@ -273,7 +273,7 @@ def _resume_fit_filter(jobs, resume_text=None, profile_snapshot=None):
         jd = _tokens(f"{j.get('title', '')} {desc}")
         hits = len(resume_tokens & jd)
         # A short JD snippet (e.g. amazon.jobs' ~200-char teaser) can't be judged
-        # fairly on token overlap — keep it and let the resume-screener read
+        # fairly on token overlap — keep it and let Claude's resume-screener read
         # the full posting. The job already cleared the desired-title gate, so it
         # is on-domain. Only rich descriptions face the >= min_hits bar.
         if hits >= min_hits or len(desc) < 400:
@@ -283,7 +283,7 @@ def _resume_fit_filter(jobs, resume_text=None, profile_snapshot=None):
                 thin_kept += 1
     note = f"kept {len(kept)}/{len(jobs)} (>= {min_hits} hits)"
     if thin_kept:
-        note += f", {thin_kept} thin-JD kept for session screening"
+        note += f", {thin_kept} thin-JD kept for Claude"
     return kept, note
 
 
@@ -331,7 +331,7 @@ def main():
     print(f"After title filter (desired titles match): {len(new_jobs)}")
 
     # Keep only entry-level roles: JD requires 0-1 years (or states no years).
-    # Drops anything clearly asking for 2+ years before session screening.
+    # Drops anything clearly asking for 2+ years before Claude screens.
     before_exp = len(new_jobs)
     new_jobs = [j for j in new_jobs
                 if _experience_ok(j.get("description", ""), profile_snapshot)]
@@ -339,7 +339,7 @@ def main():
           f"(dropped {before_exp - len(new_jobs)} proven mismatches)")
 
     # Coarse resume pre-net (the routine's resume-screener agent is the real
-    # fit + experience-level decision — the session, not keywords).
+    # fit + experience-level decision — Claude, not keywords).
     new_jobs, resume_note = _resume_fit_filter(new_jobs, profile_snapshot=profile_snapshot)
     print(f"After resume pre-net: {resume_note}")
 
