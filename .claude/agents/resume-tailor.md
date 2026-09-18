@@ -13,9 +13,8 @@ candidate's `profile`.
   REAL projects/experience from `profile` toward the job's stated requirements.
   Lead each bullet with impact; use the job's own vocabulary where it honestly
   applies.
-- If the profile lists an AWS certification and the JD mentions AWS / cloud or
-  a certification, surface it in a bullet (name the exact cert) — it's a rare
-  edge, and include the cert + relevant AWS services in the Keywords line.
+- Surface a certification only when the active profile actually contains it
+  and the JD makes it relevant. Never add unstated services to a bullet.
 - A final line: `Keywords: <6–10 keywords pulled from the job description>` for
   ATS coverage.
 - Grounding: never invent experience, employers, metrics, or credentials — only

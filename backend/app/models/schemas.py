@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
+from datetime import date
 
 
 # ---- Profile ----
@@ -18,6 +19,7 @@ class ExperienceEntry(BaseModel):
 
 
 class UserProfileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     full_name: Optional[str] = None
     bio: Optional[str] = None
     skills: Optional[list[str]] = None
@@ -26,7 +28,6 @@ class UserProfileRequest(BaseModel):
     education: Optional[str] = None
     location_preference: Optional[str] = None
     target_roles: Optional[list[str]] = None
-    resume_text: Optional[str] = None
     scoring_weights: Optional[dict] = None
 
 
@@ -44,6 +45,54 @@ class UserProfileResponse(BaseModel):
     resume_text: str = ""
     scoring_weights: dict = {}
     updated_at: Optional[str] = None
+
+
+class ReviewedExperienceEntry(BaseModel):
+    id: str = ""
+    label: str = ""
+    role: str = ""
+    company: str = ""
+    start: str = ""
+    end: str = ""
+
+
+class ReviewedEducationEntry(BaseModel):
+    id: str = ""
+    level: str
+    credential: str
+    field: str = ""
+    institution: str = ""
+
+
+class ResumeProfileReviewRequest(BaseModel):
+    skills: list[str] = Field(default_factory=list)
+    experience: list[ReviewedExperienceEntry] = Field(default_factory=list)
+    education: list[ReviewedEducationEntry] = Field(default_factory=list)
+    certifications: list[str] = Field(default_factory=list)
+    review_notes: str = ""
+
+
+class ResumeProfileResponse(BaseModel):
+    id: int
+    username: str
+    version: int
+    source_kind: str
+    source_filename: str
+    source_sha256: str
+    extraction_method: str
+    facts: dict = Field(default_factory=dict)
+    extracted_facts: dict = Field(default_factory=dict)
+    evidence: dict = Field(default_factory=dict)
+    readability: dict = Field(default_factory=dict)
+    status: str
+    created_at: Optional[str] = None
+    reviewed_at: Optional[str] = None
+    activated_at: Optional[str] = None
+
+
+class ResumeProfileStatusResponse(BaseModel):
+    active: Optional[ResumeProfileResponse] = None
+    latest: Optional[ResumeProfileResponse] = None
 
 
 # ---- Applications ----
@@ -69,7 +118,7 @@ class UpdateNotesRequest(BaseModel):
 
 
 class SnoozeRequest(BaseModel):
-    new_date: str
+    new_date: date
 
 
 # ---- Scraped Jobs ----

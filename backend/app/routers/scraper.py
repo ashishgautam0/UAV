@@ -1,13 +1,11 @@
-import re
-
 from fastapi import APIRouter, HTTPException, Query
 
 from ..models.schemas import MarkScrapedJobRequest
 from tracker import (
-    _get_client,
     delete_scraped_job,
     find_scraped_job_by_url,
     get_job_message,
+    get_current_cover_letter,
     get_scraped_job,
     get_scraped_jobs,
     mark_scraped_job,
@@ -16,39 +14,12 @@ from tracker import (
 router = APIRouter()
 
 
-def _profile_text():
+def _active_profile():
     try:
-        from message_generator import _get_profile_text
-        return _get_profile_text()
+        from profile import get_active_profile_snapshot
+        return get_active_profile_snapshot()
     except Exception:
-        return ""
-
-
-def _eval_scores(job_ids):
-    """Map job id -> A–H fit score (float 1..5) parsed from the stored
-    `evaluation` message, for the given ids. Missing/unparseable are omitted."""
-    if not job_ids:
-        return {}
-    out = {}
-    db = _get_client()
-    for i in range(0, len(job_ids), 100):
-        chunk = job_ids[i:i + 100]
-        try:
-            resp = (db.table("job_messages")
-                    .select("scraped_job_id, content")
-                    .eq("message_type", "evaluation")
-                    .in_("scraped_job_id", chunk)
-                    .execute())
-        except Exception:
-            continue
-        for row in resp.data or []:
-            m = re.search(r"fit\s*score:\s*([\d.]+)", row.get("content") or "", re.I)
-            if m:
-                try:
-                    out[row["scraped_job_id"]] = float(m.group(1))
-                except ValueError:
-                    pass
-    return out
+        return None
 
 
 @router.get("")
@@ -72,8 +43,7 @@ def ranked_scraped_jobs(limit: int = 200):
     jobs = df.to_dict("records") if not df.empty else []
     if not jobs:
         return []
-    scores = _eval_scores([j["id"] for j in jobs if j.get("id") is not None])
-    return rank_jobs(jobs, profile_text=_profile_text(), eval_scores=scores)[:limit]
+    return rank_jobs(jobs, profile_snapshot=_active_profile())[:limit]
 
 
 @router.get("/lookup")
@@ -114,18 +84,27 @@ def job_message(
     job_id: int,
     type: str = "cold_dm",
 ):
-    """Outreach message pre-written for this job by the scheduled Claude routine.
+    """Draft content written for this job by the configured cloud routine.
 
     Returns {"content": null} when the routine has not written one yet, rather
     than 404 — the UI treats "not generated yet" as a normal state.
     """
-    row = get_job_message(job_id, message_type=type)
+    row = (get_current_cover_letter(job_id) if type == "cover_letter"
+           else get_job_message(job_id, message_type=type))
     if not row:
         return {"job_id": job_id, "message_type": type, "content": None}
     return {
         "job_id": job_id,
-        "message_type": row.get("message_type"),
+        "message_type": "cover_letter" if type == "cover_letter" else row.get("message_type"),
         "content": row.get("content"),
         "generated_by": row.get("generated_by"),
         "generated_at": row.get("generated_at"),
+        "is_outdated": row.get("is_outdated", False),
+        "resume_version": row.get("resume_version") or row.get("profile_version"),
+        "jd_version": row.get("jd_version"),
+        "jd_hash": row.get("jd_hash"),
+        "match_score": row.get("match_score"),
+        "analysis_version": row.get("analysis_version"),
+        "generation_rules_version": row.get("generation_rules_version"),
+        "run_id": row.get("run_id"),
     }

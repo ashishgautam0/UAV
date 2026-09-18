@@ -1,73 +1,16 @@
-"""BestScore — rank scraped jobs so the best India roles float to the top.
+"""Explainable application priority built on the reviewed active profile.
 
-"Best" here is a composite that answers one question: which jobs should
-Subidh apply to first, right now? It blends
-
-  * FIT        how well the JD matches his profile — the A–H evaluation's
-               1–5 fit score when the research agent has scored the job,
-               otherwise a lexical profile↔JD overlap fallback.
-  * FRESHNESS  how recently the job was scraped — a proxy for "few applicants
-               so far", since the scraper only pulls the last ~24h. Early
-               applicants win, so newer ranks higher.
-  * EASE       Easy Apply postings can be applied to in seconds, so they get a
-               small nudge (speed, not quality).
-
-Everything is computed live from the columns already in `scraped_jobs` plus the
-cached A–H evaluation — no schema change and no external calls.
+Priority is separate from PDF readability, mandatory eligibility, and
+resume-to-JD match. Freshness and application ease are used only after a real
+match score exists; unknown evidence never becomes a fabricated high score.
 """
 
 import re
 from datetime import datetime, timezone
 
-# Weights sum to 1.0; FIT dominates because "best" is about match, not speed.
-# AWS gets its own weight: Subidh holds an AWS certification that few
-# candidates have, so a job that wants AWS/cloud (especially a certification)
-# is a rare-advantage role and should rank higher.
-W_FIT = 0.46
-W_FRESH = 0.15
-W_EASE = 0.06
-W_AWS = 0.22
-W_DEGREE = 0.11
-
-# Detect AWS / cloud-certification relevance in a JD.
-_AWS_CERT_RE = re.compile(
-    r"aws\s+certif|certified\s+.*aws|cloud\s+certif|"
-    r"solutions?\s+architect\s+cert",
-    re.IGNORECASE,
-)
-_AWS_RE = re.compile(
-    r"\b(aws|amazon web services|sagemaker|bedrock|ec2|s3|lambda|"
-    r"cloudformation|eks|ecs)\b",
-    re.IGNORECASE,
-)
-
-# Detect an advanced-degree preference in a JD. Subidh holds an M.Tech in AI,
-# so a role that wants a master's (or advanced degree) is one where that degree
-# is a real differentiator — surface it higher.
-_DEGREE_RE = re.compile(
-    r"master'?s?\s+degree|master\s+of|\bm\.?s\.?\b|\bm\.?sc\b|\bm\.?tech\b|"
-    r"\bms\s*/\s*phd\b|\bphd\b|doctoral|postgraduate|graduate\s+degree|"
-    r"advanced\s+degree",
-    re.IGNORECASE,
-)
-
-
-def _aws_signal(job):
-    """1.0 when the JD wants an AWS/cloud certification, 0.6 when it just uses
-    AWS, 0 otherwise — so cert-required roles rank highest."""
-    text = f"{job.get('title', '')} {job.get('description', '')}"
-    if _AWS_CERT_RE.search(text):
-        return 1.0
-    if _AWS_RE.search(text):
-        return 0.6
-    return 0.0
-
-
-def _degree_signal(job):
-    """1.0 when the JD wants a master's / advanced degree (Subidh's M.Tech in AI
-    is a differentiator there), 0 otherwise."""
-    text = f"{job.get('title', '')} {job.get('description', '')}"
-    return 1.0 if _DEGREE_RE.search(text) else 0.0
+W_MATCH = 0.75
+W_FRESH = 0.18
+W_EASE = 0.07
 
 _STOP = {
     "the", "and", "for", "with", "you", "our", "are", "will", "your", "that",
@@ -84,96 +27,129 @@ _STOP = {
 
 def _tokens(text):
     return {
-        t for t in re.split(r"[^a-z0-9+#.]+", (text or "").lower())
-        if len(t) > 2 and t not in _STOP
+        token for token in re.split(r"[^a-z0-9+#.]+", (text or "").lower())
+        if len(token) > 2 and token not in _STOP
     }
 
 
 def _fit_from_lexical(profile_tokens, jd_text, title):
-    """Fallback fit when there is no A–H evaluation yet.
-
-    Rewards a JD that hits many of the candidate's own skill tokens, with a
-    small bonus when profile terms appear in the title (a strong signal).
-    Returns 0..1.
-    """
+    """Legacy coarse pre-net only; final ranking uses explainable matching."""
     if not profile_tokens:
         return 0.0
     jd = _tokens(jd_text)
     if not jd:
         return 0.0
     overlap = profile_tokens & jd
-    # Normalise by a realistic ceiling of matched skills (~12), not the whole
-    # profile, so a well-matched JD can reach ~1.0.
-    base = min(len(overlap) / 12.0, 1.0)
-    title_hits = len(profile_tokens & _tokens(title))
-    bonus = min(title_hits * 0.08, 0.24)
-    return min(base + bonus, 1.0)
+    return min(
+        len(overlap) / 12.0
+        + min(len(profile_tokens & _tokens(title)) * 0.08, 0.24),
+        1.0,
+    )
 
 
 def _freshness(scraped_at):
-    """1.0 for a just-scraped job, decaying to a 0.2 floor by ~48h."""
     if not scraped_at:
         return 0.5
     try:
-        dt = datetime.fromisoformat(str(scraped_at).replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+        value = datetime.fromisoformat(str(scraped_at).replace("Z", "+00:00"))
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
     except (ValueError, TypeError):
         return 0.5
-    hours = (datetime.now(timezone.utc) - dt).total_seconds() / 3600.0
+    hours = (datetime.now(timezone.utc) - value).total_seconds() / 3600.0
     return max(0.2, min(1.0, 1.0 - hours / 48.0))
 
 
-def compute_bestscore(job, profile_tokens, eval_score=None):
-    """Return (score_0_100, breakdown) for one scraped-job dict.
-
-    eval_score is the A–H fit score (1..5) when available; when it is, it is the
-    authoritative fit signal and the lexical fallback is skipped.
-    """
-    if eval_score is not None:
-        try:
-            fit = max(0.0, min(1.0, float(eval_score) / 5.0))
-            fit_src = "A–H evaluation"
-        except (ValueError, TypeError):
-            eval_score = None
-    if eval_score is None:
-        fit = _fit_from_lexical(
-            profile_tokens, job.get("description", ""), job.get("title", "")
-        )
-        fit_src = "profile↔JD match"
-
+def compute_application_priority(job, analysis):
+    """Return (0..100 or None, explanation) without personal bonus rules."""
+    match_score = (analysis.get("resume_jd_match") or {}).get("score")
+    eligibility = (analysis.get("mandatory_eligibility") or {}).get("status", "unknown")
     fresh = _freshness(job.get("scraped_at"))
-    ease = 1.0 if (job.get("verdict") == "EASY_APPLY") else 0.55
-    aws = _aws_signal(job)
-    degree = _degree_signal(job)
+    ease = 1.0 if job.get("verdict") == "EASY_APPLY" else 0.55
 
-    score = 100.0 * (
-        W_FIT * fit + W_FRESH * fresh + W_EASE * ease
-        + W_AWS * aws + W_DEGREE * degree
+    if eligibility == "not_met":
+        return 0.0, {
+            "match": match_score,
+            "eligibility": eligibility,
+            "freshness": round(fresh, 3),
+            "ease": round(ease, 3),
+            "score": 0.0,
+            "reason": "An explicit mandatory requirement is not met.",
+        }
+    if eligibility == "unknown":
+        return None, {
+            "match": match_score,
+            "eligibility": eligibility,
+            "freshness": round(fresh, 3),
+            "ease": round(ease, 3),
+            "score": None,
+            "reason": "A mandatory criterion is unknown and needs review.",
+        }
+    if match_score is None:
+        return None, {
+            "match": None,
+            "eligibility": eligibility,
+            "freshness": round(fresh, 3),
+            "ease": round(ease, 3),
+            "score": None,
+            "reason": "Insufficient profile or job-description evidence.",
+        }
+
+    score = 100 * (
+        W_MATCH * (match_score / 100.0) + W_FRESH * fresh + W_EASE * ease
     )
-    breakdown = {
-        "fit": round(fit, 3),
-        "fit_source": fit_src,
+    return round(score, 1), {
+        "match": match_score,
+        "eligibility": eligibility,
         "freshness": round(fresh, 3),
         "ease": round(ease, 3),
-        "aws": round(aws, 3),
-        "degree": round(degree, 3),
         "score": round(score, 1),
+        "reason": "Match dominates; freshness and application ease break ties.",
     }
-    return round(score, 1), breakdown
 
 
-def rank_jobs(jobs, profile_text="", eval_scores=None):
-    """Attach bestscore + breakdown to each job dict and return them sorted
-    high→low. `eval_scores` maps job id -> A–H fit score (1..5)."""
-    profile_tokens = _tokens(profile_text)
-    eval_scores = eval_scores or {}
+def compute_bestscore(job, profile_tokens=None, eval_score=None, profile_snapshot=None):
+    """Compatibility wrapper; unversioned cached eval_score is ignored."""
+    from jd_analyzer import full_analyze
+
+    analysis = full_analyze(
+        job.get("title", ""),
+        job.get("description", ""),
+        profile_snapshot,
+        job.get("location", ""),
+    )
+    return compute_application_priority(job, analysis)
+
+
+def rank_jobs(jobs, profile_text="", eval_scores=None, profile_snapshot=None):
+    """Analyze every job against one immutable snapshot and rank known scores."""
+    if profile_snapshot is None:
+        try:
+            from profile import get_active_profile_snapshot
+            profile_snapshot = get_active_profile_snapshot()
+        except Exception:
+            profile_snapshot = None
+
+    from jd_analyzer import full_analyze
+
     ranked = []
     for job in jobs:
-        score, breakdown = compute_bestscore(
-            job, profile_tokens, eval_scores.get(job.get("id"))
+        analysis = full_analyze(
+            job.get("title", ""),
+            job.get("description", ""),
+            profile_snapshot,
+            job.get("location", ""),
         )
-        job = {**job, "bestscore": score, "bestscore_breakdown": breakdown}
-        ranked.append(job)
-    ranked.sort(key=lambda j: j["bestscore"], reverse=True)
+        score, breakdown = compute_application_priority(job, analysis)
+        ranked.append({
+            **job,
+            "bestscore": score,
+            "bestscore_breakdown": breakdown,
+            "analysis": analysis,
+            "profile_version": (profile_snapshot or {}).get("version"),
+        })
+    ranked.sort(
+        key=lambda item: item["bestscore"] if item["bestscore"] is not None else -1,
+        reverse=True,
+    )
     return ranked

@@ -5,8 +5,10 @@ are unchanged from the original SQLite version.
 """
 
 import os
+import hashlib
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from supabase import create_client
 import json
 
@@ -14,6 +16,11 @@ import json
 APPLICATION_CADENCE = [7, 14, 21]   # days from date_applied
 INTERVIEW_FOLLOW_UP_DAYS = 3
 TERMINAL_STATUSES = ["Offer", "Rejected", "Ghosted", "Not Interested"]
+USER_TIMEZONE = ZoneInfo("Asia/Kolkata")
+
+
+def _user_now():
+    return datetime.now(USER_TIMEZONE)
 
 # --- Supabase client (lazy singleton) ---
 _supabase_client = None
@@ -49,8 +56,8 @@ def add_application(company, role, job_type, platform, url="",
                     noc_compatible="Unknown", conversion="N/A",
                     salary="", notes=""):
     db = _get_client()
-    today = datetime.now().strftime("%Y-%m-%d")
-    follow_up = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+    today = _user_now().strftime("%Y-%m-%d")
+    follow_up = (_user_now() + timedelta(days=7)).strftime("%Y-%m-%d")
     db.table("applications").insert({
         "company": company,
         "role": role,
@@ -89,7 +96,7 @@ def update_status(app_id, new_status):
             update_data["status"] = "Ghosted"
     elif new_status == "Interview":
         update_data["follow_up_date"] = (
-            datetime.now() + timedelta(days=INTERVIEW_FOLLOW_UP_DAYS)
+            _user_now() + timedelta(days=INTERVIEW_FOLLOW_UP_DAYS)
         ).strftime("%Y-%m-%d")
 
     db.table("applications").update(update_data).eq("id", app_id).execute()
@@ -106,9 +113,17 @@ def get_all_applications():
     return pd.DataFrame(resp.data)
 
 
+def find_application_by_url(url):
+    if not url:
+        return None
+    rows = (_get_client().table("applications").select("*").eq("url", url)
+            .order("created_at", desc=True).limit(1).execute()).data or []
+    return rows[0] if rows else None
+
+
 def get_follow_ups_due():
     db = _get_client()
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = _user_now().strftime("%Y-%m-%d")
     resp = (db.table("applications")
             .select("*")
             .lte("follow_up_date", today)
@@ -120,6 +135,16 @@ def get_follow_ups_due():
     df = df[df["follow_up_date"].notna() & (df["follow_up_date"] != "")]
     # Sort by urgency: most overdue first
     df = df.sort_values("follow_up_date", ascending=True)
+    from analytics import attach_tracker_job_ids
+    urls = [url for url in df.get("url", pd.Series(dtype=str)).dropna().tolist() if url]
+    if urls:
+        jobs = []
+        for start in range(0, len(urls), 200):
+            jobs.extend((db.table("scraped_jobs").select("id,url")
+                         .in_("url", urls[start:start + 200]).execute()).data or [])
+        df = pd.DataFrame(attach_tracker_job_ids(df.to_dict("records"), jobs))
+    else:
+        df["scraped_job_id"] = None
     return df
 
 
@@ -149,7 +174,7 @@ def get_stats():
     stats['rejected'] = len(df[df['status'] == 'Rejected'])
 
     # Calculate this_week: all applications (jobs + internships) from the current week
-    today = datetime.now()
+    today = _user_now().replace(tzinfo=None)
     start_of_week = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
     df_dates = pd.to_datetime(df['date_applied'], errors='coerce')
     stats['this_week'] = int((df_dates >= start_of_week).sum())
@@ -182,9 +207,10 @@ def delete_application(app_id):
 
 def snooze_follow_up(app_id, new_date):
     """Reschedule a follow-up to a custom date without changing status or count."""
+    parsed = date.fromisoformat(new_date)
     db = _get_client()
     db.table("applications").update(
-        {"follow_up_date": new_date}
+        {"follow_up_date": parsed.isoformat()}
     ).eq("id", app_id).execute()
 
 
@@ -226,11 +252,22 @@ def get_existing_job_urls(since_days=None):
 
 
 def save_scraped_job(title, company, location, source, url, description="",
-                     score=0, noc_verdict="", skill_match=0,
-                     verdict="", ats_score=0):
+                     score=0, noc_verdict="", skill_match=None,
+                     verdict="", ats_score=None, analysis_details=None,
+                     analysis_version=None, profile_version=None):
     db = _get_client()
     try:
-        db.table("scraped_jobs").upsert({
+        jd_hash = hashlib.sha256((description or "").strip().encode("utf-8")).hexdigest()
+        existing = (db.table("scraped_jobs").select("id,jd_hash,jd_version")
+                    .eq("url", url).limit(1).execute()).data or []
+        jd_version = int(existing[0].get("jd_version") or 1) if existing else 1
+        changed = bool(existing and existing[0].get("jd_hash") != jd_hash)
+        if changed:
+            jd_version += 1
+            db.table("cover_letter_drafts").update({"is_outdated": True}).eq(
+                "scraped_job_id", existing[0]["id"]
+            ).eq("is_outdated", False).execute()
+        payload = {
             "title": title,
             "company": company,
             "location": location,
@@ -242,24 +279,41 @@ def save_scraped_job(title, company, location, source, url, description="",
             "skill_match": skill_match,
             "verdict": verdict or "",
             "ats_score": ats_score,
-        }, on_conflict="url", ignore_duplicates=True).execute()
+            "profile_version": profile_version,
+            "analysis_version": analysis_version,
+            "analysis_stale": profile_version is None,
+            "analysis_details": analysis_details or {},
+            "analyzed_at": datetime.now().isoformat() if analysis_version else None,
+            "jd_hash": jd_hash,
+            "jd_version": jd_version,
+        }
+        if existing:
+            db.table("scraped_jobs").update(payload).eq("id", existing[0]["id"]).execute()
+        else:
+            db.table("scraped_jobs").insert(payload).execute()
     except Exception:
         pass
 
 
 def update_scraped_job_analysis(job_id, score, noc_verdict, skill_match,
-                                verdict="", ats_score=0):
+                                verdict="", ats_score=None,
+                                analysis_details=None, analysis_version=None,
+                                profile_version=None):
     """Update a scraped job with analysis results."""
     db = _get_client()
     update_data = {
         "score": score,
         "noc_verdict": noc_verdict,
         "skill_match": skill_match,
+        "ats_score": ats_score,
+        "analysis_details": analysis_details or {},
+        "analysis_version": analysis_version,
+        "profile_version": profile_version,
+        "analysis_stale": profile_version is None,
+        "analyzed_at": datetime.now().isoformat() if analysis_version else None,
     }
     if verdict:
         update_data["verdict"] = verdict
-    if ats_score:
-        update_data["ats_score"] = ats_score
     db.table("scraped_jobs").update(update_data).eq("id", job_id).execute()
 
 
@@ -321,22 +375,36 @@ def get_job_message(scraped_job_id, message_type=DEFAULT_MESSAGE_TYPE):
                 .eq("scraped_job_id", scraped_job_id)
                 .eq("message_type", message_type)
                 .execute())
-        return resp.data[0] if resp.data else None
+        row = resp.data[0] if resp.data else None
+        if row and row.get("is_stale"):
+            return None
+        return row
     except Exception:
         return None
 
 
 def save_job_message(scraped_job_id, content, message_type=DEFAULT_MESSAGE_TYPE,
-                     generated_by="claude-routine"):
+                     generated_by="claude-routine", profile_version=None):
     """Store (or replace) the message for a job. Returns True on success."""
     db = _get_client()
     try:
+        profile_dependent = message_type in {
+            "screen", "cold_dm", "hr_email", "resume_points", "evaluation"
+        }
+        if profile_version is None and profile_dependent:
+            try:
+                from profile import get_active_profile_snapshot
+                profile_version = (get_active_profile_snapshot() or {}).get("version")
+            except Exception:
+                profile_version = None
         db.table("job_messages").upsert({
             "scraped_job_id": int(scraped_job_id),
             "message_type": message_type,
             "content": content,
             "generated_by": generated_by,
             "generated_at": datetime.now().isoformat(),
+            "profile_version": profile_version,
+            "is_stale": profile_dependent and profile_version is None,
         }, on_conflict="scraped_job_id,message_type").execute()
         return True
     except Exception as e:
@@ -363,16 +431,33 @@ def get_jobs_needing_messages(limit=20, message_type=DEFAULT_MESSAGE_TYPE):
             return []
 
         done = (db.table("job_messages")
-                .select("scraped_job_id")
+                .select("scraped_job_id,profile_version,is_stale")
                 .eq("message_type", message_type)
                 .in_("scraped_job_id", [j["id"] for j in jobs])
                 .execute()).data or []
-        have = {r["scraped_job_id"] for r in done}
+        try:
+            from profile import get_active_profile_snapshot
+            active_version = (get_active_profile_snapshot() or {}).get("version")
+        except Exception:
+            active_version = None
+        have = {r["scraped_job_id"] for r in done
+                if not r.get("is_stale") and r.get("profile_version") == active_version}
 
         return [j for j in jobs if j["id"] not in have][:limit]
     except Exception as e:
         print(f"Failed to list jobs needing messages: {e}")
         return []
+
+
+def get_current_cover_letter(scraped_job_id):
+    """Return the newest non-outdated audited cover-letter draft."""
+    try:
+        rows = (_get_client().table("cover_letter_drafts").select("*")
+                .eq("scraped_job_id", scraped_job_id).eq("is_outdated", False)
+                .order("generated_at", desc=True).limit(1).execute()).data or []
+        return rows[0] if rows else None
+    except Exception:
+        return None
 
 
 # ===================== MESSAGE REQUEST QUEUE =====================
@@ -495,92 +580,35 @@ def mark_scraped_job(job_id, action):
 # ===================== ANALYTICS FUNCTIONS =====================
 
 def get_weekly_trend():
-    """Get application counts grouped by week, split by type."""
+    """Get Monday-based application counts for the latest 12 active weeks."""
+    from analytics import weekly_trend
     db = _get_client()
     resp = db.table("applications").select("date_applied, type").order("date_applied").execute()
-    df = pd.DataFrame(resp.data)
-    if df.empty:
-        return pd.DataFrame()
-
-    df["date_applied"] = pd.to_datetime(df["date_applied"])
-    df["week"] = df["date_applied"].dt.isocalendar().week.astype(int)
-    df["year"] = df["date_applied"].dt.year
-
-    pivot = df.groupby(["year", "week", "type"]).size().reset_index(name="count")
-    pivot["label"] = "W" + pivot["week"].astype(str)
-    return pivot
+    return pd.DataFrame(weekly_trend(resp.data))
 
 
 def get_platform_effectiveness():
-    """Get total applications and positive responses per platform."""
+    """Positive responses / all persisted applications, grouped by platform."""
+    from analytics import platform_effectiveness
     db = _get_client()
     resp = db.table("applications").select("platform, status").execute()
-    df = pd.DataFrame(resp.data)
-    if df.empty:
-        return df
-
-    grouped = df.groupby("platform").apply(
-        lambda g: pd.Series({
-            "total": len(g),
-            "responses": len(g[g["status"].isin(
-                ["Interview Scheduled", "Interviewed", "Offer"]
-            )]),
-        })
-    ).reset_index().sort_values("total", ascending=False)
-    grouped["rate"] = (grouped["responses"] / grouped["total"] * 100).round(1)
-    return grouped
+    return pd.DataFrame(platform_effectiveness(resp.data))
 
 
 def get_status_funnel():
-    """Get counts at each status stage for a funnel view."""
+    """Get a lossless breakdown using current and legacy persisted statuses."""
+    from analytics import status_breakdown
     db = _get_client()
     resp = db.table("applications").select("status").execute()
-    df = pd.DataFrame(resp.data)
-    stages = [
-        "Applied", "Follow-up Sent", "Interview Scheduled",
-        "Interviewed", "Offer",
-    ]
-    counts = {}
-    for stage in stages:
-        counts[stage] = len(df[df["status"] == stage]) if not df.empty else 0
-    return counts
+    return status_breakdown(resp.data)
 
 
 def get_role_analysis():
-    """Group applications by role keywords and show conversion rates."""
+    """Assign each persisted role once to an evidence-based role family."""
+    from analytics import role_analysis
     db = _get_client()
     resp = db.table("applications").select("role, status").execute()
-    df = pd.DataFrame(resp.data)
-    if df.empty:
-        return pd.DataFrame()
-
-    role_keywords = [
-        "AI Developer", "AI Engineer", "ML Engineer", "AI Intern",
-        "ML Intern", "Python Developer", "Backend Developer",
-        "Data Scientist", "NLP", "Automation", "Full Stack",
-    ]
-
-    rows = []
-    for kw in role_keywords:
-        mask = df["role"].str.contains(kw, case=False, na=False)
-        subset = df[mask]
-        if len(subset) == 0:
-            continue
-        total = len(subset)
-        responses = len(
-            subset[subset["status"].isin(
-                ["Interview Scheduled", "Interviewed", "Offer"]
-            )]
-        )
-        rate = round(responses / total * 100, 1) if total > 0 else 0
-        rows.append({
-            "Role Keyword": kw,
-            "Applied": total,
-            "Responses": responses,
-            "Response Rate": f"{rate}%",
-        })
-
-    return pd.DataFrame(rows)
+    return pd.DataFrame(role_analysis(resp.data))
 
 
 # ===================== FOLLOW-UP HISTORY =====================
