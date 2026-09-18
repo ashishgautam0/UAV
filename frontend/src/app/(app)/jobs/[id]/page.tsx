@@ -11,10 +11,16 @@ import {
   lookupApplication,
   snoozeFollowUp,
   getFollowUpHistory,
+  getFollowUpDraft,
+  updateApplicationStatus,
+  updateApplicationNotes,
+  deleteApplication,
+  updateFollowUpOutcome,
 } from "@/lib/api";
 import type {
   Application,
   CachedCompanyIntel,
+  FollowUpDraft,
   FollowUpHistory,
   JobMessage,
   RecruiterEmailReport,
@@ -30,6 +36,31 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   ArrowLeft,
   Building2,
@@ -43,6 +74,9 @@ import {
   Loader2,
   MessageSquareText,
   Mail,
+  Pencil,
+  Trash2,
+  X as XIcon,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -76,6 +110,17 @@ const SECTIONS = [
   },
 ] as const;
 
+const STATUSES = [
+  "Applied",
+  "Follow-up Sent",
+  "Assignment Submitted",
+  "Interview",
+  "Offer",
+  "Rejected",
+  "Ghosted",
+  "Not Interested",
+] as const;
+
 // Pull "FIT SCORE: 4.2 / 5 — ..." out of the evaluation's first line.
 function parseFitScore(text: string | null): number | null {
   if (!text) return null;
@@ -107,7 +152,14 @@ export default function JobDetailPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [application, setApplication] = useState<Application | null>(null);
   const [history, setHistory] = useState<FollowUpHistory[]>([]);
+  const [followUpDraft, setFollowUpDraft] = useState<FollowUpDraft | null>(null);
   const [dateSaving, setDateSaving] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [emailReport, setEmailReport] = useState<RecruiterEmailReport | null>(
     null
   );
@@ -118,6 +170,7 @@ export default function JobDetailPage() {
     setLoading(true);
     setNotFound(false);
     setHistory([]);
+    setFollowUpDraft(null);
     try {
       const messagesPromise = Promise.all(
         SECTIONS.map((s) =>
@@ -139,7 +192,13 @@ export default function JobDetailPage() {
       ]);
       setApplication(tracked);
       if (tracked) {
-        setHistory(await getFollowUpHistory("application", tracked.id).catch(() => []));
+        setNoteText(tracked.notes || "");
+        const [historyRows, draft] = await Promise.all([
+          getFollowUpHistory("application", tracked.id).catch(() => []),
+          getFollowUpDraft(tracked.id).catch(() => null),
+        ]);
+        setHistory(historyRows);
+        setFollowUpDraft(draft);
       }
       const next: Record<string, string | null> = {};
       const rows: Record<string, JobMessage> = {};
@@ -205,6 +264,64 @@ export default function JobDetailPage() {
     setTimeout(() => setCopied(null), 2000);
   }
 
+  async function handleStatusChange(status: string) {
+    if (!application) return;
+    setStatusSaving(true);
+    try {
+      await updateApplicationStatus(application.id, status);
+      setApplication({ ...application, status });
+      toast.success(`Status → ${status}`);
+    } catch {
+      toast.error("Failed to update status");
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
+  async function handleNotesSave() {
+    if (!application) return;
+    setNotesSaving(true);
+    try {
+      const notes = noteText.trim();
+      await updateApplicationNotes(application.id, notes);
+      setApplication({ ...application, notes });
+      setEditingNotes(false);
+      toast.success("Note saved");
+    } catch {
+      toast.error("Failed to save note");
+    } finally {
+      setNotesSaving(false);
+    }
+  }
+
+  async function handleOutcomeChange(historyId: number, outcome: string) {
+    try {
+      await updateFollowUpOutcome(historyId, outcome);
+      setHistory((current) => current.map((event) =>
+        event.id === historyId
+          ? { ...event, follow_up_outcome: outcome as FollowUpHistory["follow_up_outcome"] }
+          : event,
+      ));
+      toast.success("Outcome updated");
+    } catch {
+      toast.error("Failed to update outcome");
+    }
+  }
+
+  async function handleDelete() {
+    if (!application) return;
+    setDeleting(true);
+    try {
+      await deleteApplication(application.id);
+      toast.success("Application deleted");
+      router.push("/tracker");
+    } catch {
+      toast.error("Failed to delete application");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -264,6 +381,137 @@ export default function JobDetailPage() {
       </div>
 
       <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Tracker record</CardTitle>
+          <CardDescription>
+            Persisted application details and management controls for this job.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {application ? (
+            <>
+              <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 md:grid-cols-3">
+                <div>
+                  <p className="text-muted-foreground">Status</p>
+                  <Select value={application.status} onValueChange={handleStatusChange} disabled={statusSaving}>
+                    <SelectTrigger className="mt-1 h-9 w-full">
+                      {statusSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <SelectValue />}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Date applied</p>
+                  <p className="mt-1 font-medium">{application.date_applied || "Unknown"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Platform</p>
+                  <p className="mt-1 font-medium">{application.platform || "Unknown"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Conversion</p>
+                  <p className="mt-1 font-medium">{application.conversion || "Not recorded"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Salary</p>
+                  <p className="mt-1 font-medium">{application.salary || "Not recorded"}</p>
+                </div>
+                {application.url && (
+                  <div>
+                    <p className="text-muted-foreground">Original URL</p>
+                    <a
+                      href={application.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex items-center gap-1 text-sky-400 hover:underline"
+                    >
+                      View listing <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <p className="text-muted-foreground">Notes</p>
+                  {!editingNotes && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditingNotes(true)} aria-label="Edit tracker notes">
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+                {editingNotes ? (
+                  <div className="space-y-2">
+                    <Textarea value={noteText} onChange={(event) => setNoteText(event.target.value)} placeholder="Add a note..." className="min-h-24" />
+                    <div className="flex gap-2">
+                      <Button size="sm" disabled={notesSaving} onClick={handleNotesSave}>
+                        {notesSaving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Check className="mr-1 h-3 w-3" />}
+                        Save
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setNoteText(application.notes || ""); setEditingNotes(false); }}>
+                        <XIcon className="mr-1 h-3 w-3" /> Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : application.notes ? (
+                  <p className="whitespace-pre-wrap break-words font-medium">{application.notes}</p>
+                ) : (
+                  <p className="italic text-muted-foreground">No notes yet</p>
+                )}
+              </div>
+
+              <div className="space-y-2 rounded-md border p-3">
+                <p className="text-sm font-medium">Follow-up draft</p>
+                {followUpDraft?.status === "ready" && followUpDraft.content ? (
+                  <>
+                    <p className="text-xs text-emerald-400">Follow-up #{followUpDraft.follow_up_number ?? 1} (auto-written)</p>
+                    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{followUpDraft.content}</p>
+                    <Button variant="outline" size="sm" onClick={() => handleCopyText(followUpDraft.content || "", "follow-up-draft")}>
+                      {copied === "follow-up-draft" ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
+                      {copied === "follow-up-draft" ? "Copied" : "Copy draft"}
+                    </Button>
+                  </>
+                ) : followUpDraft?.status === "pending" ? (
+                  <p className="text-sm text-muted-foreground">Queued — the next hourly run writes this follow-up.</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No draft yet — the hourly run queues one once the follow-up date arrives.</p>
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" variant="destructive"><Trash2 className="mr-2 h-4 w-4" />Delete tracker record</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Confirm deletion</DialogTitle>
+                      <DialogDescription>
+                        Delete the tracker record for {application.role} at {application.company}? This does not delete the underlying scraped job, but it cannot be undone.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+                      <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+                        {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {deleting ? "Deleting..." : "Delete"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No tracker record matches this job URL. Tracker-only details and management controls are unavailable.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader><CardTitle className="text-base">Follow-up schedule and recorded history</CardTitle><CardDescription>Scheduled dates are plans; the graph below contains only completed follow-ups recorded in the tracker.</CardDescription></CardHeader>
         <CardContent className="space-y-5">
           {application ? <>
@@ -277,13 +525,42 @@ export default function JobDetailPage() {
               {dateSaving && <Loader2 className="mb-2 h-4 w-4 animate-spin" />}
               <span className="mb-2 text-xs text-muted-foreground">Applied {application.date_applied || "date unknown"}</span>
             </div>
-            {history.length ? <div className="space-y-3" aria-label="Recorded follow-up history graph">
-              {history.map((event) => <div key={event.id} className="grid grid-cols-[11rem_1fr_6rem] items-center gap-3 text-sm">
-                <span className="text-muted-foreground">{new Date(event.sent_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}</span>
-                <div className="h-3 rounded bg-sky-500" title={`Follow-up #${event.follow_up_number} sent via ${event.channel || "unspecified channel"}`} />
-                <Badge variant="outline" className="justify-center">{event.follow_up_outcome.replace("_", " ")}</Badge>
-              </div>)}
-              <p className="text-xs text-muted-foreground">Each bar is one recorded send event; bar length does not imply performance.</p>
+            {history.length ? <div className="space-y-5">
+              <div className="space-y-3" aria-label="Recorded follow-up history graph">
+                {history.map((event) => <div key={event.id} className="grid grid-cols-[minmax(8rem,11rem)_1fr_minmax(5rem,6rem)] items-center gap-3 text-sm">
+                  <span className="text-muted-foreground">{new Date(event.sent_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}</span>
+                  <div className="h-3 rounded bg-sky-500" title={`Follow-up #${event.follow_up_number} sent via ${event.channel || "unspecified channel"}`} />
+                  <Badge variant="outline" className="justify-center">{event.follow_up_outcome.replace("_", " ")}</Badge>
+                </div>)}
+                <p className="text-xs text-muted-foreground">Each bar is one recorded send event; bar length does not imply performance.</p>
+              </div>
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>#</TableHead><TableHead>Channel</TableHead><TableHead>Sent</TableHead><TableHead>Message</TableHead><TableHead>Outcome</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {history.map((event) => <TableRow key={event.id}>
+                      <TableCell>{event.follow_up_number}</TableCell>
+                      <TableCell>{event.channel || "—"}</TableCell>
+                      <TableCell>{new Date(event.sent_at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}</TableCell>
+                      <TableCell className="max-w-72 whitespace-pre-wrap break-words">{event.message_content || "—"}</TableCell>
+                      <TableCell>
+                        <Select value={event.follow_up_outcome} onValueChange={(value) => handleOutcomeChange(event.id, value)}>
+                          <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="responded">Responded</SelectItem>
+                            <SelectItem value="no_response">No response</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>)}
+                  </TableBody>
+                </Table>
+              </div>
             </div> : <p className="rounded border border-dashed p-4 text-sm text-muted-foreground">No completed follow-ups have been recorded for this tracker record.</p>}
           </> : <p className="text-sm text-muted-foreground">No tracker record matches this job URL, so there is no persisted follow-up schedule or history to display.</p>}
         </CardContent>

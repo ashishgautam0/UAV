@@ -421,7 +421,7 @@ export default function DashboardPage() {
                     role="link"
                     tabIndex={0}
                     onClick={() => fu.scraped_job_id ? router.push(`/jobs/${fu.scraped_job_id}`) : toast.info("This tracker record has no matching scraped-job detail page.")}
-                    onKeyDown={(e) => { if (e.target === e.currentTarget && e.key === "Enter") { if (fu.scraped_job_id) router.push(`/jobs/${fu.scraped_job_id}`); else toast.info("This tracker record has no matching scraped-job detail page."); } }}
+                    onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); if (fu.scraped_job_id) router.push(`/jobs/${fu.scraped_job_id}`); else toast.info("This tracker record has no matching scraped-job detail page."); } }}
                     className={`rounded-lg border p-4 space-y-1 ${borderClass} cursor-pointer hover:border-primary/60`}
                   >
                     <div className="flex items-center justify-between">

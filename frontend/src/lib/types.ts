@@ -14,6 +14,7 @@ export interface Application {
   date_applied?: string;
   follow_up_date?: string;
   follow_up_count?: number;
+  scraped_job_id?: number | null;
 }
 
 export interface AddApplicationRequest {

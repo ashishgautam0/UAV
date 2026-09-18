@@ -1,98 +1,32 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  getApplications,
-  updateApplicationStatus,
-  updateApplicationNotes,
-  deleteApplication,
-  getFollowUpDraft,
-  getFollowUpHistory,
-  getJobMessage,
-  lookupScrapedJob,
-  updateFollowUpOutcome,
-} from "@/lib/api";
-import type { Application, FollowUpDraft, FollowUpHistory } from "@/lib/types";
+import { getApplications } from "@/lib/api";
+import type { Application } from "@/lib/types";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
-  SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-} from "@/components/ui/table";
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from "@/components/ui/collapsible";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import {
-  ClipboardList,
-  MessageSquareText,
-  ChevronDown,
-  Trash2,
-  Loader2,
-  ExternalLink,
-  Pencil,
-  MessageSquare,
-  Check,
-  X as XIcon,
-  History,
-} from "lucide-react";
+import { ClipboardList, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 const PLATFORMS = [
-  "LinkedIn",
-  "Wellfound",
-  "YC WaaS",
-  "Internshala",
-  "Instahyre",
-  "Naukri",
-  "Indeed",
-  "HasJob",
-  "Direct",
-  "Referral",
-  "Other",
+  "LinkedIn", "Wellfound", "YC WaaS", "Internshala", "Instahyre",
+  "Naukri", "Indeed", "HasJob", "Direct", "Referral", "Other",
 ] as const;
 
 const STATUSES = [
-  "Applied",
-  "Follow-up Sent",
-  "Assignment Submitted",
-  "Interview",
-  "Offer",
-  "Rejected",
-  "Ghosted",
-  "Not Interested",
+  "Applied", "Follow-up Sent", "Assignment Submitted", "Interview",
+  "Offer", "Rejected", "Ghosted", "Not Interested",
 ] as const;
 
 const STATUS_COLORS: Record<string, string> = {
@@ -106,261 +40,81 @@ const STATUS_COLORS: Record<string, string> = {
   "Not Interested": "bg-orange-500/15 text-orange-400 border-orange-500/30",
 };
 
-
-// ---------------------------------------------------------------------------
-// Helper: status badge
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Main Page
-// ---------------------------------------------------------------------------
-
 export default function TrackerPage() {
   const router = useRouter();
-
-  // ---- Applications state ----
   const [applications, setApplications] = useState<Application[]>([]);
   const [appPage, setAppPage] = useState(1);
-  const APPS_PER_PAGE = 10;
   const [appsLoading, setAppsLoading] = useState(true);
-
-  // ---- Filters ----
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterPlatform, setFilterPlatform] = useState("All");
+  const APPS_PER_PAGE = 10;
 
-  // ---- Application status update ----
-  const [updatingId, setUpdatingId] = useState<number | null>(null);
-  const [fuDrafts, setFuDrafts] = useState<Record<number, FollowUpDraft>>({});
-  const [fuDraftOpen, setFuDraftOpen] = useState<Set<number>>(new Set());
-  const [fuDraftLoading, setFuDraftLoading] = useState<number | null>(null);
-  const [dmByApp, setDmByApp] = useState<Record<number, string | null>>({});
-  const [dmOpen, setDmOpen] = useState<Set<number>>(new Set());
-  const [dmLoading, setDmLoading] = useState<number | null>(null);
-
-  const toggleColdDm = async (app: Application) => {
-    const id = app.id;
-    if (dmOpen.has(id)) {
-      setDmOpen((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-      return;
-    }
-    if (!(id in dmByApp)) {
-      if (!app.url) {
-        toast.info("No job posting URL saved for this application.");
-        return;
-      }
-      setDmLoading(id);
-      try {
-        const { id: jobId } = await lookupScrapedJob(app.url);
-        const content = jobId
-          ? (await getJobMessage(jobId)).content
-          : null;
-        setDmByApp((prev) => ({ ...prev, [id]: content }));
-        if (!content) {
-          toast.info("No cold DM stored for this application's job.");
-          return;
-        }
-      } catch {
-        toast.error("Failed to load the cold DM");
-        return;
-      } finally {
-        setDmLoading(null);
-      }
-    } else if (!dmByApp[id]) {
-      toast.info("No cold DM stored for this application's job.");
-      return;
-    }
-    setDmOpen((prev) => new Set(prev).add(id));
-  };
-
-  const openJobPage = async (app: Application) => {
-    if (!app.url) {
-      toast.info("No job posting URL saved for this application.");
-      return;
-    }
-    try {
-      const { id } = await lookupScrapedJob(app.url);
-      if (id) {
-        router.push(`/jobs/${id}`);
-      } else {
-        toast.info(
-          "No job page for this application — it wasn't scraped, or was deleted."
-        );
-      }
-    } catch {
-      toast.error("Failed to look up the job page");
-    }
-  };
-
-  const toggleFuDraft = async (appId: number) => {
-    if (fuDraftOpen.has(appId)) {
-      setFuDraftOpen((prev) => {
-        const next = new Set(prev);
-        next.delete(appId);
-        return next;
-      });
-      return;
-    }
-    let draft = fuDrafts[appId];
-    if (!draft) {
-      setFuDraftLoading(appId);
-      try {
-        draft = await getFollowUpDraft(appId);
-        setFuDrafts((prev) => ({ ...prev, [appId]: draft }));
-      } catch {
-        toast.error("Failed to load the follow-up draft");
-        return;
-      } finally {
-        setFuDraftLoading(null);
-      }
-    }
-    if (draft.status === "ready" && draft.content) {
-      setFuDraftOpen((prev) => new Set(prev).add(appId));
-    } else if (draft.status === "pending") {
-      toast.info("Queued — the next hourly run writes this follow-up.");
-    } else {
-      toast.info(
-        "No draft yet — the hourly run queues one once the follow-up date arrives."
-      );
-    }
-  };
-
-  // ---- Delete dialog ----
-  const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  // ---- Notes editing ----
-  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
-  const [noteText, setNoteText] = useState("");
-  const [savingNote, setSavingNote] = useState(false);
-
-  // ---- Follow-up history ----
-  const [historyAppId, setHistoryAppId] = useState<number | null>(null);
-  const [historyRecords, setHistoryRecords] = useState<FollowUpHistory[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-
-  async function toggleHistory(appId: number) {
-    if (historyAppId === appId) {
-      setHistoryAppId(null);
-      setHistoryRecords([]);
-      return;
-    }
-    setHistoryAppId(appId);
-    setHistoryLoading(true);
-    try {
-      const records = await getFollowUpHistory("application", appId);
-      setHistoryRecords(records);
-    } catch {
-      toast.error("Failed to load follow-up history");
-    } finally {
-      setHistoryLoading(false);
-    }
-  }
-
-  async function handleOutcomeChange(historyId: number, outcome: string) {
-    try {
-      await updateFollowUpOutcome(historyId, outcome);
-      setHistoryRecords((prev) =>
-        prev.map((r) =>
-          r.id === historyId ? { ...r, follow_up_outcome: outcome as FollowUpHistory["follow_up_outcome"] } : r
-        )
-      );
-      toast.success("Outcome updated");
-    } catch {
-      toast.error("Failed to update outcome");
-    }
-  }
-
-  // ---- Fetch helpers ----
   const fetchApplications = useCallback(async () => {
     setAppsLoading(true);
     try {
       const filters: { status?: string; platform?: string } = {};
       if (filterStatus !== "All") filters.status = filterStatus;
       if (filterPlatform !== "All") filters.platform = filterPlatform;
-      const data = await getApplications(filters);
-      setApplications(data);
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to load applications"
-      );
+      setApplications(await getApplications(filters));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load applications");
     } finally {
       setAppsLoading(false);
     }
-  }, [filterStatus, filterPlatform]);
+  }, [filterPlatform, filterStatus]);
 
-  // ---- Load on mount + filter change ----
   useEffect(() => {
     fetchApplications();
   }, [fetchApplications]);
 
-  // Back to the first page whenever the filters change
   useEffect(() => {
     setAppPage(1);
-  }, [filterStatus, filterPlatform]);
+  }, [filterPlatform, filterStatus]);
 
-  const appTotalPages = Math.max(
-    1,
-    Math.ceil(applications.length / APPS_PER_PAGE)
-  );
+  const appTotalPages = Math.max(1, Math.ceil(applications.length / APPS_PER_PAGE));
   const appSafePage = Math.min(appPage, appTotalPages);
   const pagedApplications = applications.slice(
     (appSafePage - 1) * APPS_PER_PAGE,
-    appSafePage * APPS_PER_PAGE
+    appSafePage * APPS_PER_PAGE,
   );
 
-  // ---- Handlers: Applications ----
-  async function handleDelete() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      await deleteApplication(deleteTarget.id);
-      toast.success("Application deleted");
-      setDeleteDialogOpen(false);
-      setDeleteTarget(null);
-      await fetchApplications();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to delete application"
-      );
-    } finally {
-      setDeleting(false);
+  function openJobPage(app: Application) {
+    if (app.scraped_job_id) {
+      router.push(`/jobs/${app.scraped_job_id}`);
+      return;
+    }
+    toast.info("This tracker record has no matching scraped-job detail page.");
+  }
+
+  function handleCardKeyDown(event: React.KeyboardEvent<HTMLDivElement>, app: Application) {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openJobPage(app);
     }
   }
 
-  // ---- Render ----
   return (
     <div className="space-y-8">
-      {/* Page Header */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-3">
+        <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight sm:text-3xl">
           <ClipboardList className="h-8 w-8" />
           Application Tracker
         </h1>
-        <p className="text-muted-foreground mt-1">
-          Track your job applications in one place.
+        <p className="mt-1 text-muted-foreground">
+          Select a tracker card to view its details and manage the application.
         </p>
       </div>
 
-      {/* ================================================================== */}
-      {/* Toolbar: Filters (compact row)                                    */}
-      {/* ================================================================== */}
       <div className="flex flex-wrap items-end gap-3">
-        {/* Compact Filters */}
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="w-[150px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All">All Statuses</SelectItem>
-            {STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s}
-              </SelectItem>
+            {STATUSES.map((status) => (
+              <SelectItem key={status} value={status}>{status}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -371,24 +125,18 @@ export default function TrackerPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All">All Platforms</SelectItem>
-            {PLATFORMS.map((p) => (
-              <SelectItem key={p} value={p}>
-                {p}
-              </SelectItem>
+            {PLATFORMS.map((platform) => (
+              <SelectItem key={platform} value={platform}>{platform}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        <span className="text-muted-foreground text-sm ml-auto">
+        <span className="ml-auto text-sm text-muted-foreground">
           {applications.length} application{applications.length !== 1 && "s"}
         </span>
       </div>
 
-      {/* ================================================================== */}
-      {/* Applications List                                                  */}
-      {/* ================================================================== */}
       <div className="space-y-3">
-
         {appsLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -401,435 +149,53 @@ export default function TrackerPage() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {pagedApplications.map((app) => (
-              <Card key={app.id}>
-                <Collapsible>
-                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors pb-3 pt-3">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                      {/* Inline status dropdown */}
-                      <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-                        <Select
-                          value={app.status}
-                          onValueChange={async (v) => {
-                            setUpdatingId(app.id);
-                            try {
-                              await updateApplicationStatus(app.id, v);
-                              toast.success(`Status → ${v}`);
-                              await fetchApplications();
-                            } catch {
-                              toast.error("Failed to update status");
-                            } finally {
-                              setUpdatingId(null);
-                            }
-                          }}
-                        >
-                          <SelectTrigger
-                            className={cn(
-                              "w-[130px] h-7 text-xs font-medium",
-                              STATUS_COLORS[app.status] || "border-border"
-                            )}
-                          >
-                            {updatingId === app.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <SelectValue />
-                            )}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STATUSES.map((s) => (
-                              <SelectItem key={s} value={s}>
-                                {s}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+            {pagedApplications.map((app) => {
+              const hasDetail = Boolean(app.scraped_job_id);
+              return (
+                <Card
+                  key={app.id}
+                  role="link"
+                  tabIndex={0}
+                  aria-label={`Open tracker details for ${app.role} at ${app.company}`}
+                  aria-disabled={!hasDetail}
+                  onClick={() => openJobPage(app)}
+                  onKeyDown={(event) => handleCardKeyDown(event, app)}
+                  className={cn(
+                    "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    hasDetail
+                      ? "cursor-pointer hover:border-primary/60 hover:bg-muted/40"
+                      : "cursor-not-allowed opacity-70",
+                  )}
+                >
+                  <CardContent className="flex flex-wrap items-center gap-x-3 gap-y-2 py-4">
+                    <Badge
+                      variant="outline"
+                      className={cn("text-xs font-medium", STATUS_COLORS[app.status])}
+                    >
+                      {app.status}
+                    </Badge>
+                    <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+                      <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+                        <span className="truncate font-bold">{app.company}</span>
+                        <span className="truncate text-sm text-muted-foreground sm:text-base">
+                          {app.role}
+                        </span>
                       </div>
-
-                      <div
-                        className="order-first w-full min-w-0 cursor-pointer sm:order-none sm:w-auto sm:flex-1"
-                        onClick={() => openJobPage(app)}
-                      >
-                          <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-                            <span className="font-bold truncate hover:underline">{app.company}</span>
-                            <span className="text-muted-foreground text-sm sm:text-base truncate">
-                              {app.role}
-                            </span>
-                            <span className="flex flex-wrap items-center gap-1.5 shrink-0">
-                              <Badge variant="secondary">{app.platform}</Badge>
-                              {(app.follow_up_count ?? 0) > 0 && (
-                                <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-400 border-amber-500/30">
-                                  {app.follow_up_count}/3 follow-ups
-                                </Badge>
-                              )}
-                            </span>
-                          </div>
-                      </div>
-
-                      {/* Quick action buttons */}
-                      <TooltipProvider delayDuration={300}>
-                        <div className="ml-auto flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-                          <CollapsibleTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                          </CollapsibleTrigger>
-                        </div>
-                      </TooltipProvider>
                     </div>
-                  </CardHeader>
+                    <Badge variant="secondary">{app.platform}</Badge>
+                    {(app.follow_up_count ?? 0) > 0 && (
+                      <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-xs text-amber-400">
+                        {app.follow_up_count}/3 follow-ups
+                      </Badge>
+                    )}
+                    {!hasDetail && (
+                      <span className="text-xs text-muted-foreground">Detail unavailable</span>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
 
-                  <CollapsibleContent>
-                    <CardContent className="pt-0 space-y-4">
-                      <Separator />
-
-                      {/* Details grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                        {app.date_applied && (
-                          <div>
-                            <p className="text-muted-foreground">
-                              Date Applied
-                            </p>
-                            <p className="font-medium">{app.date_applied}</p>
-                          </div>
-                        )}
-                        {app.follow_up_date && (
-                          <div>
-                            <p className="text-muted-foreground">
-                              Follow-up Date
-                            </p>
-                            <p className="font-medium">{app.follow_up_date}</p>
-                          </div>
-                        )}
-                        {app.url && (
-                          <div>
-                            <p className="text-muted-foreground">URL</p>
-                            <a
-                              href={app.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-blue-400 hover:underline"
-                            >
-                              View Listing
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-muted-foreground">Conversion</p>
-                          <p className="font-medium">{app.conversion}</p>
-                        </div>
-                        {app.salary && (
-                          <div>
-                            <p className="text-muted-foreground">Salary</p>
-                            <p className="font-medium">{app.salary}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Cold DM for this application's job */}
-                      {app.url && (
-                        <div className="space-y-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={dmLoading === app.id}
-                            onClick={() => toggleColdDm(app)}
-                          >
-                            {dmLoading === app.id ? (
-                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <MessageSquareText className="mr-1.5 h-3.5 w-3.5" />
-                            )}
-                            {dmOpen.has(app.id) ? "Hide Cold DM" : "View Cold DM"}
-                          </Button>
-                          {dmOpen.has(app.id) && dmByApp[app.id] && (
-                            <div className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-medium text-emerald-400">
-                                  Cold DM (auto-written)
-                                </span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 px-2 text-xs"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(dmByApp[app.id] || "");
-                                    toast.success("DM copied to clipboard");
-                                  }}
-                                >
-                                  Copy
-                                </Button>
-                              </div>
-                              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                                {dmByApp[app.id]}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Auto-written follow-up draft */}
-                      {app.follow_up_date && (
-                        <div className="space-y-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={fuDraftLoading === app.id}
-                            onClick={() => toggleFuDraft(app.id)}
-                          >
-                            {fuDraftLoading === app.id ? (
-                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
-                            )}
-                            {fuDraftOpen.has(app.id)
-                              ? "Hide Follow-up Draft"
-                              : "View Follow-up Draft"}
-                          </Button>
-                          {fuDraftOpen.has(app.id) && fuDrafts[app.id]?.content && (
-                            <div className="rounded-md border border-emerald-600/30 bg-emerald-600/5 p-3 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-medium text-emerald-400">
-                                  Follow-up #{fuDrafts[app.id]?.follow_up_number ?? 1}{" "}
-                                  (auto-written)
-                                </span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 px-2 text-xs"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(
-                                      fuDrafts[app.id]?.content || ""
-                                    );
-                                    toast.success("Follow-up copied to clipboard");
-                                  }}
-                                >
-                                  Copy
-                                </Button>
-                              </div>
-                              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                                {fuDrafts[app.id]?.content}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Notes section */}
-                      <div className="text-sm">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-muted-foreground">Notes</p>
-                          {editingNoteId !== app.id && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => {
-                                setEditingNoteId(app.id);
-                                setNoteText(app.notes || "");
-                              }}
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                        {editingNoteId === app.id ? (
-                          <div className="space-y-2">
-                            <Textarea
-                              value={noteText}
-                              onChange={(e) => setNoteText(e.target.value)}
-                              placeholder="Add a note..."
-                              className="min-h-[80px]"
-                            />
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                disabled={savingNote}
-                                onClick={async () => {
-                                  setSavingNote(true);
-                                  try {
-                                    await updateApplicationNotes(app.id, noteText.trim());
-                                    toast.success("Note saved");
-                                    setEditingNoteId(null);
-                                    await fetchApplications();
-                                  } catch {
-                                    toast.error("Failed to save note");
-                                  } finally {
-                                    setSavingNote(false);
-                                  }
-                                }}
-                              >
-                                {savingNote ? (
-                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                ) : (
-                                  <Check className="mr-1 h-3 w-3" />
-                                )}
-                                Save
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setEditingNoteId(null)}
-                              >
-                                <XIcon className="mr-1 h-3 w-3" />
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        ) : app.notes ? (
-                          <p className="font-medium whitespace-pre-wrap break-words">
-                            {app.notes}
-                          </p>
-                        ) : (
-                          <p className="text-muted-foreground/50 italic">No notes yet</p>
-                        )}
-                      </div>
-
-                      {/* Follow-up History */}
-                      <div className="text-sm">
-                        <div className="flex items-center gap-2 mb-2">
-                          <p className="text-muted-foreground">Follow-up History</p>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 px-2 text-xs"
-                            onClick={() => toggleHistory(app.id)}
-                          >
-                            <History className="h-3 w-3 mr-1" />
-                            {historyAppId === app.id ? "Hide" : "Show"}
-                          </Button>
-                        </div>
-                        {historyAppId === app.id && (
-                          <div className="space-y-2">
-                            {historyLoading ? (
-                              <div className="flex items-center gap-2 py-2">
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                                <span className="text-muted-foreground text-xs">Loading...</span>
-                              </div>
-                            ) : historyRecords.length === 0 ? (
-                              <p className="text-muted-foreground/50 italic text-xs">No follow-ups sent yet</p>
-                            ) : (
-                              <div className="rounded-md border">
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead className="text-xs h-8">#</TableHead>
-                                      <TableHead className="text-xs h-8">Channel</TableHead>
-                                      <TableHead className="text-xs h-8">Sent</TableHead>
-                                      <TableHead className="text-xs h-8">Message</TableHead>
-                                      <TableHead className="text-xs h-8">Outcome</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {historyRecords.map((rec) => (
-                                      <TableRow key={rec.id}>
-                                        <TableCell className="text-xs py-1.5">{rec.follow_up_number}</TableCell>
-                                        <TableCell className="text-xs py-1.5">{rec.channel || "—"}</TableCell>
-                                        <TableCell className="text-xs py-1.5">
-                                          {new Date(rec.sent_at).toLocaleDateString()}
-                                        </TableCell>
-                                        <TableCell className="text-xs py-1.5 max-w-[200px] truncate" title={rec.message_content}>
-                                          {rec.message_content ? rec.message_content.slice(0, 60) + (rec.message_content.length > 60 ? "..." : "") : "—"}
-                                        </TableCell>
-                                        <TableCell className="text-xs py-1.5">
-                                          <Select
-                                            value={rec.follow_up_outcome}
-                                            onValueChange={(v) => handleOutcomeChange(rec.id, v)}
-                                          >
-                                            <SelectTrigger className="h-6 w-[110px] text-xs">
-                                              <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              <SelectItem value="pending">Pending</SelectItem>
-                                              <SelectItem value="responded">Responded</SelectItem>
-                                              <SelectItem value="no_response">No Response</SelectItem>
-                                            </SelectContent>
-                                          </Select>
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <Separator />
-
-                      {/* Actions row */}
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <Dialog
-                          open={
-                            deleteDialogOpen &&
-                            deleteTarget?.id === app.id
-                          }
-                          onOpenChange={(open) => {
-                            setDeleteDialogOpen(open);
-                            if (!open) setDeleteTarget(null);
-                          }}
-                        >
-                          <DialogTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="ml-auto"
-                              onClick={() => setDeleteTarget(app)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Confirm Deletion</DialogTitle>
-                              <DialogDescription>
-                                Are you sure you want to delete the application
-                                for{" "}
-                                <span className="font-semibold">
-                                  {app.role}
-                                </span>{" "}
-                                at{" "}
-                                <span className="font-semibold">
-                                  {app.company}
-                                </span>
-                                ? This action cannot be undone.
-                              </DialogDescription>
-                            </DialogHeader>
-                            <DialogFooter>
-                              <Button
-                                variant="outline"
-                                onClick={() => {
-                                  setDeleteDialogOpen(false);
-                                  setDeleteTarget(null);
-                                }}
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                onClick={handleDelete}
-                                disabled={deleting}
-                              >
-                                {deleting ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                )}
-                                {deleting ? "Deleting..." : "Delete"}
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                    </CardContent>
-                  </CollapsibleContent>
-                </Collapsible>
-              </Card>
-            ))}
-
-            {/* Pagination */}
             {appTotalPages > 1 && (
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                 <Button
@@ -840,7 +206,7 @@ export default function TrackerPage() {
                 >
                   Previous
                 </Button>
-                <span className="text-sm text-muted-foreground tabular-nums">
+                <span className="text-sm tabular-nums text-muted-foreground">
                   Page {appSafePage} of {appTotalPages}
                 </span>
                 <Button

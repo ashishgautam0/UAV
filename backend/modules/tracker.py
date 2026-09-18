@@ -110,7 +110,22 @@ def update_notes(app_id, notes):
 def get_all_applications():
     db = _get_client()
     resp = db.table("applications").select("*").order("date_applied", desc=True).execute()
-    return pd.DataFrame(resp.data)
+    df = pd.DataFrame(resp.data)
+    if df.empty:
+        return df
+    from analytics import attach_tracker_job_ids
+    urls = [url for url in df.get("url", pd.Series(dtype=str)).dropna().tolist() if url]
+    jobs = []
+    for start in range(0, len(urls), 200):
+        jobs.extend((db.table("scraped_jobs").select("id,url")
+                     .in_("url", urls[start:start + 200]).execute()).data or [])
+    mapped = attach_tracker_job_ids(df.to_dict("records"), jobs)
+    result = pd.DataFrame(mapped)
+    # Keep missing detail mappings as JSON null rather than pandas NaN.
+    result["scraped_job_id"] = pd.Series(
+        [row["scraped_job_id"] for row in mapped], dtype="object"
+    )
+    return result
 
 
 def find_application_by_url(url):

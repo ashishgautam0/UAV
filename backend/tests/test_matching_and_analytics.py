@@ -100,10 +100,50 @@ class AnalyticsTests(unittest.TestCase):
         self.assertIn("Generative AI Engineer", genai["example_roles"])
 
     def test_tracker_navigation_uses_exact_id_and_preserves_missing(self):
-        apps = [{"id": 7, "url": "https://jobs/one"}, {"id": 8, "url": "https://jobs/missing"}]
-        mapped = attach_tracker_job_ids(apps, [{"id": 42, "url": "https://jobs/one"}])
+        apps = [
+            {"id": 7, "url": "https://jobs/one"},
+            {"id": 8, "url": "https://jobs/missing"},
+            {"id": 9, "url": "https://jobs/one-more"},
+        ]
+        mapped = attach_tracker_job_ids(apps, [
+            {"id": 42, "url": "https://jobs/one"},
+            {"id": 84, "url": "https://jobs/one-more"},
+        ])
         self.assertEqual(mapped[0]["scraped_job_id"], 42)
         self.assertIsNone(mapped[1]["scraped_job_id"])
+        self.assertEqual(mapped[2]["scraped_job_id"], 84)
+
+    def test_application_list_emits_persisted_detail_ids(self):
+        application_rows = [
+            {"id": 1, "url": "https://jobs/alpha", "date_applied": "2026-09-18"},
+            {"id": 2, "url": "https://jobs/beta", "date_applied": "2026-09-17"},
+            {"id": 3, "url": "https://jobs/manual", "date_applied": "2026-09-16"},
+        ]
+        scraped_rows = [
+            {"id": 101, "url": "https://jobs/alpha"},
+            {"id": 202, "url": "https://jobs/beta"},
+        ]
+
+        class Query:
+            def __init__(self, table): self.table = table
+            def select(self, *_): return self
+            def order(self, *_args, **_kwargs): return self
+            def in_(self, key, values):
+                self.values = values
+                return self
+            def execute(self):
+                rows = application_rows if self.table == "applications" else scraped_rows
+                return type("Response", (), {"data": rows})()
+
+        class DB:
+            def table(self, name): return Query(name)
+
+        with patch.object(tracker, "_get_client", return_value=DB()):
+            rows = tracker.get_all_applications().to_dict("records")
+        self.assertEqual(
+            [(row["id"], row["scraped_job_id"]) for row in rows],
+            [(1, 101), (2, 202), (3, None)],
+        )
 
     def test_follow_up_date_persists_iso_value(self):
         calls = {}
