@@ -1,131 +1,29 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { getProfile, updateProfile } from "@/lib/api";
-import type { UserProfile, UserProfileUpdate } from "@/lib/types";
+import { useEffect, useRef, useState } from "react";
+import { getProfile, uploadResumePdf } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Save, Loader2, Download } from "lucide-react";
-import { parseResume, downloadResumePdf, type Block } from "@/lib/resumePdf";
+import { CheckCircle2, FileText, Loader2, Upload } from "lucide-react";
 
-// ---------------------------------------------------------------------------
-// A live HTML preview of the résumé, rendered from the same parser that builds
-// the PDF — so it always renders (no PDF/iframe plugin needed) and stays in
-// sync with the download.
-// ---------------------------------------------------------------------------
-function ResumePreview({ latex }: { latex: string }) {
-  const blocks = useMemo<Block[]>(() => {
-    try {
-      return parseResume(latex);
-    } catch {
-      return [];
-    }
-  }, [latex]);
+const MAX_RESUME_BYTES = 10 * 1024 * 1024;
 
-  if (!latex.trim()) {
-    return (
-      <div className="flex h-[70vh] items-center justify-center rounded border border-border bg-muted/30 text-sm text-muted-foreground">
-        Nothing to preview yet.
-      </div>
-    );
-  }
-
-  return (
-    <div className="h-[70vh] overflow-y-auto rounded border border-border bg-white">
-      <div className="mx-auto max-w-[720px] px-10 py-8 text-neutral-900">
-        {blocks.map((b, i) => {
-          switch (b.t) {
-            case "name":
-              return (
-                <h2 key={i} className="text-center text-2xl font-bold tracking-tight">
-                  {b.text}
-                </h2>
-              );
-            case "contact":
-              return (
-                <p key={i} className="mt-1 text-center text-[11px] text-neutral-600">
-                  {b.text}
-                </p>
-              );
-            case "section":
-              return (
-                <h3
-                  key={i}
-                  className="mt-5 mb-2 border-b border-neutral-400 pb-0.5 text-xs font-bold uppercase tracking-wide"
-                >
-                  {b.text}
-                </h3>
-              );
-            case "subheading":
-              return (
-                <div key={i} className="mt-2">
-                  <div className="flex justify-between gap-3">
-                    <span className="text-[13px] font-bold">{b.left}</span>
-                    <span className="shrink-0 text-[12px] text-neutral-600">{b.right}</span>
-                  </div>
-                  {(b.subLeft || b.subRight) && (
-                    <div className="flex justify-between gap-3 italic">
-                      <span className="text-[12px] text-neutral-700">{b.subLeft}</span>
-                      <span className="shrink-0 text-[12px] text-neutral-600">{b.subRight}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            case "project":
-              return (
-                <div key={i} className="mt-2 flex justify-between gap-3">
-                  <span className="text-[13px] font-semibold">{b.left}</span>
-                  <span className="shrink-0 text-[12px] text-neutral-600">{b.right}</span>
-                </div>
-              );
-            case "item":
-              return (
-                <div key={i} className="mt-1 flex gap-2 text-[12px] leading-snug text-neutral-800">
-                  <span className="mt-[2px]">•</span>
-                  <span className="flex-1">{b.text}</span>
-                </div>
-              );
-            case "skill":
-              return (
-                <p key={i} className="mt-1 text-[12px] leading-snug text-neutral-800">
-                  <span className="font-bold">{b.label}: </span>
-                  {b.rest}
-                </p>
-              );
-            case "plain":
-              return (
-                <p key={i} className="mt-1 text-[12px] leading-snug text-neutral-800">
-                  {b.text}
-                </p>
-              );
-            default:
-              return null;
-          }
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Settings Page — the resume is stored and edited as LaTeX source, with a
-// live preview of the current draft.
-// ---------------------------------------------------------------------------
 export default function SettingsPage() {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [resumeTex, setResumeTex] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [savedCharacters, setSavedCharacters] = useState(0);
 
-  // ------ Load profile on mount ------
   useEffect(() => {
     async function load() {
       try {
-        const profile: UserProfile = await getProfile();
-        setResumeTex(profile.resume_text ?? "");
+        const profile = await getProfile();
+        setSavedCharacters(profile.resume_text?.length ?? 0);
       } catch {
-        toast.error("Failed to load profile");
+        toast.error("Failed to load resume status");
       } finally {
         setLoading(false);
       }
@@ -133,38 +31,47 @@ export default function SettingsPage() {
     load();
   }, []);
 
-  // ------ Save profile ------
-  async function handleSave() {
-    if (!resumeTex.trim()) {
-      toast.error("Resume is empty.");
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreviewUrl("");
       return;
     }
-    setSaving(true);
+    const url = URL.createObjectURL(selectedFile);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selectedFile]);
+
+  function chooseFile(file: File | undefined) {
+    if (!file) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      toast.error("Please choose a PDF file");
+      return;
+    }
+    if (file.size > MAX_RESUME_BYTES) {
+      toast.error("Resume PDF must be 10 MB or smaller");
+      return;
+    }
+    setSelectedFile(file);
+  }
+
+  async function handleUpload() {
+    if (!selectedFile) {
+      toast.error("Choose a resume PDF first");
+      return;
+    }
+
+    setUploading(true);
     try {
-      const data: UserProfileUpdate = { resume_text: resumeTex };
-      await updateProfile(data);
-      toast.success("Resume saved");
-    } catch {
-      toast.error("Failed to save resume");
+      const profile = await uploadResumePdf(selectedFile);
+      setSavedCharacters(profile.resume_text?.length ?? 0);
+      toast.success("Resume uploaded and ready for job screening");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Resume upload failed");
     } finally {
-      setSaving(false);
+      setUploading(false);
     }
   }
 
-  // ------ Download the résumé as a PDF (generated in-browser) ------
-  function handleDownload() {
-    if (!resumeTex.trim()) {
-      toast.error("Resume is empty.");
-      return;
-    }
-    try {
-      downloadResumePdf(resumeTex, "Subidh Khanal Resume.pdf");
-    } catch {
-      toast.error("Could not generate the PDF");
-    }
-  }
-
-  // ------ Loading state ------
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -173,64 +80,107 @@ export default function SettingsPage() {
     );
   }
 
-  // ------ Render ------
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div>
         <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="mr-2 h-4 w-4" />
-          )}
-          Save
-        </Button>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Upload the PDF resume that Job Search HQ should use for matching and screening.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* ---- Editor ---- */}
         <Card>
           <CardHeader>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <CardTitle>Resume (LaTeX)</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Edit the LaTeX source. The preview updates as you type; changes
-                  are saved only when you click Save.
+            <CardTitle>Resume PDF</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Choose a text-based PDF up to 10 MB. Its text is extracted and saved
+              securely for ATS checks, job screening, and draft generation.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <input
+              ref={inputRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              className="hidden"
+              onChange={(event) => chooseFile(event.target.files?.[0])}
+            />
+
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                chooseFile(event.dataTransfer.files?.[0]);
+              }}
+              className="flex min-h-48 w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/20 px-6 text-center transition-colors hover:border-primary/60 hover:bg-muted/40"
+            >
+              <Upload className="mb-3 h-8 w-8 text-muted-foreground" />
+              <span className="font-medium">
+                {selectedFile ? selectedFile.name : "Choose or drop your resume PDF"}
+              </span>
+              <span className="mt-1 text-xs text-muted-foreground">
+                PDF only · maximum 10 MB
+              </span>
+            </button>
+
+            {selectedFile && (
+              <div className="flex items-center gap-3 rounded-md border border-border p-3">
+                <FileText className="h-5 w-5 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{selectedFile.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <Button className="w-full" onClick={handleUpload} disabled={!selectedFile || uploading}>
+              {uploading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="mr-2 h-4 w-4" />
+              )}
+              {uploading ? "Uploading…" : "Upload resume"}
+            </Button>
+
+            {savedCharacters > 0 && (
+              <div className="flex items-start gap-2 rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>
+                  A resume is ready for screening ({savedCharacters.toLocaleString()} extracted
+                  characters). Upload another PDF anytime to replace it.
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={handleDownload}>
-                <Download className="mr-1.5 h-3.5 w-3.5" />
-                Download PDF
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Textarea
-              value={resumeTex}
-              onChange={(e) => setResumeTex(e.target.value)}
-              placeholder="\documentclass{article} ..."
-              rows={28}
-              spellCheck={false}
-              className="font-mono text-xs leading-relaxed"
-            />
-            <p className="text-xs text-muted-foreground">
-              {resumeTex.length.toLocaleString()} characters
-            </p>
+            )}
           </CardContent>
         </Card>
 
-        {/* ---- Live preview ---- */}
-        <Card className="lg:sticky lg:top-6 self-start">
+        <Card className="self-start lg:sticky lg:top-6">
           <CardHeader>
-            <CardTitle>Preview</CardTitle>
+            <CardTitle>PDF preview</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              How your résumé reads — updates live as you edit.
+              Preview the selected file before uploading it.
             </p>
           </CardHeader>
           <CardContent>
-            <ResumePreview latex={resumeTex} />
+            {previewUrl ? (
+              <iframe
+                src={previewUrl}
+                title="Selected resume PDF"
+                className="h-[70vh] w-full rounded border border-border bg-white"
+              />
+            ) : (
+              <div className="flex h-[70vh] flex-col items-center justify-center rounded border border-border bg-muted/30 px-6 text-center">
+                <FileText className="mb-3 h-10 w-10 text-muted-foreground/60" />
+                <p className="text-sm text-muted-foreground">
+                  Select a PDF to preview it here.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
