@@ -1,6 +1,6 @@
 # Job Search HQ
 
-A full-stack AI-powered job search automation platform for AI/ML roles. Combines intelligent LinkedIn job scraping, session-generated personalized outreach, application tracking, and analytics. A migration to hourly ChatGPT Work scheduled runs is prepared but is not active until its Supabase connector is validated.
+A full-stack AI-powered job search automation platform for AI/ML roles. Combines intelligent LinkedIn job scraping, LLM-generated personalized outreach, application tracking, and analytics — with hourly automated runs via a scheduled Claude routine.
 
 ## Features
 
@@ -10,11 +10,12 @@ A full-stack AI-powered job search automation platform for AI/ML roles. Combines
 - Deduplication and company blacklist filtering
 
 ### AI Message Generator
-- No LLM API key: every message is written by the scheduled ChatGPT session
+- No LLM API key: every message is written by the scheduled Claude routine
 - Requests queued from the UI are fulfilled on the next hourly run
 - **Cold DMs** — 2 variants per company (direct + curiosity-driven)
 - **Follow-ups** — Value-add messages, not generic check-ins
-- **Cover Letters** — Under 200 words, personalized
+- **Cover Letters** — Under 200 words, personalized; audited drafts for
+  explicitly eligible high-match jobs are versioned and provenance-tracked
 - **Thank You Notes** — Post-interview, referencing discussion points
 - **Demo Outreach** — Messages showcasing custom demo projects
 
@@ -47,11 +48,11 @@ and unknown mandatory criteria are surfaced for review rather than guessed.
 - Quick-apply button to log applications directly
 
 ### Hourly Automation
-- The proposed ChatGPT cloud replacement runs once an hour after validation; its phase/timezone must be verified at cutover
+- A scheduled Claude routine runs the scraper every hour (`59 * * * *`)
 - Scrapes LinkedIn, filters and deduplicates against previous runs
 - Saves new jobs and a markdown digest to Supabase
-- Writes a cold outreach DM for each new job — the scheduled session composes
-  it and stores it in `job_messages`. No LLM API key.
+- Writes a cold outreach DM for each new job — the routine session is Claude, so
+  it composes them itself and stores them in `job_messages`. No LLM API key.
 - Raises an in-app notification and a web push
 
 ### Additional Tools
@@ -65,10 +66,10 @@ and unknown mandatory criteria are surfaced for review rather than guessed.
 | Frontend | Next.js 16, React 19, TypeScript |
 | Styling | Tailwind CSS 4, shadcn/ui, Lucide icons |
 | Backend | FastAPI, Uvicorn |
-| AI/LLM | ChatGPT, via the scheduled cloud task (no API key) |
+| AI/LLM | Claude, via the scheduled routine (no API key) |
 | Database | Supabase (PostgreSQL) |
 | Scraping | requests, BeautifulSoup4, python-jobspy |
-| Automation | Proposed ChatGPT Work scheduled task; activate only after connector validation |
+| Automation | Scheduled Claude routine (hourly cron) |
 | Deployment | Vercel (frontend) |
 
 ## Project Structure
@@ -88,7 +89,7 @@ job_search_tool/
 │       ├── hourly.py            # Hourly automation script
 │       ├── jd_analyzer.py       # Job description analysis
 │       ├── company_research.py  # Company research & caching
-│       ├── pending_messages.py  # CLI the scheduled session drives to write DMs
+│       ├── pending_messages.py  # CLI the Claude routine drives to write DMs
 │       └── digest.py            # Markdown digest builder
 ├── frontend/
 │   └── src/app/
@@ -194,12 +195,8 @@ Environment variables:
 
 The scraper is not triggered by the deployed API — a full run makes 48 LinkedIn
 queries with pauses between them, far longer than a serverless function may run.
-The proposed replacement is a ChatGPT cloud scheduled task that runs once an
-hour. It checks out this repository in cloud compute, installs
-`backend/requirements.txt`, and runs the same Python scraping and filtering.
-This describes the target migration; it does not assert that the replacement
-schedule is active. Until cutover is validated, the old Claude routine remains
-the production scheduler.
+It is instead executed every hour by a scheduled Claude routine (`59 * * * *`),
+which checks out this repository, installs `backend/requirements.txt`, and runs:
 
 ```bash
 cd backend/modules && python hourly.py
@@ -234,23 +231,16 @@ environment, and `VAPID_PUBLIC_KEY` on the API project (the bell icon in the
 app uses it to subscribe the device). Without them the push is skipped and the
 in-app notification still lands.
 
-The ChatGPT Work path uses the connected Supabase plugin for database reads and
-writes; Vercel variables and Codex cloud environment variables are not inherited
-by a web scheduled task. `backend/modules/cloud_connector.py` provides the
-credential-free JSON/SQL boundary: Python performs scraping, filtering, scoring,
-and prompt preparation, while the plugin executes the bounded database plans.
-Never put credential values in the task prompt or repository.
+That environment needs `SUPABASE_URL` and `SUPABASE_KEY` only.
 
-Web push still requires `VAPID_PRIVATE_KEY` and `VAPID_CLAIM_EMAIL` in the
-process that signs push messages. The Supabase connector alone does not expose
-those values, so connector-mode runs preserve the in-app notification but must
-report web push as unavailable unless a separately tested supported tool is
-added. They must not silently claim push delivery.
+Audited cover-letter drafts for explicitly eligible, high-match jobs follow the
+same interface — a queue command, then a save that re-derives the resume/JD
+provenance from the live row rather than trusting the caller:
 
-The complete reusable runbook and saved task prompt are in
-[`CODEX_HOURLY_TASK.md`](CODEX_HOURLY_TASK.md). Validate one manual cloud run
-before enabling the schedule, and disable the old Claude routine only after
-that run succeeds.
+```bash
+python pending_messages.py cover-letter-list --limit 10
+python pending_messages.py save-cover-letter --job-id <ID> < letter.txt
+```
 
 ## API Routes
 

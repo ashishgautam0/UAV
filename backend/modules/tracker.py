@@ -475,6 +475,44 @@ def get_current_cover_letter(scraped_job_id):
         return None
 
 
+def save_cover_letter_draft(job_id, resume_profile_id, resume_version, jd_version,
+                             jd_hash, match_score, analysis_version, run_id, content,
+                             rules_version="grounded-cover-letter-v1", generated_by="claude"):
+    """Store an audited cover-letter draft. Any existing non-outdated draft for
+    this job that doesn't match the new resume version/JD hash/rules version is
+    marked outdated first. Idempotent on (job, resume_version, jd_hash, rules_version)."""
+    db = _get_client()
+    try:
+        current = (db.table("cover_letter_drafts")
+                   .select("id,resume_version,jd_hash,generation_rules_version")
+                   .eq("scraped_job_id", job_id).eq("is_outdated", False).execute()).data or []
+        stale_ids = [row["id"] for row in current
+                     if row.get("resume_version") != resume_version
+                     or row.get("jd_hash") != jd_hash
+                     or row.get("generation_rules_version") != rules_version]
+        if stale_ids:
+            db.table("cover_letter_drafts").update({"is_outdated": True}).in_("id", stale_ids).execute()
+        db.table("cover_letter_drafts").upsert({
+            "scraped_job_id": job_id,
+            "resume_profile_id": resume_profile_id,
+            "resume_version": resume_version,
+            "jd_version": jd_version,
+            "jd_hash": jd_hash,
+            "match_score": match_score,
+            "analysis_version": analysis_version,
+            "generation_rules_version": rules_version,
+            "run_id": run_id,
+            "content": content,
+            "generated_by": generated_by,
+            "is_outdated": False,
+        }, on_conflict="scraped_job_id,resume_version,jd_hash,generation_rules_version",
+           ignore_duplicates=True).execute()
+        return True
+    except Exception as e:
+        print(f"Failed to save cover-letter draft for job {job_id}: {e}")
+        return False
+
+
 # ===================== MESSAGE REQUEST QUEUE =====================
 # The UI queues freeform message requests here; the scheduled Claude routine
 # writes them. No hosted LLM call is involved.

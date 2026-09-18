@@ -1,7 +1,7 @@
 """
-Outreach messages for scraped jobs, written by the scheduled ChatGPT session.
+Outreach messages for scraped jobs, written by the scheduled Claude routine.
 
-There is no hosted LLM API call here. The scheduled session composes the text: it lists the
+There is no hosted LLM call here. The routine session *is* Claude: it lists the
 jobs that still need a message, writes each one itself, and saves it back. This
 script is the interface it drives.
 
@@ -14,6 +14,10 @@ script is the interface it drives.
     # freeform requests queued from the UI, each with its ready-made prompt
     python pending_messages.py requests
     python pending_messages.py fulfil --request-id 12 < message.txt
+
+    # audited cover-letter drafts for explicitly eligible, high-match jobs
+    python pending_messages.py cover-letter-list --limit 10
+    python pending_messages.py save-cover-letter --job-id 4821 < letter.txt
 
     # end-of-run summary: in-app notification + web push to the installed PWA
     python pending_messages.py notify --title "Hourly run" --body "3 jobs, 3 DMs"
@@ -183,6 +187,22 @@ def main():
     p_scr.add_argument("--decision", choices=["pass", "fail"], required=True)
     p_scr.add_argument("--reason", default="")
     p_scr.set_defaults(func=cmd_screen)
+
+    p_cll = sub.add_parser(
+        "cover-letter-list",
+        help="explicitly-eligible high-match jobs needing an audited cover-letter draft",
+    )
+    p_cll.add_argument("--limit", type=int, default=10)
+    p_cll.add_argument("--threshold", type=int, default=90)
+    p_cll.set_defaults(func=cmd_cover_letter_list)
+
+    p_cls = sub.add_parser("save-cover-letter", help="store an audited cover-letter draft for one job")
+    p_cls.add_argument("--job-id", type=int, required=True)
+    p_cls.add_argument("--threshold", type=int, default=90)
+    p_cls.add_argument("--run-id", default=None)
+    p_cls.add_argument("--content", default=None,
+                       help="cover-letter text; omit to read from stdin")
+    p_cls.set_defaults(func=cmd_save_cover_letter)
 
     p_not = sub.add_parser("notify", help="in-app notification + web push")
     p_not.add_argument("--title", required=True)
@@ -399,7 +419,7 @@ def cmd_intel(args):
 
 def cmd_screen_list(args):
     """Visible scraped jobs not yet screened against the resume, newest first,
-    with the candidate's profile. The scheduled session decides fit + level."""
+    with the candidate's profile. Claude reads each and decides fit + level."""
     from tracker import get_scraped_jobs, get_job_message
 
     df = get_scraped_jobs()
@@ -420,6 +440,115 @@ def cmd_screen_list(args):
         })
     json.dump({"profile": _profile_text(), "jobs": need}, sys.stdout, indent=2)
     sys.stdout.write("\n")
+    return 0
+
+
+def cmd_cover_letter_list(args):
+    """High-match, explicitly-eligible jobs that passed resume screening and
+    still need (or need a refreshed) audited cover-letter draft, each with a
+    ready-to-use prompt. Claude drafts it; `save-cover-letter` records it."""
+    from tracker import get_scraped_jobs, get_job_message, get_current_cover_letter
+    from profile import get_active_profile_snapshot
+    from message_generator import build_cover_letter_prompt
+
+    profile_snapshot = get_active_profile_snapshot()
+    if not profile_snapshot:
+        json.dump({"profile": "", "resume_version": None, "cover_letters": []}, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return 0
+    profile_version = profile_snapshot.get("version")
+    profile_text = profile_snapshot.get("raw_text", "")
+
+    df = get_scraped_jobs()
+    rows = df.to_dict("records") if not df.empty else []
+    out = []
+    for r in rows:
+        if len(out) >= args.limit:
+            break
+        score = r.get("ats_score")
+        if type(score) is not int or score < args.threshold:
+            continue
+        if r.get("analysis_stale") or r.get("profile_version") != profile_version:
+            continue
+        details = r.get("analysis_details") or {}
+        if (details.get("mandatory_eligibility") or {}).get("overall") != "passed":
+            continue
+        screen = get_job_message(r["id"], message_type="screen")
+        if not screen or not (screen.get("content") or "").startswith("PASS:"):
+            continue
+        current = get_current_cover_letter(r["id"])
+        if (current and current.get("resume_version") == profile_version
+                and current.get("jd_hash") == r.get("jd_hash")):
+            continue
+        jd = (r.get("description") or "").strip()
+        spec = build_cover_letter_prompt(r.get("company") or "Unknown", r.get("title") or "Role",
+                                          jd, profile_text=profile_text)
+        out.append({
+            "job_id": r["id"], "company": r.get("company", ""), "title": r.get("title", ""),
+            "match_score": score, **spec,
+        })
+    json.dump({"profile": profile_text, "resume_version": profile_version,
+               "threshold": args.threshold, "cover_letters": out}, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    return 0
+
+
+def cmd_save_cover_letter(args):
+    """Store an audited cover-letter draft for one eligible job. Re-derives
+    the resume/JD provenance from the live row rather than trusting the
+    caller, so a draft can never be recorded against a stale snapshot."""
+    from datetime import datetime, timezone
+    from tracker import get_scraped_job, get_job_message, save_cover_letter_draft
+    from profile import get_active_profile_snapshot
+
+    content = (args.content if args.content is not None else sys.stdin.read()).strip()
+    if not content:
+        print("Refusing to save an empty cover letter.", file=sys.stderr)
+        return 1
+
+    job = get_scraped_job(args.job_id)
+    if not job:
+        print(f"No scraped job {args.job_id}.", file=sys.stderr)
+        return 1
+
+    profile_snapshot = get_active_profile_snapshot()
+    if not profile_snapshot:
+        print("No active resume profile.", file=sys.stderr)
+        return 1
+
+    score = job.get("ats_score")
+    if type(score) is not int or score < args.threshold:
+        print(f"Job {args.job_id} does not meet the cover-letter threshold "
+              f"({score} < {args.threshold}).", file=sys.stderr)
+        return 1
+    if job.get("analysis_stale") or job.get("profile_version") != profile_snapshot.get("version"):
+        print(f"Job {args.job_id}'s analysis is stale against the active profile; "
+              "re-screen before drafting.", file=sys.stderr)
+        return 1
+    details = job.get("analysis_details") or {}
+    if (details.get("mandatory_eligibility") or {}).get("overall") != "passed":
+        print(f"Job {args.job_id} is not explicitly eligible.", file=sys.stderr)
+        return 1
+    screen = get_job_message(args.job_id, message_type="screen")
+    if not screen or not (screen.get("content") or "").startswith("PASS:"):
+        print(f"Job {args.job_id} has not passed resume screening.", file=sys.stderr)
+        return 1
+
+    run_id = args.run_id or datetime.now(timezone.utc).strftime("claude-%Y%m%dT%H%M%SZ")
+    ok = save_cover_letter_draft(
+        job_id=args.job_id,
+        resume_profile_id=profile_snapshot["id"],
+        resume_version=profile_snapshot["version"],
+        jd_version=job.get("jd_version") or 1,
+        jd_hash=job.get("jd_hash"),
+        match_score=score,
+        analysis_version=job.get("analysis_version"),
+        run_id=run_id,
+        content=content,
+    )
+    if not ok:
+        return 1
+    print(f"Saved cover-letter draft for job {args.job_id} ({len(content)} chars).")
     return 0
 
 
