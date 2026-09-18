@@ -1,9 +1,13 @@
 import json
+import math
 import sys
 import unittest
-from unittest.mock import patch
 from datetime import date
 from pathlib import Path
+from unittest.mock import patch
+
+import pandas as pd
+from pydantic import ValidationError
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "modules"))
@@ -15,7 +19,7 @@ from ranking import compute_application_priority
 from resume_profile import extract_profile_facts, phrase_present, reviewed_experience_months
 import tracker
 from app.models.schemas import UserProfileRequest
-from pydantic import ValidationError
+from app.routers import scraper as scraper_router
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -69,6 +73,38 @@ class MatchingTests(unittest.TestCase):
                "resume_jd_match": {"score": 99}}, "scraped_at": "2026-09-18T00:00:00Z", "verdict": "EASY_APPLY"}
         score, _ = compute_application_priority(job, job["analysis_details"])
         self.assertEqual(score, 0)
+
+    def test_ranked_api_serializes_mixed_scored_and_unscored_jobs(self):
+        """SQL NULL numeric values must remain JSON null, never Pandas NaN."""
+        rows = pd.DataFrame([
+            {
+                "id": 1, "title": "Python Engineer", "company": "One",
+                "description": "Python FastAPI role.", "location": "India",
+                "scraped_at": "2026-09-18T12:00:00Z", "verdict": "EXTERNAL",
+                "ats_score": 80, "skill_match": 75,
+            },
+            {
+                "id": 2, "title": "AI Engineer", "company": "Two",
+                "description": "Machine learning and Python.", "location": "India",
+                "scraped_at": "2026-09-18T13:00:00Z", "verdict": "EXTERNAL",
+                "ats_score": None, "skill_match": None,
+            },
+        ])
+        active = snapshot("Skills\nPython\nFastAPI\nMachine learning")
+        with (
+            patch.object(scraper_router, "get_scraped_jobs", return_value=rows),
+            patch.object(scraper_router, "_active_profile", return_value=active),
+        ):
+            result = scraper_router.ranked_scraped_jobs(limit=200)
+
+        by_id = {row["id"]: row for row in result}
+        self.assertIsNone(by_id[2]["ats_score"])
+        self.assertIsNone(by_id[2]["skill_match"])
+        self.assertFalse(any(
+            isinstance(value, float) and math.isnan(value)
+            for row in result for value in row.values()
+        ))
+        json.dumps(result, allow_nan=False)
 
 
 class AnalyticsTests(unittest.TestCase):
