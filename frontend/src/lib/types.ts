@@ -278,6 +278,7 @@ export interface ResumeFact {
 }
 
 export interface ResumeProfile {
+  backend_text?: string;
   id: number;
   username: string;
   version: number;
