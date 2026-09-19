@@ -1,0 +1,17 @@
+name: Settings profile tests
+on:
+  pull_request:
+  push:
+    branches: [main, codex/settings-active-resume]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s backend/tests -p test_settings_profile.py -v
+      - run: python -m compileall -q backend/app backend/modules
