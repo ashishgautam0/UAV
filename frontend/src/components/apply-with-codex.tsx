@@ -45,7 +45,6 @@ export function ApplyWithCodex({ jobs, disabled }: { jobs: ScrapedJob[]; disable
     "Use only facts from my resume or answers I supplied. Do not invent experience, salary, notice period, eligibility, demographic answers or consent.",
     "If login, CAPTCHA, missing mandatory answers, fees or an unsupported step blocks a job, record the blocker, leave its card unmarked and continue with the next job. Do not bypass controls or pay fees.",
     "Only after observing an explicit submission confirmation, return to the matching card (match job ID and URL) and click its 'Applied — move to Tracker' tick button. Verify it disappears from Best Matches and appears in Tracker.",
-    "If an already-submitted application is confirmed on the employer site, log it without resubmitting. Opening a job or uploading a file is not a successful submission.",
     "If Tracker logging fails after submission, retry logging only; never submit the application again.",
     "Keep this exact downloaded PDF for the whole batch. If it cannot be downloaded/read, stop and ask me to restore it.",
     "Continue until every batch job is either confirmed applied/logged or recorded as blocked. Do not loop indefinitely on blocked jobs.",
