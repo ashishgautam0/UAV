@@ -73,6 +73,7 @@ class ResumeProfileReviewRequest(BaseModel):
 
 
 class ResumeProfileResponse(BaseModel):
+    backend_text: str = ""
     id: int
     username: str
     version: int
