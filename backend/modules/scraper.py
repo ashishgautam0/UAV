@@ -630,7 +630,6 @@ def run_all_scrapers():
     # a residential proxy). scrape_naukri / scrape_google_jobs remain defined.
     scrapers = [
         ("Indeed India", scrape_indeed_india),
-        ("amazon.jobs", scrape_amazon_jobs),
         ("Partner ATS", scrape_partner_ats),
         ("Gulf (tax-free)", scrape_gulf),
         ("LinkedIn AI/ML", scrape_linkedin),
@@ -655,4 +654,10 @@ def run_all_scrapers():
             sources_errors[name] = str(e)
             print(f"  ERROR: {name} failed: {e}")
 
+    # Apply user preferences before any caller can persist or digest results.
+    from intake_policy import filter_jobs
+    all_jobs, excluded = filter_jobs(all_jobs)
+    for job, reason in excluded:
+        print(f"  Excluded {job.get('company', '')}: {reason}")
+    print(f"Intake policy: kept {len(all_jobs)}, excluded {len(excluded)}")
     return all_jobs, sources_status, sources_errors
