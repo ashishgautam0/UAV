@@ -31,7 +31,7 @@ Record the decision:
 ```bash
 python pending_messages.py screen --job-id <ID> --decision pass --reason "<evidence>"
 python pending_messages.py screen --job-id <ID> --decision fail --reason "<mismatch>"
-printf '%s' 'REVIEW: <unclear mandatory criterion>' | python pending_messages.py save --job-id <ID> --type screen
+python pending_messages.py screen --job-id <ID> --decision review --reason "<unclear mandatory criterion>"
 ```
 
 A `fail` dismisses the job everywhere except URL dedup; a `pass` or `review`

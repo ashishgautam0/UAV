@@ -377,7 +377,28 @@ def get_scraped_jobs(source=None):
     if source:
         query = query.eq("source", source)
     resp = query.order("scraped_at", desc=True).execute()
-    return pd.DataFrame(resp.data)
+    jobs = resp.data or []
+    for job in jobs:
+        job["screening_status"] = "pending"
+        job["screening_reason"] = ""
+    # Fetch current screening evidence in batches, not one request per card.
+    by_id = {job["id"]: job for job in jobs}
+    ids = list(by_id)
+    for offset in range(0, len(ids), 200):
+        messages = (db.table("job_messages")
+                    .select("scraped_job_id,content,is_stale")
+                    .eq("message_type", "screen")
+                    .in_("scraped_job_id", ids[offset:offset + 200]).execute()).data or []
+        for message in messages:
+            job = by_id.get(message["scraped_job_id"])
+            if job is None or message.get("is_stale"):
+                continue
+            tag, separator, reason = (message.get("content") or "").partition(":")
+            status = tag.strip().lower()
+            if separator and status in {"pass", "fail", "review"}:
+                job["screening_status"] = status
+                job["screening_reason"] = reason.strip()
+    return pd.DataFrame(jobs)
 
 
 # ===================== JOB MESSAGE FUNCTIONS =====================

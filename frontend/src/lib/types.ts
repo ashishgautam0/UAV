@@ -113,6 +113,8 @@ export interface RoleAnalysis {
 
 // ---- Scraped Jobs ----
 export interface ScrapedJob {
+  screening_status?: "pending" | "pass" | "fail" | "review";
+  screening_reason?: string;
   id?: number;
   title: string;
   company: string;

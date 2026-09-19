@@ -439,6 +439,15 @@ export default function TonightPage() {
                         </CardHeader>
 
                         <CardContent className="flex flex-1 flex-col gap-3 pt-0">
+                          <div className="space-y-1">
+                            <Badge variant="outline">
+                              {job.screening_status === "pass" ? "Screening passed"
+                                : job.screening_status === "review" ? "Needs review"
+                                : job.screening_status === "fail" ? "Screening failed"
+                                : "Screening pending"}
+                            </Badge>
+                            {job.screening_reason && <p className="text-xs text-muted-foreground">{job.screening_reason}</p>}
+                          </div>
                           {/* Location */}
                           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                             <MapPin className="h-3.5 w-3.5 shrink-0" />
