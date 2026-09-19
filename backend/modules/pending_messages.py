@@ -115,6 +115,14 @@ def cmd_save(args):
         print(f"Save reported success but job {args.job_id} has no row.", file=sys.stderr)
         return 1
 
+    if args.type == "screen":
+        from tracker import mark_scraped_job
+        tag = content.split(":", 1)[0].strip().upper()
+        if tag in {"PASS", "REVIEW"}:
+            mark_scraped_job(args.job_id, "keep")
+        elif tag == "FAIL":
+            mark_scraped_job(args.job_id, "dismissed")
+
     print(f"Saved {args.type} for job {args.job_id} ({len(content)} chars).")
     return 0
 
@@ -184,7 +192,7 @@ def main():
 
     p_scr = sub.add_parser("screen", help="record a resume-screening decision")
     p_scr.add_argument("--job-id", type=int, required=True)
-    p_scr.add_argument("--decision", choices=["pass", "fail"], required=True)
+    p_scr.add_argument("--decision", choices=["pass", "fail", "review"], required=True)
     p_scr.add_argument("--reason", default="")
     p_scr.set_defaults(func=cmd_screen)
 
@@ -559,12 +567,16 @@ def cmd_screen(args):
     from tracker import save_job_message, mark_scraped_job
 
     decision = args.decision
-    tag = ("PASS: " if decision == "pass" else "FAIL: ") + (args.reason or "")
-    save_job_message(args.job_id, tag.strip(), message_type="screen")
+    if decision not in {"pass", "fail", "review"}:
+        print("Invalid screening decision.", file=sys.stderr)
+        return 1
+    tag = decision.upper() + ": " + (args.reason or "")
+    if not save_job_message(args.job_id, tag.strip(), message_type="screen"):
+        return 1
     if decision == "fail":
         mark_scraped_job(args.job_id, "dismissed")
     else:
-        # A PASS must make the job visible even if a prior FAIL had hidden it
+        # PASS and REVIEW restore visibility even if a prior FAIL hid the job
         # (re-screens across rule changes), so explicitly un-dismiss.
         mark_scraped_job(args.job_id, "keep")
     print(f"Screened job {args.job_id}: {decision}. {args.reason or ''}".strip())
