@@ -37,6 +37,11 @@ export function ApplyWithCodex({ jobs, disabled }: { jobs: ScrapedJob[]; disable
   const prompt = [
     "Use your browser to apply to every job in the fixed Best Matches batch below.",
     "I authorize submitting these job applications using my attached resume and truthful information I have supplied.",
+    "Additional information supplied by me for application forms:",
+    "Notice period: 15 days.",
+    "Current CTC: INR 120000 per year. Expected CTC: INR 600000 per year.",
+    "Expected start date: 15/10/2026 (15 October 2026).",
+    "Current location: Noida, Sector 104, Uttar Pradesh, India. PIN code: 201301.",
     "Return to this Today Todo page after each submission: " + pageUrl,
     "Download my application PDF from this private link: " + downloadUrl,
     "Resume SHA-256: " + (resume?.sha256 || ""),
