@@ -8,9 +8,6 @@ import {
   SESSION_NAMES,
   recallPrompt,
   recallAll,
-  reviewAfterMiss,
-  reviewAfterClear,
-  REVIEW_INTERVALS,
   type BlockKey,
   type ReviewEntry,
 } from "@/lib/prep28";
@@ -49,7 +46,6 @@ import {
   Upload,
   Trash2,
   Loader2,
-  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -252,36 +248,6 @@ export default function Prep28Page() {
     persist({ ...state, done: nextDone });
   }
 
-  // Couldn't solve it — tick it off for the day, but put it on the ladder so it
-  // comes back tomorrow, then at 3, 7 and 14 days.
-  function markMissed(id: string) {
-    persist({
-      ...state,
-      done: { ...(state.done || {}), [id]: true },
-      review: { ...(state.review || {}), [id]: reviewAfterMiss(day) },
-    });
-  }
-
-  // Solved it on a review day — advance a rung, or retire it after the last one.
-  function clearReview(id: string) {
-    const entry = state.review?.[id];
-    if (!entry) return;
-    const next = reviewAfterClear(day, entry.step);
-    const review = { ...(state.review || {}) };
-    if (next) review[id] = next;
-    else delete review[id];
-    persist({ ...state, review });
-    if (!next) toast.success("Retired — you've held that one for a fortnight");
-  }
-
-  // Missed it again — back to the bottom of the ladder.
-  function missAgain(id: string) {
-    persist({
-      ...state,
-      review: { ...(state.review || {}), [id]: reviewAfterMiss(day) },
-    });
-  }
-
   function pickDay(value: string) {
     persist({ ...state, dayOverride: Number(value) });
   }
@@ -300,13 +266,13 @@ export default function Prep28Page() {
     }
   }
 
-  // ---- progress (identical maths to the original) ----
+  // Count only the retained study and recall blocks; preserve saved task IDs.
   const progress = useMemo(() => {
     let doneCount = 0;
     let total = 0;
     let tdone = 0;
     PLAN.forEach((p, di) => {
-      (["a", "b", "r"] as BlockKey[]).forEach((b) => {
+      (["b", "r"] as BlockKey[]).forEach((b) => {
         const n = (b === "r" ? p.r : p[b]).length;
         total += n;
         for (let i = 0; i < n; i++) {
@@ -318,7 +284,7 @@ export default function Prep28Page() {
       });
     });
     const cur = PLAN[day - 1];
-    const todayN = cur.a.length + cur.b.length + cur.r.length;
+    const todayN = cur.b.length + cur.r.length;
     return {
       pct: total ? (100 * doneCount) / total : 0,
       doneCount,
@@ -331,14 +297,6 @@ export default function Prep28Page() {
   if (!mounted) return null;
 
   const cur = PLAN[day - 1];
-
-  // carried coding: unchecked problems from the previous day only
-  const carriedA =
-    day > 1
-      ? (PLAN[day - 2]?.a ?? [])
-          .map((t, i) => ({ ...t, day: day - 1, id: tid(day - 1, "a", i) }))
-          .filter((t) => !isDone(t.id))
-      : [];
 
   // carried Block B: unchecked items from the previous day only
   const carriedB =
@@ -362,22 +320,6 @@ export default function Prep28Page() {
     id: tid(day, "b", i),
   }));
   const bAllDone = todaysB.length > 0 && todaysB.every((t) => isDone(t.id));
-  // Missed problems whose next rung has come due (or is overdue).
-  const dueReviews = Object.entries(state.review || {})
-    .filter(([, e]) => e.due <= day)
-    .map(([id, e]) => {
-      const m = /^(\d+)-a-(\d+)$/.exec(id);
-      const task = m ? PLAN[Number(m[1]) - 1]?.a[Number(m[2])] : undefined;
-      return task ? { id, task, missedOn: Number(m![1]), step: e.step } : null;
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null)
-    .sort((a, b) => a.missedOn - b.missedOn);
-
-  const todaysA = (PLAN[day - 1]?.a ?? []).map((t, i) => ({
-    ...t,
-    day,
-    id: tid(day, "a", i),
-  }));
   const hasRecall = cur.r.length > 0 || carriedRecall.length > 0;
 
   return (
@@ -454,61 +396,6 @@ export default function Prep28Page() {
 
       {/* Content — every block is shown for the selected day */}
       <div className="space-y-3">
-        <p className={cn("text-sm font-medium", BLOCK_ACCENT.a)}>{SESSION_NAMES.a}</p>
-
-        {dueReviews.length > 0 && (
-          <>
-            <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-amber-400">
-              Review — {dueReviews.length} due
-            </p>
-            {dueReviews.map((r) => (
-              <ReviewCard
-                key={r.id}
-                task={r.task}
-                missedOn={r.missedOn}
-                step={r.step}
-                onClear={() => clearReview(r.id)}
-                onMiss={() => missAgain(r.id)}
-              />
-            ))}
-          </>
-        )}
-
-        {carriedA.length > 0 && (
-          <>
-            <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-amber-400">
-              Carried over from Day {day - 1}
-            </p>
-            {carriedA.map((t) => (
-              <TaskCard
-                key={t.id}
-                task={t}
-                done={isDone(t.id)}
-                fromDay={t.day}
-                onToggle={() => toggle(t.id)}
-                onMissed={state.review?.[t.id] ? undefined : () => markMissed(t.id)}
-              />
-            ))}
-          </>
-        )}
-
-        <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Day {day}
-        </p>
-        {todaysA.map((t) => (
-          <TaskCard
-            key={t.id}
-            task={t}
-            done={isDone(t.id)}
-            onToggle={() => toggle(t.id)}
-            onMissed={state.review?.[t.id] ? undefined : () => markMissed(t.id)}
-          />
-        ))}
-        <p className="pt-1 text-xs italic text-muted-foreground">
-          Easy problems only — the point is fluency and pattern recognition, not difficulty.
-          Anything you couldn&apos;t solve comes back tomorrow, then at 3, 7 and 14 days.
-        </p>
-
         <p className={cn("pt-3 text-sm font-medium", BLOCK_ACCENT.b)}>{SESSION_NAMES.b}</p>
 
         {carriedB.length > 0 && (
@@ -645,7 +532,6 @@ function TaskCard({
   done,
   fromDay,
   onToggle,
-  onMissed,
   showPdf = false,
   pdfs = [],
   uploading = false,
@@ -658,7 +544,6 @@ function TaskCard({
   done: boolean;
   fromDay?: number;
   onToggle: () => void;
-  onMissed?: () => void;
   showPdf?: boolean;
   pdfs?: string[];
   uploading?: boolean;
@@ -697,16 +582,6 @@ function TaskCard({
               {task.u.includes("educative.io") ? "Open on Educative" : "Open reference"}
               <ExternalLink className="h-3 w-3" />
             </a>
-          )}
-
-          {onMissed && (
-            <button
-              onClick={onMissed}
-              className="inline-flex items-center gap-1 text-xs text-amber-400 hover:underline"
-            >
-              <RotateCcw className="h-3 w-3" />
-              Couldn&apos;t solve
-            </button>
           )}
 
           {showPdf && (
@@ -780,55 +655,6 @@ function TaskCard({
             ))}
           </ul>
         )}
-      </div>
-    </div>
-  );
-}
-
-function ReviewCard({
-  task,
-  missedOn,
-  step,
-  onClear,
-  onMiss,
-}: {
-  task: { t: string; d: string; u: string };
-  missedOn: number;
-  step: number;
-  onClear: () => void;
-  onMiss: () => void;
-}) {
-  return (
-    <div className="flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 shadow-sm">
-      <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <p className="text-sm font-medium leading-snug">{task.t}</p>
-        <p className="text-xs leading-relaxed text-muted-foreground">{task.d}</p>
-        <Badge
-          variant="outline"
-          className="text-[10px] text-amber-400 border-amber-500/30"
-        >
-          missed on Day {missedOn} · review {step + 1} of {REVIEW_INTERVALS.length}
-        </Badge>
-        <div className="flex flex-wrap items-center gap-2 pt-0.5">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={onClear}
-          >
-            <Check className="mr-1.5 h-3 w-3" />
-            Solved it
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs text-muted-foreground"
-            onClick={onMiss}
-          >
-            Missed again
-          </Button>
-        </div>
       </div>
     </div>
   );
