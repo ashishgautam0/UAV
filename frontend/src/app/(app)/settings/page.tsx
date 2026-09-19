@@ -27,6 +27,8 @@ function toReview(profile: ResumeProfile): ResumeProfileReview {
 export default function SettingsPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [pending, setPending] = useState<ResumeProfile | null>(null);
   const [busy, setBusy] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
@@ -38,9 +40,10 @@ export default function SettingsPage() {
     getResumeProfileStatus().then((s) => {
       setActive(s.active);
       const latest = s.latest?.status === "pending_review" ? s.latest : null;
+      setPending(latest);
       setCandidate(latest);
       if (latest) setReview(toReview(latest));
-    }).catch(() => toast.error("Failed to load resume status")).finally(() => setLoading(false));
+    }).catch(() => { setLoadError(true); toast.error("Failed to load resume status"); }).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -60,7 +63,7 @@ export default function SettingsPage() {
     if (!file) return;
     setBusy(true);
     try {
-      const next = await uploadResumePdf(file); setCandidate(next); setReview(toReview(next));
+      const next = await uploadResumePdf(file); setCandidate(next); setPending(next.status === "pending_review" ? next : pending); setReview(toReview(next));
       toast.success("PDF extracted. Review every fact before activating it.");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Resume upload failed"); }
     finally { setBusy(false); }
@@ -71,7 +74,7 @@ export default function SettingsPage() {
     setBusy(true);
     try {
       const saved = await activateResumeProfile(candidate.id, review);
-      setActive(saved); setCandidate(null); setReview(null); setFile(null);
+      setActive(saved); if (pending?.id === saved.id) setPending(null); setCandidate(null); setReview(null); setFile(null);
       toast.success(`Profile v${saved.version} is active; earlier analysis is stale and will be rescored.`);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Profile activation failed"); }
     finally { setBusy(false); }
@@ -80,7 +83,25 @@ export default function SettingsPage() {
   if (loading) return <div className="flex h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   return <div className="mx-auto max-w-5xl space-y-6">
     <div><h1 className="text-2xl font-bold">Resume profile</h1><p className="mt-1 text-sm text-muted-foreground">Upload a text-based PDF, then verify extracted facts and evidence. DOCX, text, and LaTeX input are not accepted.</p></div>
-    {active && <div className="flex gap-2 rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-600"><CheckCircle2 className="h-4 w-4" />Active: v{active.version} · {active.source_filename} · {active.readability.status || "unknown readability"}</div>}
+    {loadError && <div role="alert" className="rounded border border-destructive p-4 text-sm">Could not load the backend resume. This does not mean your resume is missing. <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button></div>}
+    {active ? <Card>
+      <CardHeader><CardTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-emerald-600" />Active backend resume</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
+        <p className="font-medium">{active.source_filename} · Version {active.version}</p>
+        <p className="text-sm text-muted-foreground">This is the active profile returned to the backend scraper and drafting code used by the Claude routine. An already-running job may still hold its earlier snapshot.</p>
+        <p className="text-xs text-muted-foreground">Last activated: {active.activated_at ? new Date(active.activated_at).toLocaleString() : "Not recorded"} · {active.readability.status || "Unknown readability"}</p>
+        <p className="break-all text-xs text-muted-foreground">PDF fingerprint: {active.source_sha256}</p>
+        <label htmlFor="backend-resume-context" className="block text-sm font-medium">Resume context used by the backend</label>
+        <Textarea id="backend-resume-context" readOnly value={active.backend_text || "Backend text unavailable. Refresh after the backend update finishes."} rows={16} />
+        <div className="flex flex-wrap gap-2">
+          <Button disabled={busy} onClick={() => { setCandidate(active); setReview(toReview(active)); }}>Edit active profile</Button>
+          <Button variant="outline" disabled={!active.backend_text} onClick={async () => { try { await navigator.clipboard.writeText(active.backend_text || ""); toast.success("Backend resume text copied"); } catch { toast.error("Select and copy the text above."); } }}>Copy backend text</Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Edit the verified facts below, then save to update future backend reads. To replace source text, projects or contact details, upload and activate an updated PDF. The source PDF text stays unchanged as evidence.</p>
+        <p className="text-xs text-muted-foreground">The PDF saved under Today Todo → Apply with Codex is a separate application attachment and does not change this backend profile.</p>
+      </CardContent>
+    </Card> : !loadError && <p className="rounded border p-4 text-sm">No active backend resume. Upload a PDF and confirm its extracted facts to activate it.</p>}
+    {pending && pending.id !== active?.id && <div className="flex flex-wrap items-center justify-between gap-3 rounded border p-4 text-sm"><span>Awaiting review: {pending.source_filename} · v{pending.version}. The backend still uses the active profile above.</span><Button variant="outline" disabled={busy} onClick={() => { setCandidate(pending); setReview(toReview(pending)); }}>Review uploaded PDF</Button></div>}
     <div className="grid gap-6 lg:grid-cols-2">
       <Card><CardHeader><CardTitle>Resume PDF</CardTitle></CardHeader><CardContent className="space-y-4">
         <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => choose(e.target.files?.[0])} />
@@ -89,7 +110,7 @@ export default function SettingsPage() {
       </CardContent></Card>
       <Card><CardHeader><CardTitle>PDF preview</CardTitle></CardHeader><CardContent>{preview ? <iframe src={preview} title="Selected resume PDF" className="h-[55vh] w-full rounded border bg-white" /> : <div className="flex h-[55vh] items-center justify-center rounded border bg-muted/30"><FileText className="h-10 w-10 text-muted-foreground" /></div>}</CardContent></Card>
     </div>
-    {candidate && review && <Card><CardHeader><CardTitle>Review profile v{candidate.version}</CardTitle><p className="text-sm text-muted-foreground">Corrections remain separate; the extracted PDF text and hash never change.</p></CardHeader><CardContent className="space-y-6">
+    {candidate && review && <Card><CardHeader><CardTitle>{candidate.id === active?.id ? "Edit active profile" : "Review uploaded profile"} · v{candidate.version}</CardTitle><p className="text-sm text-muted-foreground">Corrections remain separate; the extracted PDF text and hash never change.</p></CardHeader><CardContent className="space-y-6">
       <div><label className="text-sm font-medium">Skills (comma separated)</label><Textarea value={review.skills.join(", ")} onChange={(e) => setReview({ ...review, skills: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) })} /><p className="mt-1 text-xs text-muted-foreground">Evidence: {(candidate.facts.skills || []).map(evidence).join(" · ") || "None extracted"}</p></div>
       <div><label className="text-sm font-medium">Certifications (comma separated)</label><Textarea value={review.certifications.join(", ")} onChange={(e) => setReview({ ...review, certifications: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) })} /><p className="mt-1 text-xs text-muted-foreground">Evidence: {(candidate.facts.certifications || []).map(evidence).join(" · ") || "None extracted"}</p></div>
       <div className="space-y-3"><div className="flex items-center justify-between"><h3 className="font-medium">Experience</h3><Button type="button" variant="outline" size="sm" onClick={() => setReview({ ...review, experience: [...review.experience, { id: "", label: "", role: "", company: "", start: "", end: "" }] })}><Plus className="mr-1 h-3.5 w-3.5" />Add verified entry</Button></div>{review.experience.length === 0 && <p className="text-sm text-amber-600">No dated experience was extracted. Experience eligibility will remain unknown unless you add and verify an entry.</p>}{review.experience.map((item, i) => <div key={item.id || `new-experience-${i}`} className="grid gap-2 rounded border p-3 sm:grid-cols-2">
@@ -101,7 +122,8 @@ export default function SettingsPage() {
         <p className="text-xs text-muted-foreground">Evidence: {evidence((candidate.facts.education || []).find((fact) => fact.id === item.id) || {})}</p><Button type="button" variant="ghost" size="sm" className="justify-self-end text-red-500" onClick={() => setReview({ ...review, education: review.education.filter((_, index) => index !== i) })}><Trash2 className="mr-1 h-3.5 w-3.5" />Remove</Button>
       </div>)}</div>
       <div><label className="text-sm font-medium">Review notes</label><Textarea value={review.review_notes || ""} onChange={(e) => setReview({ ...review, review_notes: e.target.value })} /></div>
-      <Button disabled={busy} onClick={activate}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirm facts and activate v{candidate.version}</Button>
+      <Button disabled={busy} onClick={activate}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{candidate.id === active?.id ? "Save active profile changes" : `Confirm facts and activate v${candidate.version}`}</Button>
+      <Button variant="outline" disabled={busy} onClick={() => { setCandidate(null); setReview(null); }}>Cancel editing</Button>
     </CardContent></Card>}
   </div>;
 }
