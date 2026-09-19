@@ -55,7 +55,7 @@ def excluded_employer(company):
 _NUMBER = r"\d+(?:\.\d+)?"
 _DURATION = (
     rf"(?P<strict>more than|over|greater than|>)?\s*"
-    rf"(?P<low>{_NUMBER})\s*(?:\+|(?:-|–|—|to)\s*{_NUMBER})?\s*"
+    rf"(?P<low>{_NUMBER})\s*(?:\+|(?:-|–|—|to)\s*(?P<high>{_NUMBER}))?\s*"
     r"(?P<unit>years?|yrs?|months?|mos?)"
 )
 # Work/technical modifiers allowed, but do not span another sentence or number.
@@ -74,7 +74,7 @@ _WORD_NUMBERS = {"one": "1", "two": "2", "three": "3", "four": "4",
                  "nine": "9", "ten": "10"}
 
 def experience_exclusion(description):
-    """Return evidence for a required lower bound >12 months, otherwise None.
+    """Return evidence for a required experience band above 24 months, otherwise None.
 
     Unknown experience is retained. Preferred sections are optional unless an
     individual clause explicitly says required. Upper bounds do not exclude.
@@ -106,12 +106,12 @@ def experience_exclusion(description):
                     tail = clause[match.end():]
                     local = clause[max(0, match.start()-35):match.end()]
                     local += re.split(r",|\band\b", tail, maxsplit=1)[0]
-                    if _UPPER.search(clause[:match.start()]):
+                    if _UPPER.search(clause[:match.start()]) or re.search(r"\bno\s*$", clause[:match.start()], re.I):
                         continue
                     if (_OPTIONAL.search(local) or section_optional) and not _REQUIRED.search(local):
                         continue
-                    months = float(match["low"]) * (12 if match["unit"].lower().startswith(("year", "yr")) else 1)
-                    if months > 12 or (months == 12 and match["strict"]):
+                    months = float(match["high"] or match["low"]) * (12 if match["unit"].lower().startswith(("year", "yr")) else 1)
+                    if months > 24 or (months == 24 and match["strict"]):
                         return match.group().strip()
     return None
 
@@ -120,7 +120,7 @@ def exclusion_reason(job):
         return "excluded large multinational employer"
     evidence = experience_exclusion(job.get("description"))
     if evidence:
-        return "requires more than one year: " + evidence
+        return "experience requirement above two years: " + evidence
     return None
 
 def filter_jobs(jobs):
