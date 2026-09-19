@@ -315,7 +315,7 @@ def profile_text(snapshot: dict | None) -> str:
     if skills:
         lines.append("Verified skills: " + ", ".join(skills))
     for item in facts.get("experience") or []:
-        label = item.get("label") or " ".join(part for part in (item.get("role"), item.get("company")) if part)
+        label = " ".join(part for part in (item.get("role"), item.get("company")) if part) or item.get("label") or ""
         lines.append(f"Verified experience: {label} [{item.get('start', '')} to {item.get('end', '')}]")
     months = facts.get("total_experience_months")
     if isinstance(months, int):
