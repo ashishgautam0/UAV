@@ -70,6 +70,8 @@ class ResumeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved["sha256"], hashlib.sha256(raw).hexdigest())
         response = self.env["download_application_resume"](saved["token"])
         self.assertEqual(response.body, raw)
+        self.assertEqual(response.headers["content-disposition"],
+                         'attachment; filename="Subidh Khanal Resume.pdf"')
         self.assertEqual(response.headers["cache-control"], "private, no-store")
         self.env["delete_application_resume"](saved["token"])
         with self.assertRaises(HTTPException) as raised:

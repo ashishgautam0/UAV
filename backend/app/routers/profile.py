@@ -291,7 +291,7 @@ def download_application_resume(token: str):
     except Exception as exc:
         raise HTTPException(status_code=404, detail="Resume unavailable. Upload it again.") from exc
     return Response(raw, media_type="application/pdf", headers={
-        "Content-Disposition": 'attachment; filename="application-resume.pdf"',
+        "Content-Disposition": 'attachment; filename="Subidh Khanal Resume.pdf"',
         "Cache-Control": "private, no-store",
         "Referrer-Policy": "no-referrer",
         "X-Content-Type-Options": "nosniff",
