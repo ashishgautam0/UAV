@@ -1,0 +1,18 @@
+name: Application resume tests
+on:
+  pull_request:
+  push:
+    branches: [main, codex/todo-apply-prompt-resume]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install fastapi pypdf python-multipart
+      - run: python -m unittest discover -s backend/tests -p test_application_resume.py -v
+      - run: python -m compileall -q backend/app

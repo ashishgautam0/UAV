@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getRankedScrapedJobs, createApplication, markScrapedJob } from "@/lib/api";
+import { getRankedScrapedJobs, createApplication, markScrapedJob, lookupApplication } from "@/lib/api";
+import { ApplyWithCodex } from "@/components/apply-with-codex";
 import type { ScrapedJob } from "@/lib/types";
 
 import {
@@ -20,6 +21,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import {
+  Check,
   Loader2,
   ExternalLink,
   ClipboardPlus,
@@ -240,6 +242,8 @@ function SwipeableCard({
 // Page Component
 // ---------------------------------------------------------------------------
 export default function TonightPage() {
+  const logging = useRef(new Set<number>());
+  const [loggingIds, setLoggingIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [jobs, setJobs] = useState<ScrapedJob[]>([]);
@@ -279,20 +283,26 @@ export default function TonightPage() {
 
   // ------- Log to tracker handler -------
   const handleLog = useCallback(async (job: ScrapedJob) => {
-    // Drop it from the list immediately so the swipe feels instant.
-    setJobs((prev) => prev.filter((j) => j.id !== job.id));
+    if (!job.id || !job.url || logging.current.has(job.id)) return;
+    logging.current.add(job.id);
+    setLoggingIds(new Set(logging.current));
     try {
-      await createApplication({
+      const existing = await lookupApplication(job.url);
+      if (!existing) await createApplication({
         company: job.company,
         role: job.title,
         platform: job.source,
         url: job.url,
       });
       if (job.id) await markScrapedJob(job.id, "applied");
+      setJobs((prev) => prev.filter((j) => j.id !== job.id));
       toast.success(`Logged ${job.company} - ${job.title} to tracker`);
     } catch {
       toast.error("Failed to log application");
       loadData(); // restore the card if the log failed server-side
+    } finally {
+      logging.current.delete(job.id!);
+      setLoggingIds(new Set(logging.current));
     }
   }, [loadData]);
 
@@ -334,6 +344,8 @@ export default function TonightPage() {
           Refresh
         </Button>
       </div>
+
+      <ApplyWithCodex jobs={filteredJobs} disabled={loading || loadError} />
 
       {/* ---- Loading State ---- */}
       {loading && (
@@ -396,7 +408,7 @@ export default function TonightPage() {
                       onLog={() => handleLog(job)}
                       onRemove={() => handleDismiss(job)}
                     >
-                      <Card className="flex h-full flex-col">
+                      <Card className="flex h-full flex-col" data-job-id={job.id} data-job-url={job.url}>
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 flex-1">
@@ -475,6 +487,15 @@ export default function TonightPage() {
                             </p>
                           )}
 
+                          <Button
+                            variant="outline"
+                            aria-label={`Applied — move to Tracker: ${job.title} at ${job.company}`}
+                            disabled={!job.id || !job.url || loggingIds.has(job.id)}
+                            onClick={() => void handleLog(job)}
+                          >
+                            <Check className="mr-2 h-4 w-4" />
+                            {job.id && loggingIds.has(job.id) ? "Logging…" : "Applied — move to Tracker"}
+                          </Button>
                           {/* Spacer */}
                           <div className="flex-1" />
                         </CardContent>

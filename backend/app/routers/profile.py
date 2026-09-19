@@ -235,3 +235,69 @@ def review_and_activate_resume(profile_id: int, body: ResumeProfileReviewRequest
     if not saved:
         raise HTTPException(status_code=500, detail="The reviewed profile could not be activated.")
     return ResumeProfileResponse(**_public_snapshot(saved))
+
+
+# Application attachment is separate from the reviewed scoring profile.
+# Each upload gets an unguessable capability; there is no public "current PDF".
+import hashlib
+import uuid
+from fastapi.responses import Response
+from prep28 import _get_client as _storage_client, _ensure_pdf_bucket, _PDF_BUCKET
+
+_APPLICATION_LIMIT = 3 * 1024 * 1024  # below the serverless request/response cap
+
+
+def _application_path(token: str):
+    if not re.fullmatch(r"[a-f0-9]{32}", token):
+        raise HTTPException(status_code=404, detail="Resume not found.")
+    return f"application-resumes/{token}/resume.pdf"
+
+
+@router.post("/application-resume")
+async def save_application_resume(file: UploadFile = File(...)):
+    try:
+        raw = await file.read(_APPLICATION_LIMIT + 1)
+    finally:
+        await file.close()
+    if len(raw) > _APPLICATION_LIMIT:
+        raise HTTPException(status_code=413, detail="Application resume must be 3 MB or smaller.")
+    if not (file.filename or "").lower().endswith(".pdf") or not raw.startswith(b"%PDF-"):
+        raise HTTPException(status_code=415, detail="Upload a PDF resume.")
+    try:
+        pdf = PdfReader(BytesIO(raw))
+        if pdf.is_encrypted or not 1 <= len(pdf.pages) <= 30:
+            raise ValueError("Encrypted or invalid page count")
+        if len(" ".join(page.extract_text() or "" for page in pdf.pages).strip()) < 100:
+            raise ValueError("Not enough selectable text")
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail="Use an unencrypted, readable PDF resume (1–30 pages).") from exc
+    token = uuid.uuid4().hex
+    db = _storage_client()
+    _ensure_pdf_bucket(db)
+    db.storage.from_(_PDF_BUCKET).upload(
+        _application_path(token), raw,
+        {"content-type": "application/pdf", "upsert": "false", "cache-control": "0"},
+    )
+    return {"token": token, "sha256": hashlib.sha256(raw).hexdigest(), "size": len(raw)}
+
+
+@router.get("/application-resume")
+def download_application_resume(token: str):
+    path = _application_path(token)
+    try:
+        raw = _storage_client().storage.from_(_PDF_BUCKET).download(path)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="Resume unavailable. Upload it again.") from exc
+    return Response(raw, media_type="application/pdf", headers={
+        "Content-Disposition": 'attachment; filename="application-resume.pdf"',
+        "Cache-Control": "private, no-store",
+        "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff",
+    })
+
+
+@router.delete("/application-resume")
+def delete_application_resume(token: str):
+    path = _application_path(token)
+    _storage_client().storage.from_(_PDF_BUCKET).remove([path])
+    return {"success": True}
