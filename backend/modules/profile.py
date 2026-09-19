@@ -148,7 +148,21 @@ def get_latest_profile_snapshot(username="subidh"):
 
 def activate_resume_profile(profile_id, corrections, review_notes="", username="subidh"):
     """Atomically activate a reviewed version and stale dependent artifacts."""
-    result = _get_client().rpc("activate_resume_profile", {
+    db = _get_client()
+    current = get_resume_profile(profile_id, username)
+    if current and current.get("status") == "active":
+        # Editing the same PDF retains its source version. Invalidate BEFORE
+        # activation so a failure cannot leave old artifacts marked current.
+        db.table("scraped_jobs").update({"analysis_stale": True}).eq(
+            "profile_version", current["version"]
+        ).execute()
+        db.table("job_messages").update({"is_stale": True}).eq(
+            "profile_version", current["version"]
+        ).execute()
+        db.table("cover_letter_drafts").update({"is_outdated": True}).eq(
+            "resume_version", current["version"]
+        ).execute()
+    result = db.rpc("activate_resume_profile", {
         "p_profile_id": profile_id,
         "p_username": username,
         "p_corrections": corrections or {},
