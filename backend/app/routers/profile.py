@@ -20,7 +20,7 @@ from profile import (
     get_resume_profile,
     upsert_profile,
 )
-from resume_profile import extract_profile_facts, reviewed_experience_months
+from resume_profile import extract_profile_facts, reviewed_experience_months, profile_text
 
 router = APIRouter()
 
@@ -49,7 +49,9 @@ def update_profile(body: UserProfileRequest):
 def _public_snapshot(snapshot):
     if not snapshot:
         return None
-    return {key: value for key, value in snapshot.items() if key not in {"raw_text", "corrections"}}
+    result = {key: value for key, value in snapshot.items() if key not in {"raw_text", "corrections"}}
+    result["backend_text"] = profile_text(snapshot)
+    return result
 
 
 def _clean_text(value, maximum=500):
