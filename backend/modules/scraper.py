@@ -369,12 +369,16 @@ def scrape_linkedin():
 # ---------------------------------------------------------------------------
 
 def _scrape_jobspy_board(site, label, country_indeed=None, locations=None,
-                         location_ok=None, google_region="India", queries=None):
+                         location_ok=None, google_region="India", queries=None,
+                         hours_old=72):
     """Generic JobSpy scraper for an extra board (Naukri / Indeed / Google / Bayt).
 
     AWS-first query set, recent postings, with the same title/location/blacklist
     filters and in-memory dedup as LinkedIn. `locations` and `location_ok` let a
     caller (e.g. the Gulf sweep) target a different region.
+
+    hours_old defaults to 72: Indeed's API silently returns 0 results for windows
+    shorter than ~66 h, so 48 h was producing no jobs. 72 h is the safe minimum.
     """
     try:
         from jobspy import scrape_jobs
@@ -396,7 +400,7 @@ def _scrape_jobspy_board(site, label, country_indeed=None, locations=None,
                 search_term=query,
                 location=location,
                 results_wanted=40,
-                hours_old=48,
+                hours_old=hours_old,
             )
             if country_indeed:
                 kwargs["country_indeed"] = country_indeed
