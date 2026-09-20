@@ -185,7 +185,9 @@ Environment variables:
 - **API project** — `SUPABASE_URL`, `SUPABASE_KEY`,
   `APP_USERNAME`, `APP_PASSWORD`, `JWT_SECRET`, and `FRONTEND_URL` (so CORS
   allows the frontend origin). The `VAPID_*` keys are optional (they enable
-  web-push notifications) — see `backend/app/config.py`.
+  web-push notifications) — see `backend/app/config.py`. `PUBLIC_API_URL` is
+  optional and overrides the public API origin embedded in generated mini-demo
+  links (the current production API is used by default).
 - **Frontend project** — `NEXT_PUBLIC_API_URL`, set to the API project's URL.
   This is read at build time (`frontend/src/lib/api.ts` falls back to
   `http://localhost:8000`), so set it **before** the first build, or redeploy
@@ -214,6 +216,11 @@ python pending_messages.py save --job-id <ID> < message.txt
 python pending_messages.py list --type hr_email --limit 10
 python pending_messages.py save --type hr_email --job-id <ID> < message.txt
 ```
+
+HR email candidates are emitted only after the job is in Tracker and its mini
+demo is live. Each brief stored draft must include that demo URL and say that
+the latest Settings PDF is attached. The app still does not send email; the
+user reviews the draft and attaches the provided PDF before sending it.
 
 It also drains the freeform queue. Anything parked in `message_requests` is
 rendered back into the prompt the app would have sent, and the routine answers it:

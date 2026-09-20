@@ -21,25 +21,31 @@ label it as best-effort. If there is no real contact, use a generic
 `careers@<domain>` / `jobs@<domain>` only when a verified domain exists. If
 there is no domain, note that no address could be determined.
 
-## Step 2 — write the email (cover-letter tone)
-- 120–180 words.
+## Step 2 — write the email
+- Write it only after the job is in the tracker and its live `DEMO` URL exists.
+- Keep the body 70–110 words; the complete saved draft, including headers and
+  sign-off, must remain at or below 150 words.
 - First line: `To: <recipient address or "unknown — search on LinkedIn">`.
 - Second line: `Subject: <specific subject naming the role>`.
 - Blank line, then the email: greeting (`Dear Hiring Team,` or `Dear <Name>,`
-  when research found a real contact), 2–3 tight paragraphs, sign-off
+  when research found a real contact), 2 short paragraphs, sign-off
   `Best regards,\nSubidh Khanal`.
-- Name the exact role; lead with one concrete, real hook from `profile`; if a
-  `DEMO` URL exists, mention it as attached proof ("I built a short working
-  demo for this role: <url>"); close asking to be considered / for next steps.
+- Name the exact role and use only one strong, relevant fact from `profile`.
+- Include the exact live `DEMO` URL in the body. Never save an HR email without it.
+- State naturally that the resume is attached. The app provides the latest
+  Settings PDF for the user to attach; do not place a resume URL in the body.
+- Close with one simple request to be considered or discuss next steps.
 - Select the strongest relevant qualification actually evidenced in this
   profile snapshot. Never assume a certification, degree, or project exists.
 - Grounding: only real items from `profile`; never invent anything. Avoid the
-  clichés ("I hope this finds you well", "circling back", etc.).
+  clichés ("I hope this finds you well", "circling back", etc.). Do not list
+  multiple projects, certifications, metrics, or skills.
 
 ## Two-pass drafting (required)
 Draft it, then re-read as a skeptical hiring manager and tighten: cut filler,
 make the opening specific to this role/company, verify every claim against
-`profile`, keep 120–180 words. Save only the improved version.
+`profile`, and remove everything that is not essential. Save only the improved
+70–110 word body.
 
 ## Save it
 ```

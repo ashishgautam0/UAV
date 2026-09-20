@@ -1,10 +1,13 @@
 import ast
+import io
+import os
 import pathlib
 import sys
 import types
 import unittest
 from datetime import datetime
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -115,6 +118,116 @@ class HrEmailTodoTests(unittest.TestCase):
         self.assertIn("Mark emailed", dashboard)
         self.assertIn("Todo now — email Company HR", detail)
         self.assertIn("--type hr_email", readme)
+
+    def test_hr_email_candidates_require_tracker_and_live_demo(self):
+        apps = [
+            {"url": "https://jobs.test/ready", "status": "Applied"},
+            {"url": "https://jobs.test/no-demo", "status": "Applied"},
+        ]
+        jobs = [
+            {"id": 10, "url": "https://jobs.test/ready", "title": "AI Engineer",
+             "company": "Ready Co", "location": "", "description": "Role"},
+            {"id": 20, "url": "https://jobs.test/no-demo", "title": "ML Engineer",
+             "company": "No Demo Co", "location": "", "description": "Role"},
+            {"id": 30, "url": "https://jobs.test/not-tracked", "title": "Other",
+             "company": "Outside Co", "location": "", "description": "Role"},
+        ]
+
+        class Query:
+            def __init__(self, rows): self.rows = rows
+            def select(self, *_): return self
+            def in_(self, column, values):
+                self.rows = [row for row in self.rows if row.get(column) in values]
+                return self
+            def execute(self): return SimpleNamespace(data=self.rows)
+
+        class DB:
+            def table(self, name): return Query(list(apps if name == "applications" else jobs))
+
+        tracker = types.ModuleType("tracker")
+        tracker.TERMINAL_STATUSES = ["Offer", "Rejected", "Ghosted", "Not Interested"]
+        tracker._get_client = DB
+        tracker.get_job_message = lambda job_id, message_type: (
+            {"content": "demo"} if message_type == "demo_html" and job_id == 10 else None
+        )
+        load = function(
+            ROOT / "modules/pending_messages.py",
+            "_tracked_jobs_missing",
+            {"os": os},
+        )
+        with patch.dict(sys.modules, {"tracker": tracker}), \
+             patch.dict(os.environ, {"PUBLIC_API_URL": "https://api.test/"}):
+            candidates, tracked_total = load("hr_email", 10)
+
+        self.assertEqual(tracked_total, 2)
+        self.assertEqual([row["id"] for row in candidates], [10])
+        self.assertEqual(candidates[0]["demo_url"], "https://api.test/api/demo/10")
+        self.assertIn("latest PDF", candidates[0]["resume_attachment"])
+
+    def test_hr_email_save_enforces_tracker_demo_link_resume_and_length(self):
+        saved_content = {}
+        tracker = types.ModuleType("tracker")
+        tracker.is_scraped_job_tracked = lambda _job_id: True
+        save = MagicMock(return_value=True)
+
+        def get_message(job_id, message_type):
+            if message_type == "demo_html":
+                return {"content": "<html>demo</html>"}
+            if message_type == "hr_email" and saved_content:
+                return {"content": saved_content["content"]}
+            return None
+
+        def save_message(job_id, content, message_type):
+            saved_content["content"] = content
+            return save(job_id, content, message_type=message_type)
+
+        command = function(
+            ROOT / "modules/pending_messages.py",
+            "cmd_save",
+            {
+                "get_job_message": get_message,
+                "save_job_message": save_message,
+                "os": os,
+                "sys": sys,
+            },
+        )
+        args = SimpleNamespace(job_id=10, type="hr_email", content=None)
+        valid = (
+            "To: careers@ready.test\nSubject: AI Engineer application\n\n"
+            "Dear Hiring Team,\n\nI applied for the AI Engineer role. One verified "
+            "project matches your needs, and I built this concise working demo: "
+            "https://api.test/api/demo/10. My resume is attached for review.\n\n"
+            "Best regards,\nSubidh Khanal"
+        )
+
+        cases = [
+            valid.replace("https://api.test/api/demo/10", ""),
+            valid.replace("My resume is attached for review.", ""),
+            valid + " extra" * 151,
+        ]
+        with patch.dict(sys.modules, {"tracker": tracker}), \
+             patch.dict(os.environ, {"PUBLIC_API_URL": "https://api.test"}):
+            for content in cases:
+                with self.subTest(content=content[-30:]), \
+                     patch("sys.stdin", io.StringIO(content)), \
+                     patch("sys.stderr", new_callable=io.StringIO):
+                    self.assertEqual(command(args), 1)
+            save.assert_not_called()
+
+            with patch("sys.stdin", io.StringIO(valid)), \
+                 patch("sys.stdout", new_callable=io.StringIO):
+                self.assertEqual(command(args), 0)
+        save.assert_called_once()
+
+        tracker.is_scraped_job_tracked = lambda _job_id: False
+        saved_content.clear()
+        save.reset_mock()
+        with patch.dict(sys.modules, {"tracker": tracker}), \
+             patch.dict(os.environ, {"PUBLIC_API_URL": "https://api.test"}), \
+             patch("sys.stdin", io.StringIO(valid)), \
+             patch("sys.stderr", new_callable=io.StringIO):
+            self.assertEqual(command(args), 1)
+        save.assert_not_called()
 
 
 if __name__ == "__main__":

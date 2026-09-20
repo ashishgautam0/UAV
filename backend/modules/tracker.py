@@ -136,6 +136,22 @@ def find_application_by_url(url):
     return rows[0] if rows else None
 
 
+def is_scraped_job_tracked(job_id):
+    """True only when this scraped job belongs to an active tracker record."""
+    try:
+        db = _get_client()
+        job = (db.table("scraped_jobs").select("url").eq("id", int(job_id))
+               .single().execute()).data or {}
+        url = (job.get("url") or "").strip()
+        if not url:
+            return False
+        rows = (db.table("applications").select("status").eq("url", url)
+                .execute()).data or []
+        return any(row.get("status") not in TERMINAL_STATUSES for row in rows)
+    except Exception:
+        return False
+
+
 def get_follow_ups_due():
     db = _get_client()
     today = _user_now().strftime("%Y-%m-%d")

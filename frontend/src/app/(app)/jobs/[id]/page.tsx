@@ -12,6 +12,7 @@ import {
   snoozeFollowUp,
   getFollowUpHistory,
   getFollowUpDraft,
+  getApplicationResumePdfUrl,
   updateApplicationStatus,
   updateApplicationNotes,
   deleteApplication,
@@ -97,7 +98,7 @@ const SECTIONS = [
   {
     type: "hr_email",
     title: "Email to Company HR",
-    description: "A fuller email you can send to the company's HR inbox.",
+    description: "A brief professional email with the mini demo; attach your latest Settings PDF.",
     icon: Mail,
   },
   {
@@ -629,7 +630,7 @@ export default function JobDetailPage() {
                   <Copy className="mr-1.5 h-3.5 w-3.5" />
                 )}
                 {copied === s.type ? "Copied" : "Copy"}
-              </Button>{s.type === "cover_letter" && <Button variant="outline" size="sm" onClick={downloadCoverLetter}><Download className="mr-1.5 h-3.5 w-3.5" />Download</Button>}</div>
+              </Button>{s.type === "cover_letter" && <Button variant="outline" size="sm" onClick={downloadCoverLetter}><Download className="mr-1.5 h-3.5 w-3.5" />Download</Button>}{s.type === "hr_email" && <Button variant="outline" size="sm" asChild><a href={getApplicationResumePdfUrl()} target="_blank" rel="noopener noreferrer"><Download className="mr-1.5 h-3.5 w-3.5" />Resume to attach</a></Button>}</div>
             )}
             </div>
           </CardHeader>
@@ -643,6 +644,7 @@ export default function JobDetailPage() {
             )}
             {messages[s.type] ? (
               <div className="space-y-2"><p className="rounded-md border bg-muted/40 p-3 text-sm leading-relaxed whitespace-pre-wrap break-words">{messages[s.type]}</p>
+                {s.type === "hr_email" && <p className="text-xs text-muted-foreground">Before sending: attach the latest resume PDF using the button above. Nothing is sent automatically.</p>}
                 {s.type === "cover_letter" && <p className="text-xs text-muted-foreground">Resume v{messageRows[s.type]?.resume_version} · JD v{messageRows[s.type]?.jd_version} · match {messageRows[s.type]?.match_score}/100 · generated {messageRows[s.type]?.generated_at ? new Date(messageRows[s.type].generated_at!).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "time unavailable"}</p>}
               </div>
             ) : job.applied ? (
