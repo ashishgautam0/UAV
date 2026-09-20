@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getScrapedJobs, createApplication, markScrapedJob, lookupApplication } from "@/lib/api";
-import { ApplyWithCodex } from "@/components/apply-with-codex";
 import type { ScrapedJob } from "@/lib/types";
 
 import {
@@ -315,8 +314,6 @@ export default function TonightPage() {
           Refresh
         </Button>
       </div>
-
-      <ApplyWithCodex jobs={filteredJobs} disabled={loading || loadError} />
 
       {/* ---- Loading State ---- */}
       {loading && (
