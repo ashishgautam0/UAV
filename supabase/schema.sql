@@ -31,6 +31,7 @@ create table if not exists applications (
     date_applied          date        not null default current_date,
     follow_up_date        date,                                    -- null once terminal
     follow_up_count       integer     not null default 0,
+    hr_email_sent_at      timestamptz,
     status                text        not null default 'Applied',
     noc_compatible        text        not null default 'Unknown',
     conversion_potential  text        not null default 'N/A',
@@ -42,6 +43,7 @@ create table if not exists applications (
 create index if not exists idx_applications_status         on applications (status);
 create index if not exists idx_applications_follow_up_date on applications (follow_up_date);
 create index if not exists idx_applications_date_applied   on applications (date_applied desc);
+create index if not exists idx_applications_hr_email_todo   on applications (created_at) where hr_email_sent_at is null;
 
 
 -- ---------------------------------------------------------------------------

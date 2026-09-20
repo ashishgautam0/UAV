@@ -14,6 +14,7 @@ export interface Application {
   date_applied?: string;
   follow_up_date?: string;
   follow_up_count?: number;
+  hr_email_sent_at?: string | null;
   scraped_job_id?: number | null;
 }
 
@@ -48,6 +49,16 @@ export interface FollowUp {
   status: string;
   platform?: string;
   follow_up_count?: number;
+  scraped_job_id?: number | null;
+}
+
+export interface HrEmailTodo {
+  id: number;
+  company: string;
+  role: string;
+  status: string;
+  created_at?: string;
+  hr_email_sent_at: null;
   scraped_job_id?: number | null;
 }
 

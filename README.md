@@ -209,6 +209,10 @@ saves it:
 ```bash
 python pending_messages.py list --limit 10
 python pending_messages.py save --job-id <ID> < message.txt
+
+# tracked jobs that need the one-time Company HR email draft
+python pending_messages.py list --type hr_email --limit 10
+python pending_messages.py save --type hr_email --job-id <ID> < message.txt
 ```
 
 It also drains the freeform queue. Anything parked in `message_requests` is

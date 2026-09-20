@@ -4,6 +4,7 @@ import type {
   CachedCompanyIntel,
   DashboardStats,
   FollowUp,
+  HrEmailTodo,
   FollowUpDraft,
   FollowUpEffectiveness,
   FollowUpHistory,
@@ -103,6 +104,17 @@ export async function getDashboard(): Promise<DashboardStats> {
 
 export async function getFollowUps(): Promise<FollowUp[]> {
   return apiFetch<FollowUp[]>("/api/stats/follow-ups");
+}
+
+export async function getHrEmailTodos(): Promise<HrEmailTodo[]> {
+  return apiFetch<HrEmailTodo[]>("/api/stats/hr-email-todos");
+}
+
+export async function setHrEmailTodoCompleted(id: number, completed = true) {
+  return apiFetch<{ success: boolean; hr_email_sent_at: string | null }>(
+    `/api/applications/${id}/hr-email-todo`,
+    { method: "PATCH", body: JSON.stringify({ completed }) },
+  );
 }
 
 export async function getWeeklyTrend(): Promise<WeeklyTrend[]> {

@@ -135,6 +135,10 @@ class SnoozeRequest(BaseModel):
     new_date: date
 
 
+class HrEmailTodoRequest(BaseModel):
+    completed: bool = True
+
+
 # ---- Scraped Jobs ----
 
 class MarkScrapedJobRequest(BaseModel):
