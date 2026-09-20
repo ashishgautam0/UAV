@@ -217,5 +217,26 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertIn("disabled={!renderedPrompt.ready}", page)
         self.assertIn("Copy complete prompt for Codex", page)
 
+    def test_followups_use_dashboard_and_separate_confirmed_history_logging(self):
+        render = function(
+            ROOT / "app/routers/profile.py", "_render_application_prompt",
+            {"json": json, "_APPLICATION_ANSWER_LABELS": {},
+             "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}")},
+        )
+        prompt, _ = render("Custom template", {}, [], None, "https://app/tonight", "https://api/resume")
+        followup = prompt.split("FOLLOW-UPS — DASHBOARD QUEUE")[1]
+        for requirement in ("Dashboard's 'Follow-ups Due'", "Click each dashboard follow-up card",
+                            "skip future dates", "defer the follow-up", "pending draft",
+                            "existing conversation/channel", "actual latest Settings PDF attachment",
+                            "confirmation immediately before Send", "never blindly resend",
+                            "Record sent follow-up", "do not also change status",
+                            "at most one follow-up per record", "Never fabricate history"):
+            self.assertIn(requirement, followup)
+        detail = (ROOT.parent / "frontend/src/app/(app)/jobs/[id]/page.tsx").read_text()
+        self.assertIn('entity_id: application.id', detail)
+        self.assertIn('message_content: sentFollowUp.trim()', detail)
+        self.assertIn('event.follow_up_number >= followUpDraft.follow_up_number!', detail)
+        self.assertIn('setFollowUpRecordLocked(true)', detail)
+
 if __name__ == "__main__":
     unittest.main()

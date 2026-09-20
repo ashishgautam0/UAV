@@ -194,7 +194,7 @@ def _render_application_prompt(template, settings, jobs, resume, page_url, resum
         "- Complete browser work autonomously where supported, but pause for any confirmation, "
         "login, CAPTCHA, sensitive-data approval, or missing truthful answer required by the platform.\n"
         "- Never invent an answer, bypass a control, pay a fee, or apply outside this batch. "
-        "Email is limited to the confirmed HR-email step below.\n\n"
+        "Outreach is limited to the confirmed HR-email and due follow-up steps below.\n\n"
     )
     hr_step = (
         "\n\nHR EMAIL — AFTER TRACKER LOGGING (part of this task):\n"
@@ -243,7 +243,45 @@ def _render_application_prompt(template, settings, jobs, resume, page_url, resum
         "sent, pending assets, awaiting confirmation, or blocked with reason. Never report a "
         "draft or an open composer as sent.\n"
     )
-    return envelope + rendered + hr_step, unresolved
+    followup_step = (
+        "\n\nFOLLOW-UPS — DASHBOARD QUEUE (part of this task):\n"
+        "1. After the HR-email step, open Dashboard's 'Follow-ups Due' section. Snapshot that "
+        "queue once, including previously tracked jobs outside the application batch. Click "
+        "each dashboard follow-up card to open its linked Tracker detail; do not scan all "
+        "companies or guess IDs. Verify the company, role and posting URL. Report broken links "
+        "or load errors as blocked, not as an empty queue.\n"
+        "2. Recheck the saved follow-up date in Asia/Kolkata and recorded history. Process only "
+        "due or overdue follow-ups; skip future dates, terminal records, or already-recorded "
+        "follow-up numbers. Never change a date to make a job due. If an initial HR email was "
+        "just sent for this job during this run, defer the follow-up to avoid two messages "
+        "together; leave its schedule unchanged and report the deferral.\n"
+        "3. Use the current 'Follow-up draft' and its displayed follow-up number. If queued, "
+        "missing, stale or inconsistent with history, report pending draft and continue. "
+        "Do not substitute the initial HR email or invent previous contact, replies or facts. "
+        "Keep the body brief, polite and professional.\n"
+        "4. Use the verified recipient and existing conversation/channel from previous outreach. "
+        "For email, use To, the existing thread Subject (or a short role-specific subject), "
+        "and the follow-up body. Include the correct live mini-demo link and actual latest "
+        "Settings PDF attachment, applying the same resume, upload and recipient checks as "
+        "the HR step. Do not claim an attachment exists in a channel that cannot attach it. "
+        "If contact, channel, demo, resume or authenticated mail access is unavailable, report "
+        "blocked rather than guessing or switching recipients.\n"
+        "5. Inspect Sent mail or conversation history for this follow-up before sending. "
+        "Show sender, recipient, subject, full message and attachment, and obtain explicit "
+        "confirmation immediately before Send. Respect required data-sharing approvals. "
+        "After an uncertain send, check the conversation; never blindly resend.\n"
+        "6. Only after verified sending, fill 'Sent follow-up message' with the exact sent text, "
+        "select 'Sent via', and click 'Record sent follow-up' on the same Tracker detail. "
+        "This records history and advances the existing cadence; do not also change status "
+        "to 'Follow-up Sent' or click 'Mark emailed', which belongs to the separate initial HR todo. "
+        "Verify the new history row, number, channel, message and timestamp, then return to "
+        "Dashboard and check the updated date/queue. If logging is uncertain, inspect history "
+        "before any retry; never resend or record twice. A still-overdue next date does not "
+        "authorize another follow-up in this run. Process at most one follow-up per record.\n"
+        "Report each follow-up separately: sent and recorded, already sent, pending draft, "
+        "deferred, awaiting confirmation, or blocked with reason. Never fabricate history.\n"
+    )
+    return envelope + rendered + hr_step + followup_step, unresolved
 
 
 @router.get("/application-prompt", response_model=RenderedApplicationPrompt)
