@@ -148,6 +148,17 @@ class ResumeTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(("/application-resume", ("POST",)), routes_by_path)
         self.assertIn(("/resume", ("POST",)), routes_by_path)
 
+    def test_today_todo_no_longer_renders_the_settings_prompt(self):
+        page = (ROOT.parent / "frontend/src/app/(app)/tonight/page.tsx").read_text()
+        self.assertNotIn("ApplyWithCodex", page)
+        self.assertNotIn("Codex application prompt", page)
+        self.assertFalse(
+            (ROOT.parent / "frontend/src/components/apply-with-codex.tsx").exists()
+        )
+        settings = (ROOT.parent / "frontend/src/app/(app)/settings/page.tsx").read_text()
+        self.assertIn("application-prompt-template", settings)
+        self.assertIn("Save Today Todo prompt", settings)
+
     def test_profile_cleanup_preserves_rows_referenced_by_audited_drafts(self):
         class Result:
             def __init__(self, data): self.data = data
