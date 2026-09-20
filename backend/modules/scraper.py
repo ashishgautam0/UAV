@@ -614,7 +614,7 @@ def scrape_partner_ats():
 
 
 def run_all_scrapers():
-    """Run the active LinkedIn scraper with error tracking.
+    """Run the active India-focused scrapers with error tracking.
 
     Other scraper functions remain available for future use, but are not part
     of the scheduled intake rotation.
@@ -623,7 +623,8 @@ def run_all_scrapers():
     sources_status = {}
     sources_errors = {}
 
-    # LinkedIn is the only active source. Set SKIP_LINKEDIN=1 to skip it for a
+    # Indeed India returns descriptions inline, so run it before the slower,
+    # rate-limited LinkedIn source. Set SKIP_LINKEDIN=1 to skip LinkedIn for a
     # diagnostic run.
     # Naukri (406 reCAPTCHA anti-bot) and Google Jobs (upstream JobSpy connector
     # returns 0 rows — see JobSpy issue #302) both yield nothing and only waste
@@ -631,6 +632,7 @@ def run_all_scrapers():
     # re-enabling is a one-line change if those sites become scrapable (e.g. with
     # a residential proxy). scrape_naukri / scrape_google_jobs remain defined.
     scrapers = [
+        ("Indeed India", scrape_indeed_india),
         ("LinkedIn AI/ML", scrape_linkedin),
     ]
     if os.environ.get("SKIP_LINKEDIN") == "1":
