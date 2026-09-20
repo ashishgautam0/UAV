@@ -286,7 +286,8 @@ create index if not exists idx_resume_profiles_versions
 create table if not exists job_messages (
     id              bigserial primary key,
     scraped_job_id  bigint      not null references scraped_jobs(id) on delete cascade,
-    message_type    text        not null default 'cold_dm',
+    message_type    text        not null default 'cold_dm'
+                                check (message_type in ('screen', 'cold_dm', 'hr_email', 'resume_points', 'demo_html')),
     content         text        not null,
     generated_by    text        not null default 'claude-routine',
     generated_at    timestamptz not null default now(),
@@ -367,7 +368,7 @@ begin
 
     update job_messages
        set is_stale = true
-     where message_type in ('screen', 'cold_dm', 'hr_email', 'resume_points', 'evaluation')
+     where message_type in ('screen', 'cold_dm', 'hr_email', 'resume_points')
        and profile_version is distinct from target_version;
 
     update cover_letter_drafts

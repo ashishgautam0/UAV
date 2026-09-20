@@ -48,8 +48,8 @@ def list_scraped_jobs(
 def ranked_scraped_jobs(limit: int = 200):
     """Scraped jobs ordered by BestScore — the queue to apply to, best first.
 
-    Each row gains `bestscore` (0–100) and a `bestscore_breakdown`. Computed
-    live from existing columns + any cached A–H evaluations.
+    Each row gains `bestscore` (0–100) and a `bestscore_breakdown`, computed
+    live from the active resume snapshot and current job description.
     """
     from ranking import rank_jobs
 
