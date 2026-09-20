@@ -163,6 +163,38 @@ def get_follow_ups_due():
     return df
 
 
+def get_hr_email_todos():
+    """Active applications whose one-time HR email has not been sent yet."""
+    db = _get_client()
+    resp = (db.table("applications")
+            .select("*")
+            .is_("hr_email_sent_at", "null")
+            .order("created_at", desc=False)
+            .execute())
+    rows = [row for row in (resp.data or [])
+            if row.get("status") not in TERMINAL_STATUSES]
+    if not rows:
+        return pd.DataFrame()
+
+    from analytics import attach_tracker_job_ids
+    urls = [row.get("url") for row in rows if row.get("url")]
+    jobs = []
+    for start in range(0, len(urls), 200):
+        jobs.extend((db.table("scraped_jobs").select("id,url")
+                     .in_("url", urls[start:start + 200]).execute()).data or [])
+    return pd.DataFrame(attach_tracker_job_ids(rows, jobs))
+
+
+def set_hr_email_todo_completed(app_id, completed=True):
+    """Mark the immediate HR-email todo complete, or reopen it."""
+    value = _user_now().isoformat() if completed else None
+    (_get_client().table("applications")
+     .update({"hr_email_sent_at": value})
+     .eq("id", app_id)
+     .execute())
+    return value
+
+
 def get_stats():
     db = _get_client()
     resp = db.table("applications").select("status, type, platform, date_applied").execute()

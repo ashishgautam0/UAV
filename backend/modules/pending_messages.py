@@ -11,6 +11,10 @@ script is the interface it drives.
     # save one message (body on stdin avoids shell-quoting multi-line text)
     python pending_messages.py save --job-id 4821 < message.txt
 
+    # one-time Company HR email drafts for newly tracked jobs
+    python pending_messages.py list --type hr_email --limit 10
+    python pending_messages.py save --type hr_email --job-id 4821 < email.txt
+
     # freeform requests queued from the UI, each with its ready-made prompt
     python pending_messages.py requests
     python pending_messages.py fulfil --request-id 12 < message.txt
