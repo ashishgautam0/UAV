@@ -31,6 +31,7 @@ Requires SUPABASE_URL and SUPABASE_KEY. No LLM key of any kind.
 
 import argparse
 import json
+import os
 import sys
 
 from tracker import (
@@ -84,6 +85,19 @@ def _tracked_jobs_missing(message_type, limit):
             break
         if get_job_message(r["id"], message_type=message_type):
             continue
+        if message_type == "hr_email":
+            # The HR email is the final outreach asset: wait until the tracked
+            # job's live mini demo exists so the saved draft always includes it.
+            if not get_job_message(r["id"], message_type="demo_html"):
+                continue
+            api_base = os.environ.get(
+                "PUBLIC_API_URL", "https://uav-6qe7.vercel.app"
+            ).rstrip("/")
+            r["demo_url"] = f"{api_base}/api/demo/{r['id']}"
+            r["resume_attachment"] = (
+                "Attach the latest PDF from Settings; do not put a resume URL "
+                "inside the email body."
+            )
         r["description"] = (r.get("description") or "").strip()
         need.append(r)
     return need, len(tracked)
@@ -110,6 +124,30 @@ def cmd_save(args):
     if not content:
         print("Refusing to save an empty message.", file=sys.stderr)
         return 1
+
+    if args.type == "hr_email":
+        from tracker import is_scraped_job_tracked
+
+        if not is_scraped_job_tracked(args.job_id):
+            print("HR email drafts are allowed only for active tracker jobs.", file=sys.stderr)
+            return 1
+        if not get_job_message(args.job_id, message_type="demo_html"):
+            print("Build the mini demo before saving the HR email draft.", file=sys.stderr)
+            return 1
+        api_base = os.environ.get(
+            "PUBLIC_API_URL", "https://uav-6qe7.vercel.app"
+        ).rstrip("/")
+        expected_demo_url = f"{api_base}/api/demo/{args.job_id}"
+        if expected_demo_url not in content:
+            print("HR email draft must include this job's mini demo link.", file=sys.stderr)
+            return 1
+        lower = content.lower()
+        if "resume" not in lower or "attach" not in lower:
+            print("HR email draft must state that the resume is attached.", file=sys.stderr)
+            return 1
+        if len(content.split()) > 150:
+            print("HR email draft is too long (maximum 150 words including headers).", file=sys.stderr)
+            return 1
 
     ok = save_job_message(args.job_id, content, message_type=args.type)
     if not ok:
