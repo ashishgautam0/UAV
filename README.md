@@ -176,6 +176,15 @@ rendered prompt starts the supported browser work, but login, CAPTCHA,
 sensitive-data approval, missing truthful answers, and final third-party
 submission can still require user confirmation.
 
+The generated prompt also handles Company HR email after verifying the matching
+Tracker record. It uses the stored draft's To/Subject/body, verifies the hiring
+contact and live mini-demo link, and attaches the actual latest Settings PDF.
+Missing drafts/demos or mail access are reported as blocked/pending, not sent.
+Codex must request confirmation immediately before sending, check Sent mail to
+avoid duplicates, and mark the HR todo complete only after verified sending.
+This is a prompt-driven mail-client workflow, not a background email service;
+the Claude routine still only stores drafts and no schedule is changed.
+
 ## Deployment
 
 The repo deploys as **two Vercel projects from this one repository**, plus the

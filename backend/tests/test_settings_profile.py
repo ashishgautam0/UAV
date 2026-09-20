@@ -150,6 +150,15 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertIn('"job_id": 91', prompt)
         self.assertIn("O'Reilly भारत", prompt)
         self.assertIn("https://api.example/api/profile/resume/pdf", prompt)
+        self.assertIn("HR EMAIL — AFTER TRACKER LOGGING", prompt)
+        self.assertIn("To: use the draft's recipient", prompt)
+        self.assertIn("Subject: copy", prompt)
+        self.assertIn("Body: use only the email body", prompt)
+        self.assertIn("Upload the actual PDF as a file attachment", prompt)
+        self.assertIn("exact live mini-demo link", prompt)
+        self.assertIn("explicit confirmation immediately before Send", prompt)
+        self.assertIn("never blindly resend or mark completed", prompt)
+        self.assertIn("click 'Mark emailed'", prompt)
         self.assertNotIn("must not bloat", prompt)
         for placeholder in ("application_answers", "page_url", "resume_filename",
                             "resume_url", "resume_sha256", "batch_jobs"):
@@ -174,6 +183,26 @@ class SettingsProfileTests(unittest.TestCase):
             "https://api.example/api/profile/resume/pdf",
         )
         self.assertEqual(unresolved, ["unsupported_field"])
+
+    def test_hr_workflow_applies_to_previously_saved_custom_templates(self):
+        render = function(
+            ROOT / "app/routers/profile.py", "_render_application_prompt",
+            {"json": json, "_APPLICATION_ANSWER_LABELS": {},
+             "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}")},
+        )
+        prompt, unresolved = render(
+            "My saved application instructions: {{batch_jobs}}", {}, [], None,
+            "https://app.example/tonight", "https://api.example/resume.pdf",
+        )
+        self.assertFalse(unresolved)
+        self.assertIn("My saved application instructions", prompt)
+        self.assertIn("Do not generate or send HR email before tracking", prompt)
+        self.assertIn("HR email pending assets", prompt)
+        self.assertIn("HR email blocked: mail access required", prompt)
+        self.assertIn("Do not treat saved application", prompt)
+        self.assertIn("If already completed, skip", prompt)
+        self.assertIn("never guess a Tracker ID", prompt)
+        self.assertNotIn("pay a fee, send email, or apply", prompt)
 
     def test_settings_exposes_only_ready_prompt_copy(self):
         page = (ROOT.parent / "frontend/src/app/(app)/settings/page.tsx").read_text()
