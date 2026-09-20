@@ -1,5 +1,7 @@
 import ast
+import json
 import pathlib
+import re
 import sys
 import unittest
 from unittest.mock import MagicMock, patch
@@ -100,6 +102,84 @@ class SettingsProfileTests(unittest.TestCase):
             value == "" for key, value in result.items() if key != "prompt_template"
         ))
         self.assertIn("{{resume_url}}", result["prompt_template"])
+
+    def test_ready_prompt_resolves_fixed_batch_resume_and_saved_answers(self):
+        render = function(
+            ROOT / "app/routers/profile.py",
+            "_render_application_prompt",
+            {
+                "json": json,
+                "_APPLICATION_ANSWER_LABELS": {
+                    "submission_authorization": "Submission authorization",
+                    "notice_period": "Notice period",
+                },
+                "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
+            },
+        )
+        settings = {
+            "submission_authorization": "Submit after required confirmation.",
+            "notice_period": "One month",
+        }
+        template = (
+            "{{application_answers}}\n{{page_url}}\n{{resume_filename}}\n"
+            "{{resume_url}}\n{{resume_sha256}}\n{{batch_jobs}}"
+        )
+        jobs = [{
+            "id": 91,
+            "title": "ML Engineer",
+            "company": "O'Reilly भारत",
+            "location": "Remote",
+            "source": "Indeed",
+            "url": "https://jobs.example/91",
+            "screening_status": "pass",
+            "screening_reason": "Mandatory criteria verified",
+            "description": "must not bloat the browser prompt",
+        }]
+        prompt, unresolved = render(
+            template,
+            settings,
+            jobs,
+            {"filename": "latest.pdf", "sha256": "abc123"},
+            "https://app.example/tonight",
+            "https://api.example/api/profile/resume/pdf",
+        )
+        self.assertFalse(unresolved)
+        self.assertIn("Start working through the fixed batch immediately", prompt)
+        self.assertIn("Apply only when screening_status is pass", prompt)
+        self.assertIn("Submission authorization: Submit after required confirmation.", prompt)
+        self.assertIn('"job_id": 91', prompt)
+        self.assertIn("O'Reilly भारत", prompt)
+        self.assertIn("https://api.example/api/profile/resume/pdf", prompt)
+        self.assertNotIn("must not bloat", prompt)
+        for placeholder in ("application_answers", "page_url", "resume_filename",
+                            "resume_url", "resume_sha256", "batch_jobs"):
+            self.assertNotIn("{{" + placeholder + "}}", prompt)
+
+    def test_ready_prompt_reports_unknown_placeholder(self):
+        render = function(
+            ROOT / "app/routers/profile.py",
+            "_render_application_prompt",
+            {
+                "json": json,
+                "_APPLICATION_ANSWER_LABELS": {},
+                "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
+            },
+        )
+        _, unresolved = render(
+            "Run {{unsupported_field}} for {{batch_jobs}}",
+            {},
+            [],
+            None,
+            "https://app.example/tonight",
+            "https://api.example/api/profile/resume/pdf",
+        )
+        self.assertEqual(unresolved, ["unsupported_field"])
+
+    def test_settings_exposes_only_ready_prompt_copy(self):
+        page = (ROOT.parent / "frontend/src/app/(app)/settings/page.tsx").read_text()
+        self.assertIn("Ready-to-paste Codex prompt", page)
+        self.assertIn("disabled={!renderedPrompt.ready}", page)
+        self.assertIn("Copy complete prompt for Codex", page)
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,17 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import {
   activateResumeProfile,
   getApplicationPromptSettings,
+  getRenderedApplicationPrompt,
   getResumeProfileStatus,
   updateApplicationPromptSettings,
   uploadResumePdf,
 } from "@/lib/api";
-import type { ApplicationPromptSettings, ResumeFact, ResumeProfile, ResumeProfileReview } from "@/lib/types";
+import type { ApplicationPromptSettings, RenderedApplicationPrompt, ResumeFact, ResumeProfile, ResumeProfileReview } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { CheckCircle2, FileText, Loader2, Plus, Trash2, Upload } from "lucide-react";
+import { CheckCircle2, Copy, FileText, Loader2, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const EMPTY_APPLICATION_SETTINGS: ApplicationPromptSettings = {
@@ -62,15 +63,35 @@ export default function SettingsPage() {
   const [review, setReview] = useState<ResumeProfileReview | null>(null);
   const [applicationSettings, setApplicationSettings] = useState<ApplicationPromptSettings>(EMPTY_APPLICATION_SETTINGS);
   const [savingApplicationSettings, setSavingApplicationSettings] = useState(false);
+  const [renderedPrompt, setRenderedPrompt] = useState<RenderedApplicationPrompt | null>(null);
+  const [renderingPrompt, setRenderingPrompt] = useState(false);
+
+  async function refreshRenderedPrompt() {
+    setRenderingPrompt(true);
+    try {
+      const pageUrl = `${window.location.origin}/tonight`;
+      setRenderedPrompt(await getRenderedApplicationPrompt(pageUrl));
+    } catch (e) {
+      setRenderedPrompt(null);
+      toast.error(e instanceof Error ? e.message : "Ready Codex prompt could not be generated");
+    } finally {
+      setRenderingPrompt(false);
+    }
+  }
 
   useEffect(() => {
-    Promise.all([getResumeProfileStatus(), getApplicationPromptSettings()]).then(([s, settings]) => {
+    Promise.all([
+      getResumeProfileStatus(),
+      getApplicationPromptSettings(),
+      getRenderedApplicationPrompt(`${window.location.origin}/tonight`).catch(() => null),
+    ]).then(([s, settings, readyPrompt]) => {
       setActive(s.active);
       const latest = s.latest?.status === "pending_review" ? s.latest : null;
       setPending(latest);
       setCandidate(latest);
       if (latest) setReview(toReview(latest));
       setApplicationSettings(settings);
+      setRenderedPrompt(readyPrompt);
     }).catch(() => { setLoadError(true); toast.error("Failed to load resume status"); }).finally(() => setLoading(false));
   }, []);
 
@@ -113,6 +134,7 @@ export default function SettingsPage() {
     try {
       const saved = await updateApplicationPromptSettings(applicationSettings);
       setApplicationSettings(saved);
+      await refreshRenderedPrompt();
       toast.success("Application prompt details saved for every browser and device.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Application prompt details could not be saved");
@@ -184,6 +206,26 @@ export default function SettingsPage() {
             {savingApplicationSettings && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Today Todo prompt
           </Button>
+        </div>
+        <div className="md:col-span-2 space-y-3 border-t pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-medium">Ready-to-paste Codex prompt</h3>
+              <p className="text-xs text-muted-foreground">Generated from the current Today Todo batch, saved answers, and latest Settings PDF.</p>
+            </div>
+            <Button variant="outline" disabled={renderingPrompt || loadError} onClick={refreshRenderedPrompt}>
+              {renderingPrompt ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Generate current batch
+            </Button>
+          </div>
+          {renderedPrompt && <>
+            <Textarea readOnly value={renderedPrompt.prompt} rows={18} aria-label="Ready-to-paste Codex prompt" />
+            <p className="text-xs text-muted-foreground">Fixed batch: {renderedPrompt.job_count} job{renderedPrompt.job_count === 1 ? "" : "s"}. Generate again to pick up changed jobs, answers, or resume.</p>
+            {renderedPrompt.issues.length > 0 && <div role="alert" className="rounded border border-amber-500/40 bg-amber-500/5 p-3 text-sm"><p className="font-medium">Resolve before copying:</p><ul className="mt-1 list-disc pl-5">{renderedPrompt.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul></div>}
+            <Button disabled={!renderedPrompt.ready} onClick={async () => { try { await navigator.clipboard.writeText(renderedPrompt.prompt); toast.success("Complete Codex prompt copied"); } catch { toast.error("Select and copy the generated prompt above."); } }}>
+              <Copy className="mr-2 h-4 w-4" />Copy complete prompt for Codex
+            </Button>
+          </>}
         </div>
       </CardContent>
     </Card>

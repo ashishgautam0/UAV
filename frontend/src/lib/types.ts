@@ -326,6 +326,15 @@ export interface ApplicationPromptSettings {
   relocation_preference: string;
 }
 
+export interface RenderedApplicationPrompt {
+  prompt: string;
+  job_count: number;
+  resume_available: boolean;
+  ready: boolean;
+  issues: string[];
+  unresolved_placeholders: string[];
+}
+
 export interface ResumeProfileReview {
   skills: string[];
   experience: Array<{ id?: string; label?: string; role?: string; company?: string; start?: string; end?: string }>;

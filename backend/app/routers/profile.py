@@ -1,13 +1,15 @@
 import hashlib
 from io import BytesIO
+import json
 import re
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from pypdf import PdfReader
 
 from ..models.schemas import (
     ApplicationPromptSettings,
+    RenderedApplicationPrompt,
     ResumeProfileResponse,
     ResumeProfileReviewRequest,
     ResumeProfileStatusResponse,
@@ -40,6 +42,16 @@ _DEFAULT_USERNAME = "subidh"
 _MAX_RESUME_BYTES = 10 * 1024 * 1024
 _MAX_RESUME_PAGES = 30
 _APPLICATION_PREFIX = "application-resumes"
+_APPLICATION_ANSWER_LABELS = {
+    "submission_authorization": "Submission authorization",
+    "notice_period": "Notice period",
+    "current_ctc": "Current compensation",
+    "expected_ctc": "Expected compensation",
+    "expected_start_date": "Expected start date",
+    "current_location": "Current location",
+    "relocation_preference": "Relocation preference",
+}
+_PROMPT_PLACEHOLDER = re.compile(r"{{([a-z_]+)}}")
 
 
 def _application_path(source_sha256):
@@ -143,6 +155,83 @@ def update_application_settings(body: ApplicationPromptSettings):
     if saved is None:
         raise HTTPException(status_code=500, detail="Application prompt settings could not be saved.")
     return ApplicationPromptSettings(**saved)
+
+
+def _render_application_prompt(template, settings, jobs, resume, page_url, resume_url):
+    """Render one immutable browser-agent batch without browser-local state."""
+    answer_lines = [
+        f"- {_APPLICATION_ANSWER_LABELS[key]}: {settings.get(key)}"
+        for key in _APPLICATION_ANSWER_LABELS
+        if settings.get(key)
+    ]
+    batch = [{
+        "job_id": job.get("id"),
+        "title": job.get("title") or "",
+        "company": job.get("company") or "",
+        "location": job.get("location") or "",
+        "source": job.get("source") or "",
+        "url": job.get("url") or "",
+        "screening_status": job.get("screening_status") or "pending",
+        "screening_reason": job.get("screening_reason") or "",
+    } for job in jobs]
+    values = {
+        "application_answers": "\n".join(answer_lines) or "- No application-form answers are saved.",
+        "page_url": page_url,
+        "resume_filename": (resume or {}).get("filename") or "Resume.pdf",
+        "resume_url": resume_url,
+        "resume_sha256": (resume or {}).get("sha256") or "unavailable",
+        "batch_jobs": json.dumps(batch, ensure_ascii=False, indent=2, default=str),
+    }
+    rendered = template
+    for key, value in values.items():
+        rendered = rendered.replace("{{" + key + "}}", value)
+    unresolved = sorted(set(_PROMPT_PLACEHOLDER.findall(rendered)))
+    envelope = (
+        "AUTOMATION RULES (authoritative):\n"
+        "- Start working through the fixed batch immediately; do not stop after only describing a plan.\n"
+        "- Apply only when screening_status is pass. Treat pending, review, fail, missing URLs, "
+        "or unclear mandatory eligibility as blocked and do not submit them.\n"
+        "- Complete browser work autonomously where supported, but pause for any confirmation, "
+        "login, CAPTCHA, sensitive-data approval, or missing truthful answer required by the platform.\n"
+        "- Never invent an answer, bypass a control, pay a fee, send email, or apply outside this batch.\n\n"
+    )
+    return envelope + rendered, unresolved
+
+
+@router.get("/application-prompt", response_model=RenderedApplicationPrompt)
+def read_rendered_application_prompt(request: Request, page_url: str):
+    """Return one complete Codex prompt using current backend jobs and PDF."""
+    page_url = _clean_text(page_url, 1_000)
+    if not page_url.startswith(("https://", "http://localhost")):
+        raise HTTPException(status_code=422, detail="Today Todo page URL is invalid.")
+
+    from tracker import get_scraped_jobs
+
+    settings = get_application_prompt_settings(_DEFAULT_USERNAME)
+    frame = get_scraped_jobs()
+    jobs = frame.to_dict("records") if hasattr(frame, "to_dict") else list(frame or [])
+    resume = _application_pdf_metadata()
+    resume_url = str(request.url_for("download_application_resume"))
+    prompt, unresolved = _render_application_prompt(
+        settings["prompt_template"], settings, jobs, resume, page_url, resume_url,
+    )
+    issues = []
+    if not jobs:
+        issues.append("No current Today Todo jobs are available.")
+    if not resume:
+        issues.append("No latest Settings PDF is available.")
+    if not settings.get("submission_authorization"):
+        issues.append("Submission authorization is blank in Settings.")
+    if unresolved:
+        issues.append("The saved template contains unresolved placeholders.")
+    return RenderedApplicationPrompt(
+        prompt=prompt,
+        job_count=len(jobs),
+        resume_available=bool(resume),
+        ready=not issues,
+        issues=issues,
+        unresolved_placeholders=unresolved,
+    )
 
 
 def _public_snapshot(snapshot):
