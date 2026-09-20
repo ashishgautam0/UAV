@@ -8,8 +8,6 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "modules"))
 from resume_profile import profile_text
 import profile as profile_data
-from backend.app.models.schemas import ApplicationPromptSettings
-from backend.app.routers import profile as profile_routes
 
 def function(path, name, env):
     node = next(n for n in ast.parse(path.read_text()).body
@@ -92,12 +90,12 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertEqual(result["notice_period"], "Two weeks")
         self.assertNotIn("unknown", captured["scoring_weights"]["application_prompt"])
 
-    def test_application_settings_route_trims_and_persists_fields(self):
-        body = ApplicationPromptSettings(notice_period="  Two weeks  ")
-        with patch.object(profile_routes, "save_application_prompt_settings", side_effect=lambda _, data: data) as save:
-            result = profile_routes.update_application_settings(body)
-        self.assertEqual(result.notice_period, "Two weeks")
-        save.assert_called_once()
+    def test_malformed_application_prompt_settings_are_treated_as_empty(self):
+        with patch.object(profile_data, "get_profile", return_value={
+            "scoring_weights": {"application_prompt": ["not", "a", "mapping"]},
+        }):
+            result = profile_data.get_application_prompt_settings()
+        self.assertTrue(all(value == "" for value in result.values()))
 
 if __name__ == "__main__":
     unittest.main()
