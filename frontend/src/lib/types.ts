@@ -309,6 +309,25 @@ export interface ResumeProfileStatus {
   latest: ResumeProfile | null;
 }
 
+export interface ApplicationResumeStatus {
+  available: boolean;
+  filename?: string;
+  sha256?: string;
+  size?: number;
+  version?: number;
+  profile_status?: ResumeProfile["status"];
+}
+
+export interface ApplicationPromptSettings {
+  submission_authorization: string;
+  notice_period: string;
+  current_ctc: string;
+  expected_ctc: string;
+  expected_start_date: string;
+  current_location: string;
+  relocation_preference: string;
+}
+
 export interface ResumeProfileReview {
   skills: string[];
   experience: Array<{ id?: string; label?: string; role?: string; company?: string; start?: string; end?: string }>;

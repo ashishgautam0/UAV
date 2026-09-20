@@ -47,6 +47,18 @@ class UserProfileResponse(BaseModel):
     updated_at: Optional[str] = None
 
 
+class ApplicationPromptSettings(BaseModel):
+    """User-supplied application answers stored with the backend profile."""
+    model_config = ConfigDict(extra="forbid")
+    submission_authorization: str = Field(default="", max_length=500)
+    notice_period: str = Field(default="", max_length=500)
+    current_ctc: str = Field(default="", max_length=500)
+    expected_ctc: str = Field(default="", max_length=500)
+    expected_start_date: str = Field(default="", max_length=500)
+    current_location: str = Field(default="", max_length=500)
+    relocation_preference: str = Field(default="", max_length=500)
+
+
 class ReviewedExperienceEntry(BaseModel):
     id: str = ""
     label: str = ""

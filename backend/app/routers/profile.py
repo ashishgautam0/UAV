@@ -1,10 +1,13 @@
+import hashlib
 from io import BytesIO
 import re
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import RedirectResponse
 from pypdf import PdfReader
 
 from ..models.schemas import (
+    ApplicationPromptSettings,
     ResumeProfileResponse,
     ResumeProfileReviewRequest,
     ResumeProfileStatusResponse,
@@ -15,18 +18,96 @@ from profile import (
     activate_resume_profile,
     create_resume_profile,
     get_active_profile_snapshot,
+    get_application_prompt_settings,
     get_latest_profile_snapshot,
     get_profile,
     get_resume_profile,
+    prune_obsolete_resume_profiles,
+    save_application_prompt_settings,
     upsert_profile,
 )
 from resume_profile import extract_profile_facts, reviewed_experience_months, profile_text
+from prep28 import (
+    _encode_url_path,
+    _ensure_pdf_bucket,
+    _get_client as _storage_client,
+    _PDF_BUCKET,
+)
 
 router = APIRouter()
 
 _DEFAULT_USERNAME = "subidh"
 _MAX_RESUME_BYTES = 10 * 1024 * 1024
 _MAX_RESUME_PAGES = 30
+_APPLICATION_PREFIX = "application-resumes"
+
+
+def _application_path(source_sha256):
+    if not re.fullmatch(r"[a-f0-9]{64}", source_sha256 or ""):
+        raise HTTPException(status_code=404, detail="Resume not found.")
+    return f"{_APPLICATION_PREFIX}/{_DEFAULT_USERNAME}/{source_sha256}.pdf"
+
+
+def _stored_application_paths(bucket):
+    """List current and legacy resume objects, bounded to two folder levels."""
+    paths = []
+    for item in bucket.list(_APPLICATION_PREFIX) or []:
+        if not isinstance(item, dict) or not item.get("name"):
+            continue
+        name = str(item["name"])
+        direct = f"{_APPLICATION_PREFIX}/{name}"
+        if name.lower().endswith(".pdf"):
+            paths.append(direct)
+            continue
+        for child in bucket.list(direct) or []:
+            if isinstance(child, dict) and str(child.get("name", "")).lower().endswith(".pdf"):
+                paths.append(f"{direct}/{child['name']}")
+    return paths
+
+
+def _store_application_pdf(raw, source_sha256):
+    """Store the candidate PDF without disturbing the current valid object."""
+    db = _storage_client()
+    _ensure_pdf_bucket(db)
+    bucket = db.storage.from_(_PDF_BUCKET)
+    current = _application_path(source_sha256)
+    bucket.upload(current, raw, {
+        "content-type": "application/pdf", "upsert": "true", "cache-control": "0",
+    })
+    return current
+
+
+def _remove_obsolete_application_pdfs(source_sha256):
+    bucket = _storage_client().storage.from_(_PDF_BUCKET)
+    current = _application_path(source_sha256)
+    obsolete = [path for path in _stored_application_paths(bucket) if path != current]
+    if obsolete:
+        bucket.remove(obsolete)
+    return len(obsolete)
+
+
+def _application_pdf_metadata():
+    latest = get_latest_profile_snapshot(_DEFAULT_USERNAME)
+    if not latest:
+        return None
+    path = _application_path(latest.get("source_sha256"))
+    try:
+        bucket = _storage_client().storage.from_(_PDF_BUCKET)
+        filename = path.rsplit("/", 1)[-1]
+        entries = bucket.list(path.rsplit("/", 1)[0]) or []
+        entry = next(item for item in entries
+                     if isinstance(item, dict) and item.get("name") == filename)
+    except Exception:
+        return None
+    metadata = entry.get("metadata") or {}
+    size = metadata.get("size") or metadata.get("contentLength") or entry.get("size")
+    return {
+        "filename": latest.get("source_filename") or "Resume.pdf",
+        "sha256": latest.get("source_sha256"),
+        "size": size,
+        "version": latest.get("version"),
+        "profile_status": latest.get("status"),
+    }
 
 
 @router.get("/", response_model=UserProfileResponse)
@@ -44,6 +125,24 @@ def update_profile(body: UserProfileRequest):
     if saved:
         return UserProfileResponse(**saved)
     return UserProfileResponse(username=_DEFAULT_USERNAME)
+
+
+@router.get("/application-settings", response_model=ApplicationPromptSettings)
+def read_application_settings():
+    """Load application answers from backend state for any browser/device."""
+    return ApplicationPromptSettings(**get_application_prompt_settings(_DEFAULT_USERNAME))
+
+
+@router.put("/application-settings", response_model=ApplicationPromptSettings)
+def update_application_settings(body: ApplicationPromptSettings):
+    payload = {
+        key: _clean_text(value)
+        for key, value in body.model_dump().items()
+    }
+    saved = save_application_prompt_settings(_DEFAULT_USERNAME, payload)
+    if saved is None:
+        raise HTTPException(status_code=500, detail="Application prompt settings could not be saved.")
+    return ApplicationPromptSettings(**saved)
 
 
 def _public_snapshot(snapshot):
@@ -213,11 +312,30 @@ async def upload_resume(file: UploadFile = File(...)):
         page_count=len(reader.pages),
         pages_with_text=sum(bool(text) for text in page_text),
     )
-    saved = create_resume_profile(
-        _DEFAULT_USERNAME, filename, raw, resume_text, extraction
-    )
+    digest = hashlib.sha256(raw).hexdigest()
+    previous = get_latest_profile_snapshot(_DEFAULT_USERNAME)
+    previous_digest = (previous or {}).get("source_sha256")
+    try:
+        _store_application_pdf(raw, digest)
+        saved = create_resume_profile(
+            _DEFAULT_USERNAME, filename, raw, resume_text, extraction
+        )
+    except Exception:
+        # A failed database write must not leave the failed replacement active.
+        if digest != previous_digest:
+            try:
+                _storage_client().storage.from_(_PDF_BUCKET).remove([_application_path(digest)])
+            except Exception:
+                pass
+        raise
     if not saved:
+        if digest != previous_digest:
+            try:
+                _storage_client().storage.from_(_PDF_BUCKET).remove([_application_path(digest)])
+            except Exception:
+                pass
         raise HTTPException(status_code=500, detail="The resume could not be saved.")
+    _remove_obsolete_application_pdfs(digest)
     from profile import _snapshot
     return ResumeProfileResponse(**_public_snapshot(_snapshot(saved)))
 
@@ -236,70 +354,38 @@ def review_and_activate_resume(profile_id: int, body: ResumeProfileReviewRequest
     )
     if not saved:
         raise HTTPException(status_code=500, detail="The reviewed profile could not be activated.")
+    try:
+        prune_obsolete_resume_profiles(saved["id"], _DEFAULT_USERNAME)
+    except Exception as exc:
+        # Activation is already committed. Preserve referenced rows and defer
+        # unexpected cleanup failures rather than reporting a false failure.
+        print(f"[profile] obsolete resume cleanup deferred: {exc}")
     return ResumeProfileResponse(**_public_snapshot(saved))
 
 
-# Application attachment is separate from the reviewed scoring profile.
-# Each upload gets an unguessable capability; there is no public "current PDF".
-import hashlib
-import uuid
-from fastapi.responses import Response
-from prep28 import _get_client as _storage_client, _ensure_pdf_bucket, _PDF_BUCKET
-
-_APPLICATION_LIMIT = 3 * 1024 * 1024  # below the serverless request/response cap
+@router.get("/resume/application")
+def application_resume_status():
+    """Return the last Settings-uploaded PDF without browser-local state."""
+    metadata = _application_pdf_metadata()
+    return {"available": bool(metadata), **(metadata or {})}
 
 
-def _application_path(token: str):
-    if not re.fullmatch(r"[a-f0-9]{32}", token):
-        raise HTTPException(status_code=404, detail="Resume not found.")
-    return f"application-resumes/{token}/resume.pdf"
-
-
-@router.post("/application-resume")
-async def save_application_resume(file: UploadFile = File(...)):
-    try:
-        raw = await file.read(_APPLICATION_LIMIT + 1)
-    finally:
-        await file.close()
-    if len(raw) > _APPLICATION_LIMIT:
-        raise HTTPException(status_code=413, detail="Application resume must be 3 MB or smaller.")
-    if not (file.filename or "").lower().endswith(".pdf") or not raw.startswith(b"%PDF-"):
-        raise HTTPException(status_code=415, detail="Upload a PDF resume.")
-    try:
-        pdf = PdfReader(BytesIO(raw))
-        if pdf.is_encrypted or not 1 <= len(pdf.pages) <= 30:
-            raise ValueError("Encrypted or invalid page count")
-        if len(" ".join(page.extract_text() or "" for page in pdf.pages).strip()) < 100:
-            raise ValueError("Not enough selectable text")
-    except Exception as exc:
-        raise HTTPException(status_code=422, detail="Use an unencrypted, readable PDF resume (1–30 pages).") from exc
-    token = uuid.uuid4().hex
-    db = _storage_client()
-    _ensure_pdf_bucket(db)
-    db.storage.from_(_PDF_BUCKET).upload(
-        _application_path(token), raw,
-        {"content-type": "application/pdf", "upsert": "false", "cache-control": "0"},
+@router.get("/resume/pdf")
+def download_application_resume():
+    """Redirect to a short-lived private Storage URL to avoid response limits."""
+    latest = get_latest_profile_snapshot(_DEFAULT_USERNAME)
+    if not latest or not _application_pdf_metadata():
+        raise HTTPException(
+            status_code=404,
+            detail="Resume PDF unavailable. Upload it again from Settings.",
+        )
+    result = _storage_client().storage.from_(_PDF_BUCKET).create_signed_url(
+        _application_path(latest.get("source_sha256")), 300
     )
-    return {"token": token, "sha256": hashlib.sha256(raw).hexdigest(), "size": len(raw)}
-
-
-@router.get("/application-resume")
-def download_application_resume(token: str):
-    path = _application_path(token)
-    try:
-        raw = _storage_client().storage.from_(_PDF_BUCKET).download(path)
-    except Exception as exc:
-        raise HTTPException(status_code=404, detail="Resume unavailable. Upload it again.") from exc
-    return Response(raw, media_type="application/pdf", headers={
-        "Content-Disposition": 'attachment; filename="Subidh Khanal Resume.pdf"',
+    signed = result.get("signedURL") or result.get("signedUrl")
+    if not signed:
+        raise HTTPException(status_code=500, detail="Could not create the resume download link.")
+    return RedirectResponse(_encode_url_path(signed), status_code=307, headers={
         "Cache-Control": "private, no-store",
         "Referrer-Policy": "no-referrer",
-        "X-Content-Type-Options": "nosniff",
     })
-
-
-@router.delete("/application-resume")
-def delete_application_resume(token: str):
-    path = _application_path(token)
-    _storage_client().storage.from_(_PDF_BUCKET).remove([path])
-    return {"success": True}

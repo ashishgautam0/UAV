@@ -36,6 +36,17 @@ def _get_client():
 
 # ===================== PROFILE CRUD =====================
 
+_APPLICATION_PROMPT_KEY = "application_prompt"
+_APPLICATION_PROMPT_FIELDS = (
+    "submission_authorization",
+    "notice_period",
+    "current_ctc",
+    "expected_ctc",
+    "expected_start_date",
+    "current_location",
+    "relocation_preference",
+)
+
 def get_profile(username="subidh"):
     """Get full profile dict from Supabase. Returns None if not found."""
     try:
@@ -61,6 +72,34 @@ def upsert_profile(username="subidh", data=None):
         payload, on_conflict="username"
     ).execute()
     return result.data[0] if result.data else None
+
+
+def get_application_prompt_settings(username="subidh"):
+    """Return only supported application-answer fields from the profile JSON."""
+    profile = get_profile(username) or {}
+    weights = profile.get("scoring_weights") or {}
+    stored = weights.get(_APPLICATION_PROMPT_KEY) if isinstance(weights, dict) else {}
+    if not isinstance(stored, dict):
+        stored = {}
+    return {field: str(stored.get(field) or "") for field in _APPLICATION_PROMPT_FIELDS}
+
+
+def save_application_prompt_settings(username="subidh", data=None):
+    """Persist application answers without overwriting unrelated scoring settings."""
+    profile = get_profile(username) or {}
+    weights = profile.get("scoring_weights") or {}
+    if not isinstance(weights, dict):
+        weights = {}
+    cleaned = {
+        field: str((data or {}).get(field) or "")
+        for field in _APPLICATION_PROMPT_FIELDS
+    }
+    saved = upsert_profile(username, {
+        "scoring_weights": {**weights, _APPLICATION_PROMPT_KEY: cleaned},
+    })
+    if not saved:
+        return None
+    return cleaned
 
 
 # ===================== VERSIONED PDF PROFILE =====================
@@ -170,6 +209,23 @@ def activate_resume_profile(profile_id, corrections, review_notes="", username="
     }).execute()
     row = result.data[0] if isinstance(result.data, list) and result.data else result.data
     return _snapshot(row) if row else get_active_profile_snapshot(username)
+
+
+def prune_obsolete_resume_profiles(keep_profile_id, username="subidh"):
+    """Delete obsolete profile rows unless an audited cover letter references them."""
+    db = _get_client()
+    rows = (db.table("resume_profiles").select("id")
+            .eq("username", username).neq("id", keep_profile_id).execute()).data or []
+    old_ids = [row["id"] for row in rows if row.get("id") is not None]
+    if not old_ids:
+        return 0
+    referenced = (db.table("cover_letter_drafts").select("resume_profile_id")
+                  .in_("resume_profile_id", old_ids).execute()).data or []
+    protected = {row.get("resume_profile_id") for row in referenced}
+    deletable = [profile_id for profile_id in old_ids if profile_id not in protected]
+    if deletable:
+        db.table("resume_profiles").delete().in_("id", deletable).execute()
+    return len(deletable)
 
 
 # ===================== HELPER ACCESSORS =====================

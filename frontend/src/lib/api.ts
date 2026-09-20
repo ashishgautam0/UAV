@@ -22,6 +22,8 @@ import type {
   ResumeProfile,
   ResumeProfileReview,
   ResumeProfileStatus,
+  ApplicationResumeStatus,
+  ApplicationPromptSettings,
 } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -215,6 +217,27 @@ export async function updateProfile(data: UserProfileUpdate): Promise<UserProfil
 
 export async function getResumeProfileStatus(): Promise<ResumeProfileStatus> {
   return apiFetch<ResumeProfileStatus>("/api/profile/resume");
+}
+
+export async function getApplicationResumeStatus(): Promise<ApplicationResumeStatus> {
+  return apiFetch<ApplicationResumeStatus>("/api/profile/resume/application");
+}
+
+export async function getApplicationPromptSettings(): Promise<ApplicationPromptSettings> {
+  return apiFetch<ApplicationPromptSettings>("/api/profile/application-settings");
+}
+
+export async function updateApplicationPromptSettings(
+  data: ApplicationPromptSettings,
+): Promise<ApplicationPromptSettings> {
+  return apiFetch<ApplicationPromptSettings>("/api/profile/application-settings", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export function getApplicationResumePdfUrl(): string {
+  return `${API_URL}/api/profile/resume/pdf`;
 }
 
 export async function uploadResumePdf(file: File): Promise<ResumeProfile> {
