@@ -382,10 +382,9 @@ def cmd_demos(args):
 
 
 def cmd_companies(args):
-    """List companies from recent scraped jobs that have no fresh intel cached.
+    """List companies from recent jobs with no fresh website/contact cache.
 
-    The routine writes a short intel blurb for each (from its own knowledge)
-    and saves it with `save-company`.
+    The routine finds the website and a real hiring contact, when available.
     """
     from datetime import datetime, timedelta
 
@@ -404,7 +403,8 @@ def cmd_companies(args):
     for c in companies:
         if len(missing) >= args.limit:
             break
-        if get_cached_research(c) is None:
+        cached = get_cached_research(c)
+        if cached is None or not (cached.get("product_url") or "").strip():
             missing.append(c)
 
     json.dump({"companies_needing_intel": missing}, sys.stdout, indent=2)
@@ -413,9 +413,10 @@ def cmd_companies(args):
 
 
 def cmd_intel(args):
-    """Print cached company intel as JSON so agents can self-serve the email
-    domain (from product_url) and hiring contact without threading state
-    through the orchestrator. Prints {"found": false} when nothing is cached."""
+    """Print the cached website and hiring contact for downstream outreach.
+
+    Prints {"found": false} when no fresh cache entry exists.
+    """
     from tracker import get_cached_research
 
     row = get_cached_research(args.name)
@@ -585,11 +586,11 @@ def cmd_screen(args):
 
 
 def cmd_save_company(args):
-    """Save company intel from stdin JSON into company_research_cache.
+    """Save a company website/contact from stdin JSON into the cache.
 
-    Expected JSON: {"description": str, "recent_news": str,
-                    "tech_signals": [str, ...], "product_url": str}
-    Unknown/uncertain fields should simply be omitted or empty.
+    Expected JSON: {"product_url": "https://company.example",
+                    "hiring_contact": {"name": str, "title": str,
+                                       "linkedin_url": str}}
     """
     from tracker import save_research_cache
 
@@ -602,18 +603,27 @@ def cmd_save_company(args):
     except json.JSONDecodeError as e:
         print(f"stdin is not valid JSON: {e}", file=sys.stderr)
         return 1
-    if not (data.get("description") or "").strip():
-        print("Intel needs a non-empty 'description'.", file=sys.stderr)
+    product_url = (data.get("product_url") or "").strip()
+    contact = data.get("hiring_contact") or {}
+    if not isinstance(contact, dict):
+        print("hiring_contact must be a JSON object.", file=sys.stderr)
+        return 1
+    if product_url and not product_url.startswith(("https://", "http://")):
+        print("Company website must be an HTTP(S) URL.", file=sys.stderr)
+        return 1
+    if not product_url and not (contact.get("name") or "").strip():
+        print("A company website or verified hiring contact is required.", file=sys.stderr)
         return 1
 
     save_research_cache(args.name, {
-        "description": data.get("description", ""),
-        "recent_news": data.get("recent_news", ""),
-        "tech_signals": data.get("tech_signals", []) or [],
-        "product_url": data.get("product_url", ""),
-        "hiring_contact": data.get("hiring_contact", {}) or {},
+        "product_url": product_url,
+        "hiring_contact": {
+            "name": (contact.get("name") or "").strip(),
+            "title": (contact.get("title") or "").strip(),
+            "linkedin_url": (contact.get("linkedin_url") or "").strip(),
+        },
     })
-    print(f"Saved intel for {args.name}.")
+    print(f"Saved company website/contact for {args.name}.")
     return 0
 
 

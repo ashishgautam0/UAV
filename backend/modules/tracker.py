@@ -821,12 +821,8 @@ def get_cached_research(company_name):
 
 def save_research_cache(company_name, research_data):
     db = _get_client()
-    import json
     db.table("company_research_cache").upsert({
         "company_name": company_name,
-        "description": research_data.get("description", ""),
-        "recent_news": research_data.get("recent_news", ""),
-        "tech_signals": json.dumps(research_data.get("tech_signals", [])),
         "hiring_contact_name": research_data.get("hiring_contact", {}).get("name", ""),
         "hiring_contact_title": research_data.get("hiring_contact", {}).get("title", ""),
         "hiring_contact_linkedin": research_data.get("hiring_contact", {}).get("linkedin_url", ""),

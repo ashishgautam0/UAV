@@ -150,9 +150,6 @@ def _t_get_company_intel(args):
 def _t_save_company_intel(args):
     import tracker
     payload = {
-        "description": args.get("description", ""),
-        "recent_news": args.get("recent_news", ""),
-        "tech_signals": args.get("tech_signals", []),
         "product_url": args.get("product_url", ""),
         "hiring_contact": {
             "name": args.get("hiring_contact_name", ""),
@@ -305,15 +302,12 @@ TOOLS = [
     },
     {
         "name": "save_company_intel",
-        "description": "Upsert cached company research (facts only).",
+        "description": "Upsert a verified company website and hiring contact.",
         "handler": _t_save_company_intel,
         "inputSchema": {
             "type": "object",
             "properties": {
                 "company": {"type": "string"},
-                "description": {"type": "string"},
-                "recent_news": {"type": "string"},
-                "tech_signals": {"type": "array", "items": {"type": "string"}},
                 "product_url": {"type": "string"},
                 "hiring_contact_name": {"type": "string"},
                 "hiring_contact_title": {"type": "string"},

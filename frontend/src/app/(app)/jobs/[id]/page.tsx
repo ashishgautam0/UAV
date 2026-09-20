@@ -554,50 +554,12 @@ export default function JobDetailPage() {
             Company Intel — {job.company}
           </CardTitle>
           <CardDescription>
-            Background and talking points, researched by the hourly routine.
+            Official website found by the hourly routine.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {intel?.found ? (
-            <>
-              {intel.description && (
-                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                  {intel.description}
-                </p>
-              )}
-              {intel.recent_news && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">
-                    Recent direction
-                  </p>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                    {intel.recent_news}
-                  </p>
-                </div>
-              )}
-              {(() => {
-                let signals: string[] = [];
-                const raw = intel.tech_signals;
-                if (Array.isArray(raw)) signals = raw;
-                else if (typeof raw === "string") {
-                  try {
-                    const parsed = JSON.parse(raw);
-                    if (Array.isArray(parsed)) signals = parsed;
-                  } catch {
-                    /* not JSON — ignore */
-                  }
-                }
-                return signals.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {signals.map((s) => (
-                      <Badge key={s} variant="outline" className="text-xs">
-                        {s}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : null;
-              })()}
-              {intel.product_url && (
+            intel.product_url ? (
                 <a
                   href={intel.product_url}
                   target="_blank"
@@ -607,12 +569,14 @@ export default function JobDetailPage() {
                   <ExternalLink className="h-3.5 w-3.5" />
                   Company website
                 </a>
-              )}
-            </>
+            ) : (
+              <p className="text-sm italic text-muted-foreground">
+                Company website not found yet.
+              </p>
+            )
           ) : (
             <p className="text-sm italic text-muted-foreground">
-              Not researched yet — the hourly routine writes intel for each
-              new job&apos;s company; check back after the next run.
+              Company website not researched yet; check back after the next hourly run.
             </p>
           )}
         </CardContent>

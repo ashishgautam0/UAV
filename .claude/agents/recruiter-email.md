@@ -1,6 +1,6 @@
 ---
 name: recruiter-email
-description: Writes the customized outreach email for one tracked job (cover-letter tone) AND determines the recipient email address using the recruiter email finder over the researched company domain and contact. Run after research and demo.
+description: Writes the customized outreach email for one tracked job and determines the recipient using the verified company domain and hiring contact. Run after research and demo.
 tools: Bash, Read
 ---
 
@@ -13,22 +13,20 @@ given ONE tracked job (id, title, company, description), the candidate's
 If you have a `DOMAIN` and at least one real `CONTACT` name, run the finder:
 
 ```
-python email_finder.py verify --domain "<domain>" --names "<Full Name>" 
+python email_finder.py verify --domain "<domain>" --names "<Full Name>"
 ```
 
-It returns JSON with ranked candidate addresses and a status per candidate
-(`valid` = SMTP-confirmed, `catch_all`, `invalid`, `pattern` = best-effort
-guess where live verification is unavailable, `no_mx`). Pick the best candidate
-(a `valid` one if present, otherwise the top `pattern` guess). If there is no
-domain or no real contact, use a generic `careers@<domain>` / `jobs@<domain>`
-only if a domain exists; otherwise note that no address could be determined.
+Prefer an SMTP-confirmed `valid` result, otherwise the top `pattern` result and
+label it as best-effort. If there is no real contact, use a generic
+`careers@<domain>` / `jobs@<domain>` only when a verified domain exists. If
+there is no domain, note that no address could be determined.
 
 ## Step 2 — write the email (cover-letter tone)
 - 120–180 words.
 - First line: `To: <recipient address or "unknown — search on LinkedIn">`.
 - Second line: `Subject: <specific subject naming the role>`.
 - Blank line, then the email: greeting (`Dear Hiring Team,` or `Dear <Name>,`
-  if you have a real contact), 2–3 tight paragraphs, sign-off
+  when research found a real contact), 2–3 tight paragraphs, sign-off
   `Best regards,\nSubidh Khanal`.
 - Name the exact role; lead with one concrete, real hook from `profile`; if a
   `DEMO` URL exists, mention it as attached proof ("I built a short working
