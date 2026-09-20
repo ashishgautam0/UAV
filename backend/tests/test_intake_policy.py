@@ -52,7 +52,7 @@ class IntakePolicyTests(unittest.TestCase):
         self.assertEqual(kept, jobs[:1])
         self.assertEqual(len(removed), 2)
 
-    def test_active_scraper_aggregator_is_linkedin_only(self):
+    def test_active_scraper_aggregator_excludes_gulf_and_partner_ats(self):
         # Execute the real aggregator with offline source fixtures; no third-party
         # packages, network requests or production database are involved.
         source = (ROOT / "modules" / "scraper.py").read_text()
@@ -63,14 +63,14 @@ class IntakePolicyTests(unittest.TestCase):
                            {"company": "Small Startup", "description": "1 year experience"}]
         import os
         from unittest.mock import patch
-        env = {"os": os, "scrape_linkedin": fixture}
-        # No inactive-source bindings: including Indeed, Gulf, Partner ATS, or
-        # Amazon in the scheduled rotation would fail this integration test.
+        env = {"os": os, "scrape_indeed_india": fixture, "scrape_linkedin": fixture}
+        # No inactive-source bindings: including Gulf, Partner ATS, Naukri,
+        # Google Jobs, or Amazon would fail this integration test.
         exec(compile(ast.Module(body=[node], type_ignores=[]), "<aggregator>", "exec"), env)
         with patch.dict(os.environ, {}, clear=True):
             jobs, counts, errors = env["run_all_scrapers"]()
-        self.assertEqual(len(jobs), 1)
-        self.assertEqual(counts, {"LinkedIn AI/ML": 3})
+        self.assertEqual(len(jobs), 2)
+        self.assertEqual(counts, {"Indeed India": 3, "LinkedIn AI/ML": 3})
         self.assertFalse(errors)
         self.assertTrue(all(j["description"] == "1 year experience" for j in jobs))
 
