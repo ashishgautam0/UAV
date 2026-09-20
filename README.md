@@ -167,6 +167,15 @@ npm run dev
 
 The frontend runs on `http://localhost:3000` and the backend on `http://localhost:8000`.
 
+The Settings page stores the editable Today Todo browser-agent template and
+application answers in the backend. Its **Ready-to-paste Codex prompt** is
+rendered from the current Today Todo rows plus the latest Settings PDF, with a
+fixed job ID/URL batch. Copying remains disabled when the resume, jobs,
+submission authorization, or a supported placeholder is missing. Pasting the
+rendered prompt starts the supported browser work, but login, CAPTCHA,
+sensitive-data approval, missing truthful answers, and final third-party
+submission can still require user confirmation.
+
 ## Deployment
 
 The repo deploys as **two Vercel projects from this one repository**, plus the

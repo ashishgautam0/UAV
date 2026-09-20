@@ -60,6 +60,16 @@ class ApplicationPromptSettings(BaseModel):
     relocation_preference: str = Field(default="", max_length=500)
 
 
+class RenderedApplicationPrompt(BaseModel):
+    """A fixed, ready-to-paste browser-agent batch assembled by the backend."""
+    prompt: str
+    job_count: int
+    resume_available: bool
+    ready: bool
+    issues: list[str] = Field(default_factory=list)
+    unresolved_placeholders: list[str] = Field(default_factory=list)
+
+
 class ReviewedExperienceEntry(BaseModel):
     id: str = ""
     label: str = ""

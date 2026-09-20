@@ -25,6 +25,7 @@ import type {
   ResumeProfileStatus,
   ApplicationResumeStatus,
   ApplicationPromptSettings,
+  RenderedApplicationPrompt,
 } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -246,6 +247,14 @@ export async function updateApplicationPromptSettings(
     method: "PUT",
     body: JSON.stringify(data),
   });
+}
+
+export async function getRenderedApplicationPrompt(
+  pageUrl: string,
+): Promise<RenderedApplicationPrompt> {
+  return apiFetch<RenderedApplicationPrompt>(
+    `/api/profile/application-prompt?page_url=${encodeURIComponent(pageUrl)}`,
+  );
 }
 
 export function getApplicationResumePdfUrl(): string {
