@@ -44,7 +44,7 @@ and unknown mandatory criteria are surfaced for review rather than guessed.
 ### Tonight's Plan
 - View scraped jobs from the past 24 hours
 - Filter by work mode (remote/hybrid/onsite)
-- Sort by relevance score, source, or company
+- Show saved jobs newest-first, with optional work-mode filtering
 - Quick-apply button to log applications directly
 
 ### Hourly Automation

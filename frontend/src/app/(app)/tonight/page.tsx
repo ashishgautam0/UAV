@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getRankedScrapedJobs, createApplication, markScrapedJob, lookupApplication } from "@/lib/api";
+import { getScrapedJobs, createApplication, markScrapedJob, lookupApplication } from "@/lib/api";
 import { ApplyWithCodex } from "@/components/apply-with-codex";
 import type { ScrapedJob } from "@/lib/types";
 
@@ -35,41 +35,11 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-function bestScoreColor(score: number) {
-  if (score >= 70) return "bg-emerald-600 text-white";
-  if (score >= 50) return "bg-yellow-500 text-black";
-  return "bg-muted text-muted-foreground";
-}
-
 function workModeBadgeColor(mode: string | undefined) {
   const m = (mode ?? "").toLowerCase();
   if (m === "remote") return "bg-emerald-600/15 text-emerald-400 border-emerald-600/30";
   if (m === "hybrid") return "bg-blue-600/15 text-blue-400 border-blue-600/30";
   return "bg-orange-600/15 text-orange-400 border-orange-600/30";
-}
-
-function bestScoreTitle(
-  breakdown: NonNullable<ScrapedJob["bestscore_breakdown"]>
-) {
-  const details: string[] = [];
-  if (typeof breakdown.match === "number") {
-    details.push(`resume-JD match ${Math.round(breakdown.match)}%`);
-  } else if (typeof breakdown.fit === "number") {
-    details.push(
-      `fit ${Math.round(breakdown.fit * 100)}%${
-        breakdown.fit_source ? ` (${breakdown.fit_source})` : ""
-      }`
-    );
-  }
-  if (breakdown.eligibility) {
-    details.push(`eligibility ${breakdown.eligibility.replaceAll("_", " ")}`);
-  }
-  details.push(`freshness ${Math.round(breakdown.freshness * 100)}%`);
-  if (breakdown.reason) details.push(breakdown.reason);
-  return details.join(" · ");
 }
 
 // ---------------------------------------------------------------------------
@@ -262,8 +232,9 @@ export default function TonightPage() {
     setLoading(true);
     setLoadError(false);
     try {
-      // Ranked best-first by BestScore (fit × freshness × ease).
-      setJobs(await getRankedScrapedJobs());
+      // The API returns visible jobs newest-first; Today Todo deliberately does
+      // not calculate, display, or sort by a ranking score.
+      setJobs(await getScrapedJobs());
     } catch {
       setLoadError(true);
       toast.error("Failed to load data");
@@ -309,7 +280,7 @@ export default function TonightPage() {
   // ------- Remove handler -------
   // Marks the job dismissed rather than deleting it: the row stays so the
   // scraper's URL dedup keeps recognising it and never re-adds it, while the
-  // ranked/list views (which filter dismissed=0) hide it.
+  // list views (which filter dismissed=0) hide it.
   const handleDismiss = useCallback(async (job: ScrapedJob) => {
     // Drop it from the list immediately so the swipe feels instant.
     setJobs((prev) => prev.filter((j) => j.id !== job.id));
@@ -332,7 +303,7 @@ export default function TonightPage() {
             Today Todo
           </h1>
           <p className="text-muted-foreground mt-1">
-            Ranked best-first by match, freshness &amp; ease. Tap to apply · swipe right to log · swipe left to remove.
+            Newest jobs first. Tap to apply · swipe right to log · swipe left to remove.
           </p>
         </div>
         <Button variant="outline" onClick={loadData} disabled={loading}>
@@ -420,21 +391,6 @@ export default function TonightPage() {
                                 {job.company}
                               </div>
                             </div>
-                            {typeof job.bestscore === "number" && (
-                              <Badge
-                                title={
-                                  job.bestscore_breakdown
-                                    ? bestScoreTitle(job.bestscore_breakdown)
-                                    : "BestScore"
-                                }
-                                className={cn(
-                                  "shrink-0 tabular-nums",
-                                  bestScoreColor(job.bestscore)
-                                )}
-                              >
-                                {Math.round(job.bestscore)}
-                              </Badge>
-                            )}
                           </div>
                         </CardHeader>
 

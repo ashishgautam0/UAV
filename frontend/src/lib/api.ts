@@ -120,10 +120,8 @@ export async function getRoleAnalysis(): Promise<RoleAnalysis[]> {
 }
 
 // ---- Scraper ----
-export async function getRankedScrapedJobs(
-  limit = 200
-): Promise<ScrapedJob[]> {
-  return apiFetch<ScrapedJob[]>(`/api/scraped-jobs/ranked?limit=${limit}`);
+export async function getScrapedJobs(): Promise<ScrapedJob[]> {
+  return apiFetch<ScrapedJob[]>("/api/scraped-jobs");
 }
 
 export async function markScrapedJob(id: number, action: string) {
