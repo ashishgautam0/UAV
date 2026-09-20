@@ -2,11 +2,14 @@ import ast
 import pathlib
 import sys
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "modules"))
 from resume_profile import profile_text
+import profile as profile_data
+from backend.app.models.schemas import ApplicationPromptSettings
+from backend.app.routers import profile as profile_routes
 
 def function(path, name, env):
     node = next(n for n in ast.parse(path.read_text()).body
@@ -56,6 +59,45 @@ class SettingsProfileTests(unittest.TestCase):
         db = self.activate("pending_review")
         db.table.assert_not_called()
         db.rpc.assert_called_once()
+
+    def test_application_prompt_settings_are_allowlisted(self):
+        stored = {
+            "scoring_weights": {
+                "application_prompt": {
+                    "notice_period": "One month",
+                    "unsupported": "must not escape",
+                },
+            },
+        }
+        with patch.object(profile_data, "get_profile", return_value=stored):
+            result = profile_data.get_application_prompt_settings()
+        self.assertEqual(result["notice_period"], "One month")
+        self.assertNotIn("unsupported", result)
+        self.assertEqual(result["current_location"], "")
+
+    def test_saving_application_prompt_preserves_other_scoring_settings(self):
+        existing = {"scoring_weights": {"skill": 44, "application_prompt": {"notice_period": "old"}}}
+        captured = {}
+
+        def save(username, data):
+            captured.update(data)
+            return {"username": username, **data}
+
+        with patch.object(profile_data, "get_profile", return_value=existing), \
+             patch.object(profile_data, "upsert_profile", side_effect=save):
+            result = profile_data.save_application_prompt_settings(
+                data={"notice_period": "Two weeks", "unknown": "ignored"}
+            )
+        self.assertEqual(captured["scoring_weights"]["skill"], 44)
+        self.assertEqual(result["notice_period"], "Two weeks")
+        self.assertNotIn("unknown", captured["scoring_weights"]["application_prompt"])
+
+    def test_application_settings_route_trims_and_persists_fields(self):
+        body = ApplicationPromptSettings(notice_period="  Two weeks  ")
+        with patch.object(profile_routes, "save_application_prompt_settings", side_effect=lambda _, data: data) as save:
+            result = profile_routes.update_application_settings(body)
+        self.assertEqual(result.notice_period, "Two weeks")
+        save.assert_called_once()
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { activateResumeProfile, getResumeProfileStatus, uploadResumePdf } from "@/lib/api";
-import type { ResumeFact, ResumeProfile, ResumeProfileReview } from "@/lib/types";
+import {
+  activateResumeProfile,
+  getApplicationPromptSettings,
+  getResumeProfileStatus,
+  updateApplicationPromptSettings,
+  uploadResumePdf,
+} from "@/lib/api";
+import type { ApplicationPromptSettings, ResumeFact, ResumeProfile, ResumeProfileReview } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +17,24 @@ import { toast } from "sonner";
 import { CheckCircle2, FileText, Loader2, Plus, Trash2, Upload } from "lucide-react";
 
 const MAX_BYTES = 10 * 1024 * 1024;
+const EMPTY_APPLICATION_SETTINGS: ApplicationPromptSettings = {
+  submission_authorization: "",
+  notice_period: "",
+  current_ctc: "",
+  expected_ctc: "",
+  expected_start_date: "",
+  current_location: "",
+  relocation_preference: "",
+};
+const APPLICATION_FIELDS: Array<{ key: keyof ApplicationPromptSettings; label: string; hint: string }> = [
+  { key: "submission_authorization", label: "Submission authorization", hint: "Optional instruction describing what the browser agent may submit." },
+  { key: "notice_period", label: "Notice period", hint: "Use your truthful current notice period." },
+  { key: "current_ctc", label: "Current compensation", hint: "Include currency and period if you want this supplied." },
+  { key: "expected_ctc", label: "Expected compensation", hint: "Include currency and period if you want this supplied." },
+  { key: "expected_start_date", label: "Expected start date", hint: "Use an unambiguous date or availability statement." },
+  { key: "current_location", label: "Current location", hint: "Enter only the location detail you want used in applications." },
+  { key: "relocation_preference", label: "Relocation preference", hint: "Describe your actual relocation preference." },
+];
 const evidence = (item: ResumeFact) => item.evidence?.map((e) => e.excerpt).filter(Boolean).join(" · ") || "User review required";
 
 function toReview(profile: ResumeProfile): ResumeProfileReview {
@@ -35,14 +59,17 @@ export default function SettingsPage() {
   const [active, setActive] = useState<ResumeProfile | null>(null);
   const [candidate, setCandidate] = useState<ResumeProfile | null>(null);
   const [review, setReview] = useState<ResumeProfileReview | null>(null);
+  const [applicationSettings, setApplicationSettings] = useState<ApplicationPromptSettings>(EMPTY_APPLICATION_SETTINGS);
+  const [savingApplicationSettings, setSavingApplicationSettings] = useState(false);
 
   useEffect(() => {
-    getResumeProfileStatus().then((s) => {
+    Promise.all([getResumeProfileStatus(), getApplicationPromptSettings()]).then(([s, settings]) => {
       setActive(s.active);
       const latest = s.latest?.status === "pending_review" ? s.latest : null;
       setPending(latest);
       setCandidate(latest);
       if (latest) setReview(toReview(latest));
+      setApplicationSettings(settings);
     }).catch(() => { setLoadError(true); toast.error("Failed to load resume status"); }).finally(() => setLoading(false));
   }, []);
 
@@ -64,7 +91,7 @@ export default function SettingsPage() {
     setBusy(true);
     try {
       const next = await uploadResumePdf(file); setCandidate(next); setPending(next.status === "pending_review" ? next : pending); setReview(toReview(next));
-      toast.success("PDF extracted. Review every fact before activating it.");
+      toast.success("PDF replaced and extracted. Review every fact before activating it.");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Resume upload failed"); }
     finally { setBusy(false); }
   }
@@ -78,6 +105,19 @@ export default function SettingsPage() {
       toast.success(`Profile v${saved.version} is active; earlier analysis is stale and will be rescored.`);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Profile activation failed"); }
     finally { setBusy(false); }
+  }
+
+  async function saveApplicationSettings() {
+    setSavingApplicationSettings(true);
+    try {
+      const saved = await updateApplicationPromptSettings(applicationSettings);
+      setApplicationSettings(saved);
+      toast.success("Application prompt details saved for every browser and device.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Application prompt details could not be saved");
+    } finally {
+      setSavingApplicationSettings(false);
+    }
   }
 
   if (loading) return <div className="flex h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -98,15 +138,43 @@ export default function SettingsPage() {
           <Button variant="outline" disabled={!active.backend_text} onClick={async () => { try { await navigator.clipboard.writeText(active.backend_text || ""); toast.success("Backend resume text copied"); } catch { toast.error("Select and copy the text above."); } }}>Copy backend text</Button>
         </div>
         <p className="text-xs text-muted-foreground">Edit the verified facts below, then save to update future backend reads. To replace source text, projects or contact details, upload and activate an updated PDF. The source PDF text stays unchanged as evidence.</p>
-        <p className="text-xs text-muted-foreground">The PDF saved under Today Todo → Apply with Codex is a separate application attachment and does not change this backend profile.</p>
+        <p className="text-xs text-muted-foreground">Today Todo automatically uses the latest PDF uploaded here on every browser and device.</p>
       </CardContent>
     </Card> : !loadError && <p className="rounded border p-4 text-sm">No active backend resume. Upload a PDF and confirm its extracted facts to activate it.</p>}
     {pending && pending.id !== active?.id && <div className="flex flex-wrap items-center justify-between gap-3 rounded border p-4 text-sm"><span>Awaiting review: {pending.source_filename} · v{pending.version}. The backend still uses the active profile above.</span><Button variant="outline" disabled={busy} onClick={() => { setCandidate(pending); setReview(toReview(pending)); }}>Review uploaded PDF</Button></div>}
+    <Card>
+      <CardHeader>
+        <CardTitle>Application prompt details</CardTitle>
+        <p className="text-sm text-muted-foreground">Saved with the backend profile and loaded by Today Todo on every browser and device. Leave any answer blank rather than guessing.</p>
+      </CardHeader>
+      <CardContent className="grid gap-4 md:grid-cols-2">
+        {APPLICATION_FIELDS.map(({ key, label, hint }) => (
+          <div key={key} className={key === "submission_authorization" ? "md:col-span-2" : ""}>
+            <label htmlFor={`application-${key}`} className="text-sm font-medium">{label}</label>
+            <Textarea
+              id={`application-${key}`}
+              value={applicationSettings[key]}
+              maxLength={500}
+              rows={key === "submission_authorization" ? 3 : 2}
+              onChange={(event) => setApplicationSettings((current) => ({ ...current, [key]: event.target.value }))}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+          </div>
+        ))}
+        <div className="md:col-span-2">
+          <Button disabled={savingApplicationSettings || loadError} onClick={saveApplicationSettings}>
+            {savingApplicationSettings && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save application prompt details
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
     <div className="grid gap-6 lg:grid-cols-2">
       <Card><CardHeader><CardTitle>Resume PDF</CardTitle></CardHeader><CardContent className="space-y-4">
         <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => choose(e.target.files?.[0])} />
         <button type="button" onClick={() => inputRef.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); choose(e.dataTransfer.files?.[0]); }} className="flex min-h-40 w-full flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center"><Upload className="mb-3 h-8 w-8 text-muted-foreground" /><span className="font-medium">{file?.name || "Choose or drop a PDF"}</span><span className="text-xs text-muted-foreground">PDF only · 10 MB · 30 pages</span></button>
         <Button className="w-full" disabled={!file || busy} onClick={upload}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}Extract for review</Button>
+        <p className="text-xs text-muted-foreground">Uploading a valid PDF replaces the prior application PDF in cloud storage. Uploads are available only from Settings.</p>
       </CardContent></Card>
       <Card><CardHeader><CardTitle>PDF preview</CardTitle></CardHeader><CardContent>{preview ? <iframe src={preview} title="Selected resume PDF" className="h-[55vh] w-full rounded border bg-white" /> : <div className="flex h-[55vh] items-center justify-center rounded border bg-muted/30"><FileText className="h-10 w-10 text-muted-foreground" /></div>}</CardContent></Card>
     </div>
