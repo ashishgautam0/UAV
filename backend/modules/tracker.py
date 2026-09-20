@@ -406,10 +406,14 @@ def get_scraped_jobs(source=None):
 # hosted LLM call — see backend/modules/pending_messages.py.
 
 DEFAULT_MESSAGE_TYPE = "cold_dm"
+JOB_MESSAGE_TYPES = ("screen", "cold_dm", "hr_email", "resume_points", "demo_html")
+REMOVED_MESSAGE_TYPES = {"evaluation"}
 
 
 def get_job_message(scraped_job_id, message_type=DEFAULT_MESSAGE_TYPE):
     """Return the stored message row for a job, or None."""
+    if message_type in REMOVED_MESSAGE_TYPES:
+        return None
     try:
         db = _get_client()
         resp = (db.table("job_messages")
@@ -428,10 +432,13 @@ def get_job_message(scraped_job_id, message_type=DEFAULT_MESSAGE_TYPE):
 def save_job_message(scraped_job_id, content, message_type=DEFAULT_MESSAGE_TYPE,
                      generated_by="claude-routine", profile_version=None):
     """Store (or replace) the message for a job. Returns True on success."""
+    if message_type not in JOB_MESSAGE_TYPES:
+        print(f"Unsupported job message type: {message_type}")
+        return False
     db = _get_client()
     try:
         profile_dependent = message_type in {
-            "screen", "cold_dm", "hr_email", "resume_points", "evaluation"
+            "screen", "cold_dm", "hr_email", "resume_points"
         }
         if profile_version is None and profile_dependent:
             try:
@@ -460,6 +467,8 @@ def get_jobs_needing_messages(limit=20, message_type=DEFAULT_MESSAGE_TYPE):
     PostgREST has no NOT EXISTS, so the anti-join is done here: pull the
     candidate jobs, pull the ids that already have a message, subtract.
     """
+    if message_type not in JOB_MESSAGE_TYPES:
+        return []
     try:
         db = _get_client()
         jobs = (db.table("scraped_jobs")

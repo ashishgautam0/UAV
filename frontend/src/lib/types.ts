@@ -319,6 +319,7 @@ export interface ApplicationResumeStatus {
 }
 
 export interface ApplicationPromptSettings {
+  prompt_template: string;
   submission_authorization: string;
   notice_period: string;
   current_ctc: string;

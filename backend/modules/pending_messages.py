@@ -31,6 +31,7 @@ import sys
 
 from tracker import (
     DEFAULT_MESSAGE_TYPE,
+    JOB_MESSAGE_TYPES,
     complete_message_request,
     fail_message_request,
     get_job_message,
@@ -133,12 +134,12 @@ def main():
 
     p_list = sub.add_parser("list", help="jobs with no stored message yet")
     p_list.add_argument("--limit", type=int, default=10)
-    p_list.add_argument("--type", default=DEFAULT_MESSAGE_TYPE)
+    p_list.add_argument("--type", default=DEFAULT_MESSAGE_TYPE, choices=JOB_MESSAGE_TYPES)
     p_list.set_defaults(func=cmd_list)
 
     p_save = sub.add_parser("save", help="store a message for one job")
     p_save.add_argument("--job-id", type=int, required=True)
-    p_save.add_argument("--type", default=DEFAULT_MESSAGE_TYPE)
+    p_save.add_argument("--type", default=DEFAULT_MESSAGE_TYPE, choices=JOB_MESSAGE_TYPES)
     p_save.add_argument("--content", default=None,
                         help="message text; omit to read from stdin")
     p_save.set_defaults(func=cmd_save)

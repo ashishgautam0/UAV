@@ -136,7 +136,7 @@ def read_application_settings():
 @router.put("/application-settings", response_model=ApplicationPromptSettings)
 def update_application_settings(body: ApplicationPromptSettings):
     payload = {
-        key: _clean_text(value)
+        key: _clean_text(value, 12_000 if key == "prompt_template" else 500)
         for key, value in body.model_dump().items()
     }
     saved = save_application_prompt_settings(_DEFAULT_USERNAME, payload)

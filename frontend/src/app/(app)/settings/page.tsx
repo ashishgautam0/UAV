@@ -18,6 +18,7 @@ import { CheckCircle2, FileText, Loader2, Plus, Trash2, Upload } from "lucide-re
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const EMPTY_APPLICATION_SETTINGS: ApplicationPromptSettings = {
+  prompt_template: "",
   submission_authorization: "",
   notice_period: "",
   current_ctc: "",
@@ -144,10 +145,27 @@ export default function SettingsPage() {
     {pending && pending.id !== active?.id && <div className="flex flex-wrap items-center justify-between gap-3 rounded border p-4 text-sm"><span>Awaiting review: {pending.source_filename} · v{pending.version}. The backend still uses the active profile above.</span><Button variant="outline" disabled={busy} onClick={() => { setCandidate(pending); setReview(toReview(pending)); }}>Review uploaded PDF</Button></div>}
     <Card>
       <CardHeader>
-        <CardTitle>Application prompt details</CardTitle>
-        <p className="text-sm text-muted-foreground">Saved with the backend profile and loaded by Today Todo on every browser and device. Leave any answer blank rather than guessing.</p>
+        <CardTitle>Today Todo application prompt</CardTitle>
+        <p className="text-sm text-muted-foreground">Edit the backend-saved prompt used by Today Todo. Dynamic values are inserted when the page loads.</p>
       </CardHeader>
       <CardContent className="grid gap-4 md:grid-cols-2">
+        <div className="md:col-span-2">
+          <label htmlFor="application-prompt-template" className="text-sm font-medium">Prompt template</label>
+          <Textarea
+            id="application-prompt-template"
+            value={applicationSettings.prompt_template}
+            maxLength={12000}
+            rows={18}
+            onChange={(event) => setApplicationSettings((current) => ({ ...current, prompt_template: event.target.value }))}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Available placeholders: {"{{application_answers}}"}, {"{{page_url}}"}, {"{{resume_filename}}"}, {"{{resume_url}}"}, {"{{resume_sha256}}"}, and {"{{batch_jobs}}"}.
+          </p>
+        </div>
+        <div className="md:col-span-2 border-t pt-4">
+          <h3 className="font-medium">Application-form answers</h3>
+          <p className="text-xs text-muted-foreground">Saved with the backend profile. Leave any answer blank rather than guessing.</p>
+        </div>
         {APPLICATION_FIELDS.map(({ key, label, hint }) => (
           <div key={key} className={key === "submission_authorization" ? "md:col-span-2" : ""}>
             <label htmlFor={`application-${key}`} className="text-sm font-medium">{label}</label>
@@ -164,7 +182,7 @@ export default function SettingsPage() {
         <div className="md:col-span-2">
           <Button disabled={savingApplicationSettings || loadError} onClick={saveApplicationSettings}>
             {savingApplicationSettings && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save application prompt details
+            Save Today Todo prompt
           </Button>
         </div>
       </CardContent>

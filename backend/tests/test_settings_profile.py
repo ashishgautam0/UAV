@@ -70,6 +70,7 @@ class SettingsProfileTests(unittest.TestCase):
         with patch.object(profile_data, "get_profile", return_value=stored):
             result = profile_data.get_application_prompt_settings()
         self.assertEqual(result["notice_period"], "One month")
+        self.assertIn("{{batch_jobs}}", result["prompt_template"])
         self.assertNotIn("unsupported", result)
         self.assertEqual(result["current_location"], "")
 
@@ -95,7 +96,10 @@ class SettingsProfileTests(unittest.TestCase):
             "scoring_weights": {"application_prompt": ["not", "a", "mapping"]},
         }):
             result = profile_data.get_application_prompt_settings()
-        self.assertTrue(all(value == "" for value in result.values()))
+        self.assertTrue(all(
+            value == "" for key, value in result.items() if key != "prompt_template"
+        ))
+        self.assertIn("{{resume_url}}", result["prompt_template"])
 
 if __name__ == "__main__":
     unittest.main()
