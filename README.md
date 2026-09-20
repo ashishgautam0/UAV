@@ -188,6 +188,15 @@ avoid duplicates, and mark the HR todo complete only after verified sending.
 This is a prompt-driven mail-client workflow, not a background email service;
 the Claude routine still only stores drafts and no schedule is changed.
 
+The prompt also processes Dashboard's **Follow-ups Due** queue through each
+linked Tracker detail. It checks dates/history, uses the current numbered draft,
+requires confirmation before sending, and records the exact sent message/channel
+with **Record sent follow-up** only after verified delivery to the mail provider.
+Missing drafts are pending; future dates and follow-ups immediately after a new
+HR email are deferred. Initial HR completion and follow-up history stay separate.
+The recording control checks existing history and locks after an uncertain write;
+it is not a database-level concurrency guarantee across multiple browser sessions.
+
 ## Deployment
 
 The repo deploys as **two Vercel projects from this one repository**, plus the

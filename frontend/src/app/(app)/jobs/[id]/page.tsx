@@ -12,6 +12,7 @@ import {
   snoozeFollowUp,
   getFollowUpHistory,
   getFollowUpDraft,
+  logFollowUp,
   getApplicationResumePdfUrl,
   updateApplicationStatus,
   updateApplicationNotes,
@@ -149,6 +150,10 @@ export default function JobDetailPage() {
   );
   const [emailLoading, setEmailLoading] = useState(false);
   const [hrEmailSaving, setHrEmailSaving] = useState(false);
+  const [followUpSaving, setFollowUpSaving] = useState(false);
+  const [followUpRecordLocked, setFollowUpRecordLocked] = useState(false);
+  const [sentFollowUp, setSentFollowUp] = useState("");
+  const [sentChannel, setSentChannel] = useState("Email");
   const [extraName, setExtraName] = useState("");
 
   const load = useCallback(async () => {
@@ -319,6 +324,30 @@ export default function JobDetailPage() {
     }
   }
 
+  async function recordSentFollowUp() {
+    if (!application || !followUpDraft?.follow_up_number || !sentFollowUp.trim() || followUpSaving || followUpRecordLocked) return;
+    setFollowUpSaving(true);
+    try {
+      const currentHistory = await getFollowUpHistory("application", application.id);
+      if (currentHistory.some((event) => event.follow_up_number >= followUpDraft.follow_up_number!)) {
+        setHistory(currentHistory);
+        setFollowUpRecordLocked(true);
+        toast.error("This follow-up number is already recorded. Review history before doing anything else.");
+        return;
+      }
+      // Lock before the write: an uncertain response must not invite a duplicate retry.
+      setFollowUpRecordLocked(true);
+      await logFollowUp({ entity_type: "application", entity_id: application.id,
+        message_content: sentFollowUp.trim(), channel: sentChannel });
+      toast.success("Sent follow-up recorded. Review the updated history and schedule.");
+      await load();
+    } catch {
+      toast.error("Could not confirm follow-up recording. Check history before retrying; do not resend.");
+    } finally {
+      setFollowUpSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -469,6 +498,18 @@ export default function JobDetailPage() {
                       {copied === "follow-up-draft" ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
                       {copied === "follow-up-draft" ? "Copied" : "Copy draft"}
                     </Button>
+                    <div className="space-y-2 border-t pt-3">
+                      <p className="text-xs text-muted-foreground">Only record after you have actually sent this follow-up. This saves history and advances the schedule; it does not send a message.</p>
+                      <label htmlFor="sent-follow-up" className="text-sm font-medium">Sent follow-up message</label>
+                      <Textarea id="sent-follow-up" value={sentFollowUp} onChange={(event) => setSentFollowUp(event.target.value)} disabled={followUpSaving || followUpRecordLocked} placeholder="Paste the exact message you sent" />
+                      <label htmlFor="sent-follow-up-channel" className="block text-sm font-medium">Sent via</label>
+                      <select id="sent-follow-up-channel" className="rounded border bg-background p-2 text-sm" value={sentChannel} onChange={(event) => setSentChannel(event.target.value)} disabled={followUpSaving || followUpRecordLocked}>
+                        <option>Email</option><option>LinkedIn</option><option>WhatsApp</option><option>Other</option>
+                      </select>
+                      <Button className="ml-2" size="sm" disabled={!sentFollowUp.trim() || !followUpDraft.follow_up_number || followUpSaving || followUpRecordLocked} onClick={recordSentFollowUp}>
+                        {followUpSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Record sent follow-up
+                      </Button>
+                    </div>
                   </>
                 ) : followUpDraft?.status === "pending" ? (
                   <p className="text-sm text-muted-foreground">Queued — the next hourly run writes this follow-up.</p>
