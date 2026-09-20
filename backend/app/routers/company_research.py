@@ -29,9 +29,8 @@ def recruiter_emails(
 ):
     """Guess + (where port 25 is open) verify recruiter email addresses.
 
-    Domain and a default recruiter name are taken from cached company intel;
-    the caller may add more names or override the domain. Computed live —
-    nothing is stored, so results never go stale.
+    Domain and a default recruiter name come from the cached website/contact;
+    the caller may add names or override the domain. Computed live.
     """
     intel = get_cached_research(company) or {}
     dom = (domain or intel.get("product_url") or "").strip()
@@ -61,7 +60,7 @@ def research(
         return cached
 
     result = research_company(body.company_name)
-    if result.get("description"):
+    if result.get("product_url") or result.get("hiring_contact", {}).get("name"):
         save_research_cache(body.company_name, result)
 
     return result

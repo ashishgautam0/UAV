@@ -115,14 +115,11 @@ create index if not exists idx_follow_up_history_outcome on follow_up_history (f
 
 
 -- ---------------------------------------------------------------------------
--- company_research_cache — 14-day cache of per-company research
+-- company_research_cache — 14-day cache of websites and hiring contacts
 -- ---------------------------------------------------------------------------
 create table if not exists company_research_cache (
     id                       bigserial primary key,
     company_name             text        not null unique,
-    description              text        not null default '',
-    recent_news              text        not null default '',
-    tech_signals             jsonb       not null default '[]'::jsonb,
     hiring_contact_name      text        not null default '',
     hiring_contact_title     text        not null default '',
     hiring_contact_linkedin  text        not null default '',

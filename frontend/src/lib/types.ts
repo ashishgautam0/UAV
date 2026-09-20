@@ -162,14 +162,6 @@ export interface JobMessage {
 
 // ---- Company Research ----
 export interface CompanyIntel {
-  description?: string;
-  recent_news?: string;
-  tech_signals?: string[];
-  hiring_contact?: {
-    name?: string;
-    title?: string;
-    linkedin?: string;
-  };
   product_url?: string;
   [key: string]: unknown;
 }
@@ -177,13 +169,7 @@ export interface CompanyIntel {
 export interface CachedCompanyIntel {
   found: boolean;
   company_name?: string;
-  description?: string;
-  recent_news?: string;
-  tech_signals?: string[] | string;
   product_url?: string;
-  hiring_contact_name?: string;
-  hiring_contact_title?: string;
-  hiring_contact_linkedin?: string;
   researched_at?: string;
 }
 
