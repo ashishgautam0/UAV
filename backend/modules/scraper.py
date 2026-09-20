@@ -614,29 +614,25 @@ def scrape_partner_ats():
 
 
 def run_all_scrapers():
-    """Run all scrapers (LinkedIn + AWS-focused boards) with error tracking."""
+    """Run the active LinkedIn scraper with error tracking.
+
+    Other scraper functions remain available for future use, but are not part
+    of the scheduled intake rotation.
+    """
     all_jobs = []
     sources_status = {}
     sources_errors = {}
 
-    # Fast sources first (they return descriptions inline, no per-job fetch),
-    # LinkedIn last since its per-job description fetch is the slow, rate-limited
-    # stage — this way a slow LinkedIn run never blocks the others. Set
-    # SKIP_LINKEDIN=1 to skip it entirely for a quick run.
+    # LinkedIn is the only active source. Set SKIP_LINKEDIN=1 to skip it for a
+    # diagnostic run.
     # Naukri (406 reCAPTCHA anti-bot) and Google Jobs (upstream JobSpy connector
     # returns 0 rows — see JobSpy issue #302) both yield nothing and only waste
     # ~130s per run. They're dropped from the rotation but kept as functions so
     # re-enabling is a one-line change if those sites become scrapable (e.g. with
     # a residential proxy). scrape_naukri / scrape_google_jobs remain defined.
     scrapers = [
-        ("Indeed India", scrape_indeed_india),
-        ("Partner ATS", scrape_partner_ats),
-        ("Gulf (tax-free)", scrape_gulf),
         ("LinkedIn AI/ML", scrape_linkedin),
     ]
-    if os.environ.get("SKIP_GULF") == "1":
-        scrapers = [s for s in scrapers if s[0] != "Gulf (tax-free)"]
-        print("SKIP_GULF=1 — skipping the Gulf sweep for this run.")
     if os.environ.get("SKIP_LINKEDIN") == "1":
         scrapers = [s for s in scrapers if s[0] != "LinkedIn AI/ML"]
         print("SKIP_LINKEDIN=1 — skipping LinkedIn for this run.")
