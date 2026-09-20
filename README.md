@@ -176,8 +176,11 @@ rendered prompt starts the supported browser work, but login, CAPTCHA,
 sensitive-data approval, missing truthful answers, and final third-party
 submission can still require user confirmation.
 
-The generated prompt also handles Company HR email after verifying the matching
-Tracker record. It uses the stored draft's To/Subject/body, verifies the hiring
+The generated prompt uses Dashboard's Company HR email todos as the email queue,
+including previously tracked jobs outside the application batch. It opens each
+todo's linked Tracker detail instead of scanning company details or all Tracker
+records, and returns to Dashboard to verify completion and process the next todo.
+It uses the stored draft's To/Subject/body, verifies the hiring
 contact and live mini-demo link, and attaches the actual latest Settings PDF.
 Missing drafts/demos or mail access are reported as blocked/pending, not sent.
 Codex must request confirmation immediately before sending, check Sent mail to

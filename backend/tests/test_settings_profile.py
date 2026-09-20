@@ -202,6 +202,13 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertIn("Do not treat saved application", prompt)
         self.assertIn("If already completed, skip", prompt)
         self.assertIn("never guess a Tracker ID", prompt)
+        self.assertIn("Use only its 'Email Company HR' todo section", prompt)
+        self.assertIn("can include previously tracked jobs", prompt)
+        self.assertIn("click that dashboard card", prompt)
+        self.assertIn("Do not scan company details or every Tracker record", prompt)
+        self.assertIn("report a queue error", prompt)
+        self.assertIn("verify that todo is no longer pending", prompt)
+        self.assertNotIn("For each eligible job in this fixed batch", prompt)
         self.assertNotIn("pay a fee, send email, or apply", prompt)
 
     def test_settings_exposes_only_ready_prompt_copy(self):
