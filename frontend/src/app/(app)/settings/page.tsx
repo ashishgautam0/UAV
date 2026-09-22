@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { CheckCircle2, Copy, FileText, Loader2, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
+import styles from "./settings.module.css";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const EMPTY_APPLICATION_SETTINGS: ApplicationPromptSettings = {
@@ -144,7 +145,7 @@ export default function SettingsPage() {
   }
 
   if (loading) return <div className="flex h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-  return <div className="mx-auto max-w-5xl space-y-6">
+  return <div className={`${styles.settings} mx-auto w-full min-w-0 max-w-5xl space-y-6`}>
     <div><h1 className="text-2xl font-bold">Resume profile</h1><p className="mt-1 text-sm text-muted-foreground">Upload a text-based PDF, then verify extracted facts and evidence. DOCX, text, and LaTeX input are not accepted.</p></div>
     {loadError && <div role="alert" className="rounded border border-destructive p-4 text-sm">Could not load the backend resume. This does not mean your resume is missing. <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button></div>}
     {active ? <Card>
