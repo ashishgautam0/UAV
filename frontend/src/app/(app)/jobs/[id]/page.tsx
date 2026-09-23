@@ -324,12 +324,24 @@ export default function JobDetailPage() {
     }
   }
 
+  const connectionDue = Boolean(application?.follow_up_date && application.follow_up_date <= new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) && !["Offer", "Rejected", "Ghosted", "Not Interested"].includes(application.status));
+
   async function recordSentFollowUp() {
-    if (!application || !followUpDraft?.follow_up_number || !sentFollowUp.trim() || followUpSaving || followUpRecordLocked) return;
+    if (!application || !sentFollowUp.trim() || followUpSaving || followUpRecordLocked) return;
+    const isConnection = sentChannel === "LinkedIn connection";
+    if (isConnection ? !connectionDue : !followUpDraft?.follow_up_number) return;
     setFollowUpSaving(true);
     try {
+      if (isConnection) {
+        const latest = job ? await lookupApplication(job.url) : null;
+        const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+        if (!latest || latest.id !== application.id || !latest.follow_up_date || latest.follow_up_date > today || ["Offer", "Rejected", "Ghosted", "Not Interested"].includes(latest.status)) {
+          toast.error("This Tracker record is no longer due. Review its schedule before recording.");
+          return;
+        }
+      }
       const currentHistory = await getFollowUpHistory("application", application.id);
-      if (currentHistory.some((event) => event.follow_up_number >= followUpDraft.follow_up_number!)) {
+      if (currentHistory.length !== history.length || (!isConnection && currentHistory.some((event) => event.follow_up_number >= followUpDraft!.follow_up_number!))) {
         setHistory(currentHistory);
         setFollowUpRecordLocked(true);
         toast.error("This follow-up number is already recorded. Review history before doing anything else.");
@@ -498,18 +510,7 @@ export default function JobDetailPage() {
                       {copied === "follow-up-draft" ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
                       {copied === "follow-up-draft" ? "Copied" : "Copy draft"}
                     </Button>
-                    <div className="space-y-2 border-t pt-3">
-                      <p className="text-xs text-muted-foreground">Only record after you have actually sent this follow-up. This saves history and advances the schedule; it does not send a message.</p>
-                      <label htmlFor="sent-follow-up" className="text-sm font-medium">Sent follow-up message</label>
-                      <Textarea id="sent-follow-up" value={sentFollowUp} onChange={(event) => setSentFollowUp(event.target.value)} disabled={followUpSaving || followUpRecordLocked} placeholder="Paste the exact message you sent" />
-                      <label htmlFor="sent-follow-up-channel" className="block text-sm font-medium">Sent via</label>
-                      <select id="sent-follow-up-channel" className="rounded border bg-background p-2 text-sm" value={sentChannel} onChange={(event) => setSentChannel(event.target.value)} disabled={followUpSaving || followUpRecordLocked}>
-                        <option>Email</option><option>LinkedIn</option><option>WhatsApp</option><option>Other</option>
-                      </select>
-                      <Button className="ml-2" size="sm" disabled={!sentFollowUp.trim() || !followUpDraft.follow_up_number || followUpSaving || followUpRecordLocked} onClick={recordSentFollowUp}>
-                        {followUpSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Record sent follow-up
-                      </Button>
-                    </div>
+
                   </>
                 ) : followUpDraft?.status === "pending" ? (
                   <p className="text-sm text-muted-foreground">Queued — the next hourly run writes this follow-up.</p>
@@ -517,6 +518,21 @@ export default function JobDetailPage() {
                   <p className="text-sm text-muted-foreground">No draft yet — the hourly run queues one once the follow-up date arrives.</p>
                 )}
               </div>
+
+                    <div className="space-y-2 border-t pt-3">
+                      <p className="text-sm font-medium">Record completed outreach</p>
+                      {!connectionDue && <p className="text-xs text-muted-foreground">Connection-note recording becomes available when this active job’s follow-up date is due.</p>}
+                      <p className="text-xs text-muted-foreground">Only record confirmed sending. A cold connection note must be due and counts as this follow-up slot. Paste its exact note and recipient profile URL, choose LinkedIn connection, then record once. This saves history and advances the existing schedule; it does not send anything.</p>
+                      <label htmlFor="sent-follow-up" className="text-sm font-medium">Sent follow-up message</label>
+                      <Textarea id="sent-follow-up" value={sentFollowUp} onChange={(event) => setSentFollowUp(event.target.value)} disabled={followUpSaving || followUpRecordLocked} placeholder="Paste the exact message you sent" />
+                      <label htmlFor="sent-follow-up-channel" className="block text-sm font-medium">Sent via</label>
+                      <select id="sent-follow-up-channel" className="rounded border bg-background p-2 text-sm" value={sentChannel} onChange={(event) => setSentChannel(event.target.value)} disabled={followUpSaving || followUpRecordLocked}>
+                        <option>Email</option><option>LinkedIn</option><option>LinkedIn connection</option><option>WhatsApp</option><option>Other</option>
+                      </select>
+                      <Button className="ml-2" size="sm" disabled={!sentFollowUp.trim() || (sentChannel === "LinkedIn connection" ? !connectionDue : !followUpDraft?.follow_up_number) || followUpSaving || followUpRecordLocked} onClick={recordSentFollowUp}>
+                        {followUpSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Record sent follow-up
+                      </Button>
+                    </div>
 
               <div className="flex justify-end">
                 <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
