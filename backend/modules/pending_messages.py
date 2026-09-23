@@ -133,11 +133,12 @@ def cmd_list(args):
 
 def cmd_save(args):
     content = (args.content if args.content is not None else sys.stdin.read()).strip()
-    from outreach_quality import validate_outreach_draft
-    problem = validate_outreach_draft(args.type, content)
-    if problem:
-        print(problem, file=sys.stderr)
-        return 1
+    if args.type == "cold_dm":
+        from outreach_quality import validate_outreach_draft
+        problem = validate_outreach_draft(args.type, content)
+        if problem:
+            print(problem, file=sys.stderr)
+            return 1
     if not content:
         print("Refusing to save an empty message.", file=sys.stderr)
         return 1
