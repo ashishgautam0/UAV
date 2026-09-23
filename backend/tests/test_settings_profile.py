@@ -214,7 +214,7 @@ class SettingsProfileTests(unittest.TestCase):
     def test_settings_exposes_only_ready_prompt_copy(self):
         page = (ROOT.parent / "frontend/src/app/(app)/settings/page.tsx").read_text()
         self.assertIn("Ready-to-paste Codex prompt", page)
-        self.assertIn("disabled={!renderedPrompt.ready}", page)
+        self.assertIn("disabled={!renderedPrompt?.ready || promptDirty", page)
         self.assertIn("Copy complete prompt for Codex", page)
 
     def test_followups_use_dashboard_and_separate_confirmed_history_logging(self):
