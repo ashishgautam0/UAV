@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { CheckCircle2, Copy, FileText, Loader2, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 import styles from "./settings.module.css";
+import { toPromptEditor, fromPromptEditor } from "@/lib/application-prompt-editor";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const EMPTY_APPLICATION_SETTINGS: ApplicationPromptSettings = {
@@ -29,15 +30,6 @@ const EMPTY_APPLICATION_SETTINGS: ApplicationPromptSettings = {
   current_location: "",
   relocation_preference: "",
 };
-const APPLICATION_FIELDS: Array<{ key: keyof ApplicationPromptSettings; label: string; hint: string }> = [
-  { key: "submission_authorization", label: "Submission authorization", hint: "Optional instruction describing what the browser agent may submit." },
-  { key: "notice_period", label: "Notice period", hint: "Use your truthful current notice period." },
-  { key: "current_ctc", label: "Current compensation", hint: "Include currency and period if you want this supplied." },
-  { key: "expected_ctc", label: "Expected compensation", hint: "Include currency and period if you want this supplied." },
-  { key: "expected_start_date", label: "Expected start date", hint: "Use an unambiguous date or availability statement." },
-  { key: "current_location", label: "Current location", hint: "Enter only the location detail you want used in applications." },
-  { key: "relocation_preference", label: "Relocation preference", hint: "Describe your actual relocation preference." },
-];
 const evidence = (item: ResumeFact) => item.evidence?.map((e) => e.excerpt).filter(Boolean).join(" · ") || "User review required";
 
 function toReview(profile: ResumeProfile): ResumeProfileReview {
@@ -64,6 +56,8 @@ export default function SettingsPage() {
   const [review, setReview] = useState<ResumeProfileReview | null>(null);
   const [applicationSettings, setApplicationSettings] = useState<ApplicationPromptSettings>(EMPTY_APPLICATION_SETTINGS);
   const [savingApplicationSettings, setSavingApplicationSettings] = useState(false);
+  const [promptEditor, setPromptEditor] = useState("");
+  const [promptDirty, setPromptDirty] = useState(false);
   const [renderedPrompt, setRenderedPrompt] = useState<RenderedApplicationPrompt | null>(null);
   const [renderingPrompt, setRenderingPrompt] = useState(false);
 
@@ -92,6 +86,7 @@ export default function SettingsPage() {
       setCandidate(latest);
       if (latest) setReview(toReview(latest));
       setApplicationSettings(settings);
+      setPromptEditor(toPromptEditor(settings));
       setRenderedPrompt(readyPrompt);
     }).catch(() => { setLoadError(true); toast.error("Failed to load resume status"); }).finally(() => setLoading(false));
   }, []);
@@ -133,8 +128,10 @@ export default function SettingsPage() {
   async function saveApplicationSettings() {
     setSavingApplicationSettings(true);
     try {
-      const saved = await updateApplicationPromptSettings(applicationSettings);
+      const saved = await updateApplicationPromptSettings(fromPromptEditor(promptEditor, applicationSettings));
       setApplicationSettings(saved);
+      setPromptEditor(toPromptEditor(saved));
+      setPromptDirty(false);
       await refreshRenderedPrompt();
       toast.success("Application prompt details saved for every browser and device.");
     } catch (e) {
@@ -169,44 +166,35 @@ export default function SettingsPage() {
     <Card>
       <CardHeader>
         <CardTitle>Today Todo application prompt</CardTitle>
-        <p className="text-sm text-muted-foreground">Edit the backend-saved prompt used by Today Todo. Dynamic values are inserted when the page loads.</p>
+        <p className="text-sm text-muted-foreground">Edit instructions and answers together below. Saving updates the backend for every device.</p>
       </CardHeader>
       <CardContent className="grid gap-4 md:grid-cols-2">
-        <div className="md:col-span-2">
-          <label htmlFor="application-prompt-template" className="text-sm font-medium">Prompt template</label>
-          <Textarea
-            id="application-prompt-template"
-            value={applicationSettings.prompt_template}
-            maxLength={12000}
-            rows={18}
-            onChange={(event) => setApplicationSettings((current) => ({ ...current, prompt_template: event.target.value }))}
-          />
-          <p className="mt-1 text-xs text-muted-foreground">
-            Available placeholders: {"{{application_answers}}"}, {"{{page_url}}"}, {"{{resume_filename}}"}, {"{{resume_url}}"}, {"{{resume_sha256}}"}, and {"{{batch_jobs}}"}.
-          </p>
-        </div>
-        <div className="md:col-span-2 border-t pt-4">
-          <h3 className="font-medium">Application-form answers</h3>
-          <p className="text-xs text-muted-foreground">Saved with the backend profile. Leave any answer blank rather than guessing.</p>
-        </div>
-        {APPLICATION_FIELDS.map(({ key, label, hint }) => (
-          <div key={key} className={key === "submission_authorization" ? "md:col-span-2" : ""}>
-            <label htmlFor={`application-${key}`} className="text-sm font-medium">{label}</label>
-            <Textarea
-              id={`application-${key}`}
-              value={applicationSettings[key]}
-              maxLength={500}
-              rows={key === "submission_authorization" ? 3 : 2}
-              onChange={(event) => setApplicationSettings((current) => ({ ...current, [key]: event.target.value }))}
-            />
-            <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-          </div>
-        ))}
-        <div className="md:col-span-2">
-          <Button disabled={savingApplicationSettings || loadError} onClick={saveApplicationSettings}>
+        <div className="md:col-span-2 overflow-hidden rounded-lg border p-3">
+          <div role="toolbar" aria-label="Prompt actions" className="mb-3 flex flex-wrap gap-2">
+          <Button disabled={savingApplicationSettings || renderingPrompt || loadError} onClick={saveApplicationSettings}>
             {savingApplicationSettings && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Today Todo prompt
           </Button>
+            <Button variant="outline" disabled={renderingPrompt || savingApplicationSettings || promptDirty || loadError} onClick={refreshRenderedPrompt}>
+              {renderingPrompt ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Generate current batch
+            </Button>
+            <Button disabled={!renderedPrompt?.ready || promptDirty || savingApplicationSettings || renderingPrompt || loadError} onClick={async () => { try { await navigator.clipboard.writeText(renderedPrompt!.prompt); toast.success("Complete Codex prompt copied"); } catch { toast.error("Open the generated preview below to select and copy."); } }}>
+              <Copy className="mr-2 h-4 w-4" />Copy complete prompt for Codex
+            </Button>
+          </div>
+          {promptDirty && <p role="status" className="mb-2 text-sm text-amber-600">Unsaved changes — save before generating or copying.</p>}
+          <label htmlFor="application-prompt-template" className="text-sm font-medium">Editable prompt and application answers</label>
+          <Textarea
+            id="application-prompt-template"
+            value={promptEditor}
+            disabled={savingApplicationSettings || loadError}
+            rows={18}
+            onChange={(event) => { setPromptEditor(event.target.value); setPromptDirty(true); }}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Keep the answer labels and section markers; edit values after each colon and leave unknown answers blank. Dynamic placeholders: {"{{application_answers}}"}, {"{{page_url}}"}, {"{{resume_filename}}"}, {"{{resume_url}}"}, {"{{resume_sha256}}"}, and {"{{batch_jobs}}"}.
+          </p>
         </div>
         <div className="md:col-span-2 space-y-3 border-t pt-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -214,18 +202,13 @@ export default function SettingsPage() {
               <h3 className="font-medium">Ready-to-paste Codex prompt</h3>
               <p className="text-xs text-muted-foreground">Generated from the current Today Todo batch, saved answers, and latest Settings PDF.</p>
             </div>
-            <Button variant="outline" disabled={renderingPrompt || loadError} onClick={refreshRenderedPrompt}>
-              {renderingPrompt ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-              Generate current batch
-            </Button>
+
           </div>
           {renderedPrompt && <>
-            <Textarea readOnly value={renderedPrompt.prompt} rows={18} aria-label="Ready-to-paste Codex prompt" />
+            <details><summary className="cursor-pointer text-sm">View generated prompt{promptDirty ? " (previously saved version)" : ""}</summary><Textarea readOnly value={renderedPrompt.prompt} rows={18} aria-label="Ready-to-paste Codex prompt" /></details>
             <p className="text-xs text-muted-foreground">Fixed batch: {renderedPrompt.job_count} job{renderedPrompt.job_count === 1 ? "" : "s"}. Generate again to pick up changed jobs, answers, or resume.</p>
             {renderedPrompt.issues.length > 0 && <div role="alert" className="rounded border border-amber-500/40 bg-amber-500/5 p-3 text-sm"><p className="font-medium">Resolve before copying:</p><ul className="mt-1 list-disc pl-5">{renderedPrompt.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul></div>}
-            <Button disabled={!renderedPrompt.ready} onClick={async () => { try { await navigator.clipboard.writeText(renderedPrompt.prompt); toast.success("Complete Codex prompt copied"); } catch { toast.error("Select and copy the generated prompt above."); } }}>
-              <Copy className="mr-2 h-4 w-4" />Copy complete prompt for Codex
-            </Button>
+
           </>}
         </div>
       </CardContent>
