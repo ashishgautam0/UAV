@@ -18,10 +18,14 @@ name and profile; leave all contact fields empty rather than guessing.
 ## Company website (reuse the cache)
 First check for a fresh cached website/contact:
 `python pending_messages.py intel --name "<Company>"`
-If it returns `{"found": true}`, reuse it — skip re-researching the company.
+If it returns `{"found": true}`, reuse the official website. Recheck cached
+contacts for current hiring relevance; a cached name does not verify an email.
 Otherwise find and cache the real primary website and a verified hiring
 contact, if available. The email agent derives a domain from this URL, so
-prefer the company's root website over a careers page.
+prefer the company's root website over a careers page. In the handoff, include
+the official hiring page URL, current contact role/profile, and any explicitly
+published hiring email with its source excerpt. Never derive email from a
+domain. Keep evidence in the report; do not add unsupported cache fields.
 
 ```
 cat > /tmp/intel.json <<'JSON'
