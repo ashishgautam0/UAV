@@ -223,7 +223,7 @@ export default function SettingsPage() {
     {!loadError && <>
       <OutreachPrompt kind="hr_email" title="Initial HR email prompt" description="Send through your Gmail. Use Dashboard’s HR todos; verify recipients and research official hiring contacts if Claude’s address is invalid or unverified." initialValue={applicationSettings.hr_email_template} />
       <OutreachPrompt kind="followup" title="HR follow-up email prompt" description="Use your Gmail and Dashboard’s Follow-ups Due queue. Check recipient evidence, dates, Sent history and bounces before sending." initialValue={applicationSettings.followup_template} />
-      <OutreachPrompt kind="cold_dm" title="Cold DM prompt" description="Use stored Cold DM drafts and verified hiring contacts in Tracker. Check conversation history before sending." initialValue={applicationSettings.cold_dm_template} />
+      <OutreachPrompt kind="cold_dm" title="Cold DM prompt" description="Use each Tracker job’s Send it to LinkedIn searches, verify a recruiter or hiring manager, then send Connect with a personalized note. Premium invitation limits still apply." initialValue={applicationSettings.cold_dm_template} />
     </>}
     <div className="grid gap-6 lg:grid-cols-2">
       <Card><CardHeader><CardTitle>Resume PDF</CardTitle></CardHeader><CardContent className="space-y-4">
