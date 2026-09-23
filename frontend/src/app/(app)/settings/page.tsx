@@ -221,8 +221,8 @@ export default function SettingsPage() {
       </CardContent>
     </Card>
     {!loadError && <>
-      <OutreachPrompt kind="hr_email" title="Initial HR email prompt" description="Use Dashboard’s Email Company HR todos and their linked Tracker records." initialValue={applicationSettings.hr_email_template} />
-      <OutreachPrompt kind="followup" title="HR follow-up email prompt" description="Use Dashboard’s Follow-ups Due queue, check dates and history, and record only confirmed sends." initialValue={applicationSettings.followup_template} />
+      <OutreachPrompt kind="hr_email" title="Initial HR email prompt" description="Send through your Gmail. Use Dashboard’s HR todos; verify recipients and research official hiring contacts if Claude’s address is invalid or unverified." initialValue={applicationSettings.hr_email_template} />
+      <OutreachPrompt kind="followup" title="HR follow-up email prompt" description="Use your Gmail and Dashboard’s Follow-ups Due queue. Check recipient evidence, dates, Sent history and bounces before sending." initialValue={applicationSettings.followup_template} />
       <OutreachPrompt kind="cold_dm" title="Cold DM prompt" description="Use stored Cold DM drafts and verified hiring contacts in Tracker. Check conversation history before sending." initialValue={applicationSettings.cold_dm_template} />
     </>}
     <div className="grid gap-6 lg:grid-cols-2">

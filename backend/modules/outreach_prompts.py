@@ -1,5 +1,25 @@
 """Independent editable browser task defaults; no external LLM required."""
 
+GMAIL_HR_DELIVERY_RULES = """GMAIL AND HR RECIPIENT CHECKS (apply even to previously saved templates):
+Use my Gmail account for initial HR emails and email follow-ups. Use a supported connected Gmail tool if it can send the actual PDF attachment; otherwise use my authenticated Gmail browser session. Confirm the visible From account belongs to me. If multiple accounts are available and my intended sender is unclear, ask which one. Never switch to another mail provider or assume Gmail is connected. If Gmail access or attachment support is unavailable, report 'Gmail access/attachment required' and leave the todo pending. Never ask for passwords in chat.
+
+Verify Claude's proposed To address before composing. An address can be invalid because it is malformed, has a confirmed hard bounce, is a placeholder/no-reply mailbox, belongs to another company, or lacks evidence that it handles hiring for this role. Unverified is not the same as proven invalid. A plausible format, working website or MX record does not prove a mailbox exists or is appropriate. Do not send test emails or probe mailboxes.
+
+If the address is missing, invalid, stale or unverified, research a replacement for this exact company and job:
+1. Start with the linked job posting and establish the company's official website and hiring entity, including subsidiary/location when relevant. Do not confuse similarly named companies.
+2. Inspect the official job listing, careers/recruiting page and relevant team/contact page. Use a focused public web search if necessary to locate those pages; open the actual source, not just a search snippet. Limit research to five relevant pages per job, then report unresolved.
+3. Prefer a publicly listed recruiter/HR contact responsible for the role/location; otherwise use an explicitly published recruiting/applications mailbox. An external recruiting address is acceptable only when the official employer posting identifies that recruiter for this job. Do not use a generic sales/support/privacy address unless the company explicitly directs applicants there.
+4. Never construct firstname.lastname@, careers@ or other guessed patterns. Do not rely only on scraped email directories, unverifiable search snippets or Claude's suggestion. Select one evidenced recipient, not a bulk list. If evidence conflicts, is outdated or yields no appropriate address, leave the todo pending and ask for resolution.
+5. Before Send, show the original address, why it was rejected or unverified, the proposed replacement, the exact source URL and the short public excerpt showing its hiring relevance. Show Gmail From, final To, Subject, body, mini-demo link and attached PDF filename; obtain explicit confirmation immediately before Send. Research must not share my resume or private details with lookup services.
+
+For follow-ups, check the existing Gmail thread and Sent/bounce history first. Never resend to a known hard-bounced recipient. If a replacement is needed, show and confirm the recipient change; do not blindly Reply to the old thread or forward its private history to a new person. Compose a new role-specific message without claiming that the new recipient received earlier outreach. If the earlier channel was not email, do not silently switch channels; report the mismatch for review.
+
+Check Gmail Sent for this job across both old and replacement recipients to prevent duplicate outreach. After an uncertain send, inspect Sent before retrying. Only mark emailed or record the follow-up after observing Gmail send evidence. A sent confirmation proves sending, not delivery; report known bounces as failed delivery, never as successful delivery. Preserve the existing PDF/demo checks and truthful, short professional body.
+
+These Gmail and evidence requirements override any older generic-mail or recipient-switching wording in the editable template below.
+
+"""
+
 OUTREACH_DEFAULTS = {'hr_email_template': 'Open the app: {{page_url}}\n'
                       'Latest Settings PDF: {{resume_filename}} at {{resume_url}}\n'
                       'PDF SHA-256: {{resume_sha256}}\n'
@@ -30,7 +50,7 @@ OUTREACH_DEFAULTS = {'hr_email_template': 'Open the app: {{page_url}}\n'
                       'stored draft after tracking.\n'
                       "3. To: use the draft's recipient only after verifying it against the "
                       "company's hiring contacts or official careers website. Unknown, guessed or "
-                      'conflicting addresses require user resolution; never infer careers@ or send '
+                      'conflicting addresses require the recipient research checks above; never infer careers@ or send '
                       'to multiple contacts automatically.\n'
                       '4. Subject: copy the specific role/company subject from the stored draft '
                       "into the mail client's Subject field. Body: use only the email body, "
@@ -43,8 +63,8 @@ OUTREACH_DEFAULTS = {'hr_email_template': 'Open the app: {{page_url}}\n'
                       'facts, stop this email for review/regeneration. Upload the actual PDF as a '
                       'file attachment, not a link in the body, and verify that the mail composer '
                       'shows the correct attachment fully uploaded.\n'
-                      "6. Use the user's available authenticated email browser or supported "
-                      "connected mail tool. If neither is available, report 'HR email blocked: "
+                      "6. Use my Gmail account via supported connected Gmail tools or authenticated "
+                      "Gmail browser access, with actual PDF attachment support. If unavailable, report 'HR email blocked: "
                       "mail access required'. Never request passwords in chat or assume a mail "
                       'integration exists. Follow all required approvals before transmitting '
                       'personal data.\n'
@@ -95,8 +115,8 @@ OUTREACH_DEFAULTS = {'hr_email_template': 'Open the app: {{page_url}}\n'
                       'actual attachment finishes uploading. Resolve stale drafts or unverified '
                       'recipients before sending. Do not claim an attachment exists in a channel '
                       'that cannot attach it. If contact, channel, demo, resume or authenticated '
-                      'mail access is unavailable, report blocked rather than guessing or '
-                      'switching recipients.\n'
+                      'mail access is unavailable, apply the Gmail and recipient research checks above; '
+                      'report unresolved cases as blocked rather than guessing.\n'
                       '5. Inspect Sent mail or conversation history for this follow-up before '
                       'sending. Show sender, recipient, subject, full message and attachment, and '
                       'obtain explicit confirmation immediately before Send. Respect required '

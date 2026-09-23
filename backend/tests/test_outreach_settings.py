@@ -42,7 +42,7 @@ class OutreachSettingsTests(unittest.TestCase):
         for kind, template in profile_data.OUTREACH_DEFAULTS.items():
             with self.subTest(kind=kind):
                 prompt, unknown = self.renderer()(template, {"filename": "résumé.pdf", "sha256": "abc"},
-                                                  "https://app/dashboard", "https://api/pdf")
+                                                  "https://app/dashboard", "https://api/pdf", kind.removesuffix("_template"))
                 self.assertFalse(unknown)
                 self.assertIn("résumé.pdf", prompt)
                 self.assertIn("https://app/dashboard", prompt)
@@ -56,6 +56,36 @@ class OutreachSettingsTests(unittest.TestCase):
         self.assertEqual(unknown, ["unsupported"])
         self.assertIn("My brief", prompt)
         self.assertIn("Check conversation/Sent history", prompt)
+
+    def test_gmail_recipient_rules_apply_to_saved_email_templates_only(self):
+        for kind in ("hr_email", "followup", "cold_dm"):
+            prompt, _ = self.renderer()("Previously saved custom instructions", {}, "https://app", "https://pdf", kind)
+            self.assertIn("Previously saved custom instructions", prompt)
+            if kind == "cold_dm":
+                self.assertNotIn("GMAIL AND HR RECIPIENT CHECKS", prompt)
+            else:
+                for requirement in ("Use my Gmail account", "actual PDF attachment", "visible From",
+                                    "five relevant pages", "official job listing", "hiring entity",
+                                    "Never construct firstname.lastname@", "Unverified is not the same",
+                                    "Do not send test emails", "exact source URL", "explicit confirmation",
+                                    "do not blindly Reply", "old and replacement recipients",
+                                    "not delivery", "leave the todo pending"):
+                    self.assertIn(requirement, prompt)
+
+    def test_endpoint_passes_selected_workflow_to_renderer(self):
+        seen = []
+        def render(template, resume, page_url, resume_url, kind):
+            seen.append(kind)
+            return "prompt", []
+        endpoint = function(ROOT / "app/routers/profile.py", "read_outreach_prompt", {
+            "Request": object, "Literal": Literal, "RenderedApplicationPrompt": RenderedApplicationPrompt,
+            "_clean_text": lambda value, maximum: value, "_DEFAULT_USERNAME": "fixture",
+            "get_application_prompt_settings": lambda _: profile_data.OUTREACH_DEFAULTS,
+            "_application_pdf_metadata": lambda: {"filename": "resume.pdf"}, "_render_outreach_prompt": render,
+        })
+        for kind in ("hr_email", "followup", "cold_dm"):
+            endpoint(SimpleNamespace(url_for=lambda _: "https://api/pdf"), "https://app/dashboard", kind)
+        self.assertEqual(seen, ["hr_email", "followup", "cold_dm"])
 
     def test_outreach_readiness_is_independent_of_today_todo_and_submission_authorization(self):
         for resume, expected in (({"filename": "active.pdf", "sha256": "abc"}, True), (None, False)):
