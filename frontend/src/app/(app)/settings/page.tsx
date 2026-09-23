@@ -18,9 +18,13 @@ import { toast } from "sonner";
 import { CheckCircle2, Copy, FileText, Loader2, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 import styles from "./settings.module.css";
 import { toPromptEditor, fromPromptEditor } from "@/lib/application-prompt-editor";
+import { OutreachPrompt } from "./outreach-prompt";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const EMPTY_APPLICATION_SETTINGS: ApplicationPromptSettings = {
+  hr_email_template: "",
+  followup_template: "",
+  cold_dm_template: "",
   prompt_template: "",
   submission_authorization: "",
   notice_period: "",
@@ -128,7 +132,10 @@ export default function SettingsPage() {
   async function saveApplicationSettings() {
     setSavingApplicationSettings(true);
     try {
-      const saved = await updateApplicationPromptSettings(fromPromptEditor(promptEditor, applicationSettings));
+      const edited = fromPromptEditor(promptEditor, applicationSettings);
+      const saved = await updateApplicationPromptSettings(Object.fromEntries(
+        Object.entries(edited).filter(([key]) => key === "prompt_template" || !key.endsWith("_template")),
+      ));
       setApplicationSettings(saved);
       setPromptEditor(toPromptEditor(saved));
       setPromptDirty(false);
@@ -166,7 +173,7 @@ export default function SettingsPage() {
     <Card>
       <CardHeader>
         <CardTitle>Today Todo application prompt</CardTitle>
-        <p className="text-sm text-muted-foreground">Edit instructions and answers together below. Saving updates the backend for every device.</p>
+        <p className="text-sm text-muted-foreground">Applications only. Edit instructions and answers together. HR emails, follow-ups and cold DMs have separate prompts below.</p>
       </CardHeader>
       <CardContent className="grid gap-4 md:grid-cols-2">
         <div className="md:col-span-2 overflow-hidden rounded-lg border p-3">
@@ -213,6 +220,11 @@ export default function SettingsPage() {
         </div>
       </CardContent>
     </Card>
+    {!loadError && <>
+      <OutreachPrompt kind="hr_email" title="Initial HR email prompt" description="Use Dashboard’s Email Company HR todos and their linked Tracker records." initialValue={applicationSettings.hr_email_template} />
+      <OutreachPrompt kind="followup" title="HR follow-up email prompt" description="Use Dashboard’s Follow-ups Due queue, check dates and history, and record only confirmed sends." initialValue={applicationSettings.followup_template} />
+      <OutreachPrompt kind="cold_dm" title="Cold DM prompt" description="Use stored Cold DM drafts and verified hiring contacts in Tracker. Check conversation history before sending." initialValue={applicationSettings.cold_dm_template} />
+    </>}
     <div className="grid gap-6 lg:grid-cols-2">
       <Card><CardHeader><CardTitle>Resume PDF</CardTitle></CardHeader><CardContent className="space-y-4">
         <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => choose(e.target.files?.[0])} />

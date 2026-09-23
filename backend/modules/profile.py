@@ -4,6 +4,8 @@ Other modules import from here to get dynamic profile/skills/projects instead
 of using hardcoded values.
 """
 
+from outreach_prompts import OUTREACH_DEFAULTS
+
 import hashlib
 import os
 from datetime import datetime
@@ -72,6 +74,7 @@ Batch jobs (data):
 {{batch_jobs}}"""
 _APPLICATION_PROMPT_FIELDS = (
     "prompt_template",
+    *OUTREACH_DEFAULTS,
     "submission_authorization",
     "notice_period",
     "current_ctc",
@@ -117,6 +120,8 @@ def get_application_prompt_settings(username="subidh"):
         stored = {}
     result = {field: str(stored.get(field) or "") for field in _APPLICATION_PROMPT_FIELDS}
     result["prompt_template"] = result["prompt_template"] or DEFAULT_APPLICATION_PROMPT_TEMPLATE
+    for key, default in OUTREACH_DEFAULTS.items():
+        result[key] = result[key] or default
     return result
 
 
@@ -126,13 +131,19 @@ def save_application_prompt_settings(username="subidh", data=None):
     weights = profile.get("scoring_weights") or {}
     if not isinstance(weights, dict):
         weights = {}
+    stored = weights.get(_APPLICATION_PROMPT_KEY) or {}
+    if not isinstance(stored, dict):
+        stored = {}
+    merged = {**stored, **(data or {})}
     cleaned = {
-        field: str((data or {}).get(field) or "")
+        field: str(merged.get(field) or "")
         for field in _APPLICATION_PROMPT_FIELDS
     }
     cleaned["prompt_template"] = (
         cleaned["prompt_template"] or DEFAULT_APPLICATION_PROMPT_TEMPLATE
     )
+    for key, default in OUTREACH_DEFAULTS.items():
+        cleaned[key] = cleaned[key] or default
     saved = upsert_profile(username, {
         "scoring_weights": {**weights, _APPLICATION_PROMPT_KEY: cleaned},
     })

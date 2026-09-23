@@ -15,4 +15,5 @@ jobs:
           python-version: '3.12'
       - run: pip install fastapi pypdf python-multipart
       - run: python -m unittest discover -s backend/tests -p test_application_resume.py -v
+      - run: PYTHONPATH=backend python -m unittest discover -s backend/tests -p test_outreach_settings.py -v
       - run: python -m compileall -q backend/app
