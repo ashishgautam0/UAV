@@ -1,13 +1,17 @@
 .settings {
   overflow-wrap: anywhere;
-}
-
-/* Grid/flex children must be allowed to shrink around long PDF names and URLs. */
-.settings :where(div, p, span, label, iframe) {
+  width: 100%;
   min-width: 0;
 }
 
+/* Grid/flex children must be allowed to shrink around long PDF names and URLs. */
+.settings :where(div, p, span, label, iframe, details, summary) {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .settings textarea {
+  width: 100%;
   field-sizing: fixed;
   max-width: 100%;
   max-height: 60dvh;
@@ -30,7 +34,16 @@
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 639px) {
+.settings button svg {
+  flex-shrink: 0;
+}
+
+.settings [role="toolbar"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+}
+
+@media (max-width: 767px) {
   .settings [data-slot="card-header"],
   .settings [data-slot="card-content"] {
     padding-inline: 1rem;
@@ -49,6 +62,16 @@
   .settings textarea,
   .settings input {
     font-size: 1rem;
+  }
+
+  .settings textarea {
+    height: 18rem;
+    min-height: 8rem;
+    max-height: 50dvh;
+  }
+
+  .settings [data-slot="card-title"] {
+    line-height: 1.4;
   }
 
   .settings iframe {

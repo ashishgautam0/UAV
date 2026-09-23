@@ -51,6 +51,9 @@ class ApplicationPromptSettings(BaseModel):
     """User-supplied application answers stored with the backend profile."""
     model_config = ConfigDict(extra="forbid")
     prompt_template: str = Field(default="", max_length=12_000)
+    hr_email_template: str = Field(default="", max_length=12_000)
+    followup_template: str = Field(default="", max_length=12_000)
+    cold_dm_template: str = Field(default="", max_length=12_000)
     submission_authorization: str = Field(default="", max_length=500)
     notice_period: str = Field(default="", max_length=500)
     current_ctc: str = Field(default="", max_length=500)

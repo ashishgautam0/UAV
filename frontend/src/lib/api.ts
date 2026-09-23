@@ -241,7 +241,7 @@ export async function getApplicationPromptSettings(): Promise<ApplicationPromptS
 }
 
 export async function updateApplicationPromptSettings(
-  data: ApplicationPromptSettings,
+  data: Partial<ApplicationPromptSettings>,
 ): Promise<ApplicationPromptSettings> {
   return apiFetch<ApplicationPromptSettings>("/api/profile/application-settings", {
     method: "PUT",
@@ -259,6 +259,12 @@ export async function getRenderedApplicationPrompt(
 
 export function getApplicationResumePdfUrl(): string {
   return `${API_URL}/api/profile/resume/pdf`;
+}
+
+export async function getRenderedOutreachPrompt(pageUrl: string, kind: "hr_email" | "followup" | "cold_dm"): Promise<RenderedApplicationPrompt> {
+  return apiFetch<RenderedApplicationPrompt>(
+    `/api/profile/outreach-prompt?page_url=${encodeURIComponent(pageUrl)}&kind=${kind}`,
+  );
 }
 
 export async function uploadResumePdf(file: File): Promise<ResumeProfile> {

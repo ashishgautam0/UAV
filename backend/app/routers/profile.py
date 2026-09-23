@@ -1,5 +1,6 @@
 import hashlib
 from io import BytesIO
+from typing import Literal
 import json
 import re
 
@@ -51,7 +52,7 @@ _APPLICATION_ANSWER_LABELS = {
     "current_location": "Current location",
     "relocation_preference": "Relocation preference",
 }
-_PROMPT_PLACEHOLDER = re.compile(r"{{([a-z_]+)}}")
+_PROMPT_PLACEHOLDER = re.compile(r"{{([a-z_][a-z0-9_]*)}}")
 
 
 def _application_path(source_sha256):
@@ -148,8 +149,8 @@ def read_application_settings():
 @router.put("/application-settings", response_model=ApplicationPromptSettings)
 def update_application_settings(body: ApplicationPromptSettings):
     payload = {
-        key: _clean_text(value, 12_000 if key == "prompt_template" else 500)
-        for key, value in body.model_dump().items()
+        key: _clean_text(value, 12_000 if key.endswith("template") else 500)
+        for key, value in body.model_dump(exclude_unset=True).items()
     }
     saved = save_application_prompt_settings(_DEFAULT_USERNAME, payload)
     if saved is None:
@@ -194,94 +195,9 @@ def _render_application_prompt(template, settings, jobs, resume, page_url, resum
         "- Complete browser work autonomously where supported, but pause for any confirmation, "
         "login, CAPTCHA, sensitive-data approval, or missing truthful answer required by the platform.\n"
         "- Never invent an answer, bypass a control, pay a fee, or apply outside this batch. "
-        "Outreach is limited to the confirmed HR-email and due follow-up steps below.\n\n"
+        "Do not send HR emails, cold DMs or follow-ups in this application task; use their separate Settings prompts.\n\n"
     )
-    hr_step = (
-        "\n\nHR EMAIL — AFTER TRACKER LOGGING (part of this task):\n"
-        "1. After processing applications, open Dashboard using the app navigation. Use only "
-        "its 'Email Company HR' todo section to decide which companies need email. This "
-        "dashboard queue is separate from the fixed Today Todo application batch and can include "
-        "previously tracked jobs. Do not scan company details or every Tracker record to find "
-        "email work. Snapshot the pending dashboard todos once; do not chase newly appearing "
-        "todos indefinitely. If the section fails to load, report a queue error; if empty, "
-        "report no pending HR emails.\n"
-        "For each queued todo, click that dashboard card to open its corresponding Tracker job "
-        "detail. Confirm the company/role and posting URL match the todo; never guess a Tracker ID "
-        "from the scraped-job ID. If the link or matching record is missing, report that todo "
-        "blocked and continue. Do not generate or send HR email before tracking.\n"
-        "2. In 'Email to Company HR', inspect completion status. If already completed, skip. "
-        "If the stored HR draft or live mini demo is not ready, record 'HR email pending assets' "
-        "and continue; do not invent a demo or wait indefinitely. The Claude routine remains "
-        "responsible for generating the stored draft after tracking.\n"
-        "3. To: use the draft's recipient only after verifying it against the company's hiring "
-        "contacts or official careers website. Unknown, guessed or conflicting addresses require "
-        "user resolution; never infer careers@ or send to multiple contacts automatically.\n"
-        "4. Subject: copy the specific role/company subject from the stored draft into the "
-        "mail client's Subject field. Body: use only the email body, without To/Subject headers; "
-        "keep it short, professional, 70–110 words and grounded in verified resume facts. "
-        "Include the exact live mini-demo link for this job and mention the attached resume.\n"
-        "5. Attachment: use 'Resume to attach' on the Tracker detail page to download the latest "
-        "Settings PDF. Verify its current filename/hash against Settings; if it changed since "
-        "this batch or disagrees with the draft's facts, stop this email for review/regeneration. "
-        "Upload the actual PDF as a file attachment, not a link in the body, and verify that "
-        "the mail composer shows the correct attachment fully uploaded.\n"
-        "6. Use the user's available authenticated email browser or supported connected mail "
-        "tool. If neither is available, report 'HR email blocked: mail access required'. Never "
-        "request passwords in chat or assume a mail integration exists. Follow all required "
-        "approvals before transmitting personal data.\n"
-        "7. Before sending, check Sent mail for this recipient and job to avoid duplicates. "
-        "Show the sender account, To, Subject, full body and attachment filename and obtain "
-        "explicit confirmation immediately before Send. Do not treat saved application "
-        "authorization as email-send confirmation.\n"
-        "8. Only after observing a sent confirmation or matching Sent item, click 'Mark emailed' "
-        "on the same Tracker record and verify completion persists. Return to Dashboard and "
-        "verify that todo is no longer pending, then open the next snapshotted dashboard todo. "
-        "If logging fails, retry "
-        "logging only. If sending times out or its outcome is uncertain, check Sent first; "
-        "never blindly resend or mark completed. Do not reopen completed todos.\n"
-        "Include a separate per-job HR result in the final report: sent and recorded, already "
-        "sent, pending assets, awaiting confirmation, or blocked with reason. Never report a "
-        "draft or an open composer as sent.\n"
-    )
-    followup_step = (
-        "\n\nFOLLOW-UPS — DASHBOARD QUEUE (part of this task):\n"
-        "1. After the HR-email step, open Dashboard's 'Follow-ups Due' section. Snapshot that "
-        "queue once, including previously tracked jobs outside the application batch. Click "
-        "each dashboard follow-up card to open its linked Tracker detail; do not scan all "
-        "companies or guess IDs. Verify the company, role and posting URL. Report broken links "
-        "or load errors as blocked, not as an empty queue.\n"
-        "2. Recheck the saved follow-up date in Asia/Kolkata and recorded history. Process only "
-        "due or overdue follow-ups; skip future dates, terminal records, or already-recorded "
-        "follow-up numbers. Never change a date to make a job due. If an initial HR email was "
-        "just sent for this job during this run, defer the follow-up to avoid two messages "
-        "together; leave its schedule unchanged and report the deferral.\n"
-        "3. Use the current 'Follow-up draft' and its displayed follow-up number. If queued, "
-        "missing, stale or inconsistent with history, report pending draft and continue. "
-        "Do not substitute the initial HR email or invent previous contact, replies or facts. "
-        "Keep the body brief, polite and professional.\n"
-        "4. Use the verified recipient and existing conversation/channel from previous outreach. "
-        "For email, use To, the existing thread Subject (or a short role-specific subject), "
-        "and the follow-up body. Include the correct live mini-demo link and actual latest "
-        "Settings PDF attachment, applying the same resume, upload and recipient checks as "
-        "the HR step. Do not claim an attachment exists in a channel that cannot attach it. "
-        "If contact, channel, demo, resume or authenticated mail access is unavailable, report "
-        "blocked rather than guessing or switching recipients.\n"
-        "5. Inspect Sent mail or conversation history for this follow-up before sending. "
-        "Show sender, recipient, subject, full message and attachment, and obtain explicit "
-        "confirmation immediately before Send. Respect required data-sharing approvals. "
-        "After an uncertain send, check the conversation; never blindly resend.\n"
-        "6. Only after verified sending, fill 'Sent follow-up message' with the exact sent text, "
-        "select 'Sent via', and click 'Record sent follow-up' on the same Tracker detail. "
-        "This records history and advances the existing cadence; do not also change status "
-        "to 'Follow-up Sent' or click 'Mark emailed', which belongs to the separate initial HR todo. "
-        "Verify the new history row, number, channel, message and timestamp, then return to "
-        "Dashboard and check the updated date/queue. If logging is uncertain, inspect history "
-        "before any retry; never resend or record twice. A still-overdue next date does not "
-        "authorize another follow-up in this run. Process at most one follow-up per record.\n"
-        "Report each follow-up separately: sent and recorded, already sent, pending draft, "
-        "deferred, awaiting confirmation, or blocked with reason. Never fabricate history.\n"
-    )
-    return envelope + rendered + hr_step + followup_step, unresolved
+    return envelope + rendered, unresolved
 
 
 @router.get("/application-prompt", response_model=RenderedApplicationPrompt)
@@ -564,3 +480,34 @@ def download_application_resume():
         "Cache-Control": "private, no-store",
         "Referrer-Policy": "no-referrer",
     })
+
+
+def _render_outreach_prompt(template, resume, page_url, resume_url):
+    values = {"page_url": page_url, "resume_filename": (resume or {}).get("filename") or "Resume.pdf",
+              "resume_url": resume_url, "resume_sha256": (resume or {}).get("sha256") or "unavailable"}
+    rendered = _PROMPT_PLACEHOLDER.sub(lambda match: values.get(match.group(1), match.group(0)), template)
+    unresolved = sorted(set(_PROMPT_PLACEHOLDER.findall(rendered)))
+    rules = ("TASK RULES: Execute only this selected outreach workflow. Do not submit applications or run other outreach queues. "
+             "Use verified facts and recipients only. Check conversation/Sent history to avoid duplicates. "
+             "Obtain explicit confirmation immediately before sending. Never record success without observed send evidence. "
+             "Report missing tools, login or assets rather than guessing or bypassing controls.\n\n")
+    return rules + rendered, unresolved
+
+
+@router.get("/outreach-prompt", response_model=RenderedApplicationPrompt)
+def read_outreach_prompt(request: Request, page_url: str,
+                         kind: Literal["hr_email", "followup", "cold_dm"]):
+    page_url = _clean_text(page_url, 1_000)
+    if not page_url.startswith(("https://", "http://localhost")):
+        raise HTTPException(status_code=422, detail="App page URL is invalid.")
+    settings = get_application_prompt_settings(_DEFAULT_USERNAME)
+    resume = _application_pdf_metadata()
+    prompt, unresolved = _render_outreach_prompt(settings[kind + "_template"], resume, page_url,
+                                                 str(request.url_for("download_application_resume")))
+    issues = []
+    if not resume:
+        issues.append("No latest Settings PDF is available.")
+    if unresolved:
+        issues.append("The saved template contains unresolved placeholders.")
+    return RenderedApplicationPrompt(prompt=prompt, job_count=0, resume_available=bool(resume),
+                                     ready=not issues, issues=issues, unresolved_placeholders=unresolved)

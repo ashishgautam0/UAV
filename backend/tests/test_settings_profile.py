@@ -99,7 +99,7 @@ class SettingsProfileTests(unittest.TestCase):
         }):
             result = profile_data.get_application_prompt_settings()
         self.assertTrue(all(
-            value == "" for key, value in result.items() if key != "prompt_template"
+            value == "" for key, value in result.items() if not key.endswith("template")
         ))
         self.assertIn("{{resume_url}}", result["prompt_template"])
 
@@ -150,15 +150,9 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertIn('"job_id": 91', prompt)
         self.assertIn("O'Reilly भारत", prompt)
         self.assertIn("https://api.example/api/profile/resume/pdf", prompt)
-        self.assertIn("HR EMAIL — AFTER TRACKER LOGGING", prompt)
-        self.assertIn("To: use the draft's recipient", prompt)
-        self.assertIn("Subject: copy", prompt)
-        self.assertIn("Body: use only the email body", prompt)
-        self.assertIn("Upload the actual PDF as a file attachment", prompt)
-        self.assertIn("exact live mini-demo link", prompt)
-        self.assertIn("explicit confirmation immediately before Send", prompt)
-        self.assertIn("never blindly resend or mark completed", prompt)
-        self.assertIn("click 'Mark emailed'", prompt)
+        self.assertNotIn("HR EMAIL —", prompt)
+        self.assertNotIn("FOLLOW-UPS —", prompt)
+        self.assertNotIn("click 'Mark emailed'", prompt)
         self.assertNotIn("must not bloat", prompt)
         for placeholder in ("application_answers", "page_url", "resume_filename",
                             "resume_url", "resume_sha256", "batch_jobs"):
@@ -184,18 +178,8 @@ class SettingsProfileTests(unittest.TestCase):
         )
         self.assertEqual(unresolved, ["unsupported_field"])
 
-    def test_hr_workflow_applies_to_previously_saved_custom_templates(self):
-        render = function(
-            ROOT / "app/routers/profile.py", "_render_application_prompt",
-            {"json": json, "_APPLICATION_ANSWER_LABELS": {},
-             "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}")},
-        )
-        prompt, unresolved = render(
-            "My saved application instructions: {{batch_jobs}}", {}, [], None,
-            "https://app.example/tonight", "https://api.example/resume.pdf",
-        )
-        self.assertFalse(unresolved)
-        self.assertIn("My saved application instructions", prompt)
+    def test_standalone_hr_workflow_retains_queue_and_send_guards(self):
+        prompt = profile_data.OUTREACH_DEFAULTS["hr_email_template"]
         self.assertIn("Do not generate or send HR email before tracking", prompt)
         self.assertIn("HR email pending assets", prompt)
         self.assertIn("HR email blocked: mail access required", prompt)
@@ -218,13 +202,7 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertIn("Copy complete prompt for Codex", page)
 
     def test_followups_use_dashboard_and_separate_confirmed_history_logging(self):
-        render = function(
-            ROOT / "app/routers/profile.py", "_render_application_prompt",
-            {"json": json, "_APPLICATION_ANSWER_LABELS": {},
-             "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}")},
-        )
-        prompt, _ = render("Custom template", {}, [], None, "https://app/tonight", "https://api/resume")
-        followup = prompt.split("FOLLOW-UPS — DASHBOARD QUEUE")[1]
+        followup = profile_data.OUTREACH_DEFAULTS["followup_template"]
         for requirement in ("Dashboard's 'Follow-ups Due'", "Click each dashboard follow-up card",
                             "skip future dates", "defer the follow-up", "pending draft",
                             "existing conversation/channel", "actual latest Settings PDF attachment",
