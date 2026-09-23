@@ -247,10 +247,24 @@ python pending_messages.py list --type hr_email --limit 10
 python pending_messages.py save --type hr_email --job-id <ID> < message.txt
 ```
 
+Each candidate includes a purpose-specific `draft_spec`. Follow it alongside
+`.claude/agents/cold-dm.md` and `.claude/agents/recruiter-email.md`, using the
+active verified PDF profile and exact JD. Cold DMs are single LinkedIn connection
+notes: target 180–260 characters, maximum 300, one truthful hook and an invitation
+to connect. They do not need a demo or claim attachments. Direct save and queued
+fulfil reject long/variant drafts; rewrite rather than truncate. Research and
+cold notes can proceed before demo creation; HR emails follow the demo.
+The Claude routine stores drafts only and does not send outreach.
+
 HR email candidates are emitted only after the job is in Tracker and its mini
 demo is live. Each brief stored draft must include that demo URL and say that
 the latest Settings PDF is attached. The app still does not send email; the
-user reviews the draft and attaches the provided PDF before sending it.
+user's separate Gmail workflow verifies the recipient and attaches the PDF
+before sending it. Use an evidenced hiring address or an explicit unknown
+recipient marker, never guessed email patterns. Body target: 70–110 words,
+one JD-to-profile connection and one request, at most 150 words total.
+Merging these instructions does not prove the saved Claude schedule has loaded
+them or that a scheduled drafting run has executed.
 
 It also drains the freeform queue. Anything parked in `message_requests` is
 rendered back into the prompt the app would have sent, and the routine answers it:

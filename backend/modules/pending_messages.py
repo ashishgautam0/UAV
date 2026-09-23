@@ -105,11 +105,23 @@ def _tracked_jobs_missing(message_type, limit):
 
 def cmd_list(args):
     jobs, tracked_total = _tracked_jobs_missing(args.type, args.limit)
+    profile = _profile_text()
+    from message_generator import build_cold_dm_prompt, build_hr_email_prompt
+    for job in jobs:
+        if args.type in {"cold_dm", "hr_email"} and not profile.strip():
+            job["draft_spec"] = {"error": "Active verified PDF profile unavailable; do not draft."}
+            continue
+        if args.type == "cold_dm":
+            job["draft_spec"] = build_cold_dm_prompt(
+                job["company"], job["title"], job["description"], profile_text=profile)
+        elif args.type == "hr_email":
+            job["draft_spec"] = build_hr_email_prompt(
+                job["company"], job["title"], job["description"], job["demo_url"], profile)
     json.dump(
         {
             "message_type": args.type,
             "tracked_jobs_total": tracked_total,
-            "profile": _profile_text(),
+            "profile": profile,
             "jobs": jobs,
         },
         sys.stdout,
@@ -121,6 +133,11 @@ def cmd_list(args):
 
 def cmd_save(args):
     content = (args.content if args.content is not None else sys.stdin.read()).strip()
+    from outreach_quality import validate_outreach_draft
+    problem = validate_outreach_draft(args.type, content)
+    if problem:
+        print(problem, file=sys.stderr)
+        return 1
     if not content:
         print("Refusing to save an empty message.", file=sys.stderr)
         return 1
@@ -311,6 +328,12 @@ def cmd_fulfil(args):
     # Apply the same sentence-boundary trim the old inline generator used.
     from message_generator import enforce_char_limit
     spec = _build_prompt(row["message_type"], row.get("params"))
+    if row["message_type"] == "cold-dm":
+        from outreach_quality import validate_outreach_draft
+        problem = validate_outreach_draft(row["message_type"], content)
+        if problem:
+            print(problem, file=sys.stderr)
+            return 1
     content = enforce_char_limit(content, spec.get("char_limit"))
 
     if not complete_message_request(args.request_id, content):
