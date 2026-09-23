@@ -49,7 +49,27 @@ class OutreachSettingsTests(unittest.TestCase):
                 self.assertIn("explicit confirmation immediately before sending", prompt)
                 self.assertNotIn("{{", prompt)
         self.assertNotIn("HR EMAIL —", profile_data.OUTREACH_DEFAULTS["followup_template"])
-        self.assertIn("no dedicated cold-DM sent flag", profile_data.OUTREACH_DEFAULTS["cold_dm_template"])
+        self.assertIn("channel LinkedIn connection", profile_data.OUTREACH_DEFAULTS["cold_dm_template"])
+
+    def test_connection_notes_use_due_queue_and_record_one_slot(self):
+        prompt, _ = self.renderer()("Legacy scan all Tracker jobs", {}, "https://app", "https://pdf", "cold_dm")
+        for required in ("START ONLY FROM Dashboard's 'Follow-ups Due'", "Asia/Kolkata", "Missing/future dates",
+                         "Record completed outreach", "select 'LinkedIn connection'", "advance the schedule",
+                         "retry only missing logging", "day 7, 14 and 21", "at most one outreach action"):
+            self.assertIn(required, prompt)
+
+    def test_connection_recording_uses_existing_history_and_cadence(self):
+        from unittest.mock import MagicMock
+        from app.models.schemas import LogFollowUpRequest
+        log, advance = MagicMock(return_value=1), MagicMock()
+        endpoint = function(ROOT / "app/routers/follow_ups.py", "log_follow_up_sent", {
+            "LogFollowUpRequest": LogFollowUpRequest, "log_follow_up": log, "update_status": advance})
+        result = endpoint(LogFollowUpRequest(entity_type="application", entity_id=42,
+                          message_content="Exact sent note; https://www.linkedin.com/in/fixture", channel="LinkedIn connection"))
+        self.assertEqual(result["follow_up_number"], 1)
+        self.assertEqual(log.call_args.kwargs["entity_id"], 42)
+        self.assertEqual(log.call_args.kwargs["channel"], "LinkedIn connection")
+        advance.assert_called_once_with(42, "Follow-up Sent")
 
     def test_custom_outreach_retains_send_guards_and_reports_unknown_placeholders(self):
         prompt, unknown = self.renderer()("My brief {{unsupported}}", {}, "https://app", "https://pdf")
@@ -95,7 +115,7 @@ class OutreachSettingsTests(unittest.TestCase):
                          "not Gmail, InMail", "one-click Connect", "300 characters", "live composer limit",
                          "cannot attach a resume", "already connected", "If Pending", "canonical recipient",
                          "at most once", "acceptance pending", "not the overall", "stop invitation sending",
-                         "no dedicated connection-invitation sent flag", "My saved generic DM prompt"):
+                         "Record completed outreach", "My saved generic DM prompt"):
             self.assertIn(required, prompt)
         for kind in ("hr_email", "followup"):
             other, _ = self.renderer()("Email template", {}, "https://app", "https://pdf", kind)

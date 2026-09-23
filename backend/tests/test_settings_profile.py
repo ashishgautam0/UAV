@@ -213,7 +213,7 @@ class SettingsProfileTests(unittest.TestCase):
         detail = (ROOT.parent / "frontend/src/app/(app)/jobs/[id]/page.tsx").read_text()
         self.assertIn('entity_id: application.id', detail)
         self.assertIn('message_content: sentFollowUp.trim()', detail)
-        self.assertIn('event.follow_up_number >= followUpDraft.follow_up_number!', detail)
+        self.assertIn('event.follow_up_number >= followUpDraft!.follow_up_number!', detail)
         self.assertIn('setFollowUpRecordLocked(true)', detail)
 
 if __name__ == "__main__":

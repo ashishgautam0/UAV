@@ -255,6 +255,13 @@ to connect. They do not need a demo or claim attachments. Direct save and queued
 fulfil reject long/variant drafts; rewrite rather than truncate. Research and
 cold notes can proceed before demo creation; HR emails follow the demo.
 The Claude routine stores drafts only and does not send outreach.
+The user-run cold-DM prompt starts from Dashboard **Follow-ups Due**, not from
+all newly tracked jobs. A confirmed LinkedIn invitation with its note is recorded
+in Tracker as **LinkedIn connection** using **Record sent follow-up**, advancing
+one existing cadence slot (days 7/14/21 from application). Blocked, future,
+already-pending or uncertain sends do not advance it. Recording is available
+without an email follow-up draft. Existing history/status writes are separate;
+after uncertain logging, inspect both and do not blindly record twice.
 
 HR email candidates are emitted only after the job is in Tracker and its mini
 demo is live. Each brief stored draft must include that demo URL and say that
