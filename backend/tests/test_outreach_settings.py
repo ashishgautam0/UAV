@@ -87,6 +87,20 @@ class OutreachSettingsTests(unittest.TestCase):
             endpoint(SimpleNamespace(url_for=lambda _: "https://api/pdf"), "https://app/dashboard", kind)
         self.assertEqual(seen, ["hr_email", "followup", "cold_dm"])
 
+    def test_connection_note_rules_apply_to_old_custom_cold_dm_templates(self):
+        prompt, unresolved = self.renderer()("My saved generic DM prompt", {}, "https://app", "https://pdf", "cold_dm")
+        self.assertFalse(unresolved)
+        for required in ("'Send it to'", "'Recruiters at [company]'", "'Hiring managers at [company]'",
+                         "search links, not verified people", "current employment", "Connect → Add a note",
+                         "not Gmail, InMail", "one-click Connect", "300 characters", "live composer limit",
+                         "cannot attach a resume", "already connected", "If Pending", "canonical recipient",
+                         "at most once", "acceptance pending", "not the overall", "stop invitation sending",
+                         "no dedicated connection-invitation sent flag", "My saved generic DM prompt"):
+            self.assertIn(required, prompt)
+        for kind in ("hr_email", "followup"):
+            other, _ = self.renderer()("Email template", {}, "https://app", "https://pdf", kind)
+            self.assertNotIn("LINKEDIN COLD DM = CONNECTION REQUEST", other)
+
     def test_outreach_readiness_is_independent_of_today_todo_and_submission_authorization(self):
         for resume, expected in (({"filename": "active.pdf", "sha256": "abc"}, True), (None, False)):
             env = {"Request": object, "Literal": Literal, "RenderedApplicationPrompt": RenderedApplicationPrompt,

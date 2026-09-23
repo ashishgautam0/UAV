@@ -20,6 +20,25 @@ These Gmail and evidence requirements override any older generic-mail or recipie
 
 """
 
+LINKEDIN_CONNECTION_RULES = """LINKEDIN COLD DM = CONNECTION REQUEST WITH A NOTE:
+For each snapshotted Tracker job with a current Cold DM draft, open that exact persisted Tracker detail and its 'Send it to' section. Start with 'Recruiters at [company]'; use 'Hiring managers at [company]' if needed. These are search links, not verified people. Open candidate profiles and verify current employment at the exact company and hiring relevance for the role/location. Inspect up to five relevant profiles per job. Select one appropriate HR/recruiter, or a relevant hiring manager if no recruiter is found. If none is verified, report blocked; never guess a person or use the email finder.
+
+Use my authenticated LinkedIn account. This workflow sends Connect → Add a note → Send invitation, not Gmail, InMail or a normal direct message. Open the person's profile and choose a flow that lets you review the note before sending. Never use a one-click Connect control that sends an invitation without a note. If Add a note is unavailable, report blocked instead of sending a blank invitation or switching channels.
+
+Personalize the stored Cold DM into a short connection note: recipient's verified name, exact role/company and one relevant verified resume fact or a simple reason to connect. Do not invent prior acquaintance, qualifications or a conversation. Keep it within the character limit displayed by LinkedIn, including spaces and any link; Premium documentation lists up to 300 characters, but the live composer limit takes precedence. Shorten and recheck before sending. Connection notes cannot attach a resume PDF: do not claim an attachment. Do not force a demo URL into a note if it prevents a useful concise introduction.
+
+Check the profile's connection state, sent invitations and conversation history first. If already connected, report 'already connected'; do not send a new invitation or substitute a DM. If Pending or previously sent, skip; never withdraw/reinvite as a workaround. Keep a run-level set of canonical recipient profile URLs across all jobs so the same person is invited at most once; report the other jobs as covered/deferred. Do not contact multiple people for one job in this run.
+
+Show the recipient name/profile URL, current company/role evidence, exact note and character count for confirmation immediately before Send invitation. After sending, verify an invitation confirmation or the profile's Pending state and, where visible, the sent invitation entry. Report 'invitation sent; acceptance pending', not a delivered DM or accepted connection. On a timeout, inspect sent invitations before retrying; never blindly resend.
+
+LinkedIn Premium removes the separate personalized-note allowance, not the overall connection-invitation limits. Do not assume an unlimited invitation budget or a fixed weekly quota. If LinkedIn shows an invitation limit, restriction, CAPTCHA or unavailable access, stop invitation sending and report remaining jobs as deferred/blocked. Do not evade limits using different accounts, InMail, email or repeated attempts.
+
+Do not mark HR emailed or record a follow-up for a connection request. The app has no dedicated connection-invitation sent flag; use LinkedIn Pending/sent invitations plus history to prevent duplicates and report that persistence limitation. Include Tracker ID, company/job, recipient profile, exact note, observed result and timestamp in the run report. Work through the bounded snapshot, then report remaining work rather than chasing new records.
+
+These connection-note rules override any older generic cold-DM sending wording below.
+
+"""
+
 OUTREACH_DEFAULTS = {'hr_email_template': 'Open the app: {{page_url}}\n'
                       'Latest Settings PDF: {{resume_filename}} at {{resume_url}}\n'
                       'PDF SHA-256: {{resume_sha256}}\n'
@@ -143,13 +162,16 @@ OUTREACH_DEFAULTS = {'hr_email_template': 'Open the app: {{page_url}}\n'
                      'login/CAPTCHA, or pay fees. Use available authenticated browser/mail '
                      'capabilities; report unavailable capabilities. This task does not submit job '
                      'applications.\n'
-                     'COLD DM — TRACKER ONLY\n'
-                     'Open Tracker from the app navigation and take one bounded snapshot of up to '
-                     '10 records with a stored Cold DM draft. Use the persisted Tracker detail '
+                     'COLD DM — LINKEDIN CONNECTION NOTES, TRACKER ONLY\n'
+                     'Open Tracker from the app navigation and snapshot the current records with a '
+                     'stored Cold DM draft, following available pagination once and deduplicating Tracker IDs. '
+                     'Stop on repeated pages or a load error and report incomplete coverage. Process each '
+                     'snapshotted record unless LinkedIn limits block further invitations. Use the persisted Tracker detail '
                      'links; verify company, role and posting URL. Do not use untracked discovery '
                      'jobs or substitute HR email/follow-up drafts.\n'
-                     "Use the stored Cold DM and verified hiring contact's LinkedIn profile. If "
-                     'the draft/contact is missing or ambiguous, report blocked. Never guess a '
+                     "Use the stored Cold DM and the Tracker's Send it to recruiter/hiring-manager "
+                     'search links to find a verified LinkedIn recipient. Follow the connection-note '
+                     'rules above. If the draft is missing or the contact remains ambiguous, report blocked. Never guess a '
                      'profile or email address. Keep the message brief, professional and grounded '
                      'in the active verified resume facts. If the resume has changed or the draft '
                      'is stale, request regeneration and skip it. Do not invent experience or a '
@@ -160,10 +182,10 @@ OUTREACH_DEFAULTS = {'hr_email_template': 'Open the app: {{page_url}}\n'
                      'bypass restrictions.\n'
                      'Show recipient, company and exact message and obtain confirmation '
                      'immediately before Send. Only report sent after observing confirmation or '
-                     'the matching conversation message. For uncertain results, inspect history '
+                     'the Pending/sent invitation state. For uncertain results, inspect sent invitations '
                      'before retrying; never blindly resend. Do not click Mark emailed or Record '
                      'sent follow-up for a cold DM. This app has no dedicated cold-DM sent flag: '
-                     'use conversation history for duplicate prevention and state this '
+                     'use Pending/sent invitations and conversation history for duplicate prevention and state this '
                      'limitation.\n'
                      'Report each record: sent with observed evidence, already sent, awaiting '
                      'confirmation, missing draft/contact, or blocked. Do not run HR email, '

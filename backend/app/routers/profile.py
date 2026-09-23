@@ -483,7 +483,7 @@ def download_application_resume():
 
 
 def _render_outreach_prompt(template, resume, page_url, resume_url, kind="hr_email"):
-    from outreach_prompts import GMAIL_HR_DELIVERY_RULES
+    from outreach_prompts import GMAIL_HR_DELIVERY_RULES, LINKEDIN_CONNECTION_RULES
     values = {"page_url": page_url, "resume_filename": (resume or {}).get("filename") or "Resume.pdf",
               "resume_url": resume_url, "resume_sha256": (resume or {}).get("sha256") or "unavailable"}
     rendered = _PROMPT_PLACEHOLDER.sub(lambda match: values.get(match.group(1), match.group(0)), template)
@@ -492,7 +492,7 @@ def _render_outreach_prompt(template, resume, page_url, resume_url, kind="hr_ema
              "Use verified facts and recipients only. Check conversation/Sent history to avoid duplicates. "
              "Obtain explicit confirmation immediately before sending. Never record success without observed send evidence. "
              "Report missing tools, login or assets rather than guessing or bypassing controls.\n\n")
-    delivery = GMAIL_HR_DELIVERY_RULES if kind in {"hr_email", "followup"} else ""
+    delivery = GMAIL_HR_DELIVERY_RULES if kind in {"hr_email", "followup"} else LINKEDIN_CONNECTION_RULES
     return rules + delivery + rendered, unresolved
 
 

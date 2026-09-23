@@ -766,7 +766,7 @@ export default function JobDetailPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Send it to</CardTitle>
           <CardDescription>
-            Find the person on LinkedIn, or guess their work email below.
+            For a cold DM, find a relevant recruiter or hiring manager using these LinkedIn searches, verify their current company, then send a connection request with a short note. Email suggestions below are unverified and are not used for connection notes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
