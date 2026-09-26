@@ -21,13 +21,13 @@ These Gmail and evidence requirements override any older generic-mail or recipie
 """
 
 LINKEDIN_CONNECTION_RULES = """LINKEDIN COLD DM = CONNECTION REQUEST WITH A NOTE:
-START ONLY FROM Dashboard's 'Follow-ups Due' queue. Snapshot that queue, follow each card to its exact Tracker record, and recheck its saved follow_up_date in Asia/Kolkata immediately before sending. Only due or overdue, nonterminal records are eligible. Missing/future dates, load errors or ambiguous records are blocked; never change a date to make a job eligible. Do not scan all Tracker jobs for immediate cold outreach. A stored cold draft is preparation, not permission to send early.
+START ONLY FROM Dashboard's 'Follow-ups Due' queue. Snapshot the due cards, click each individual card to open its exact Tracker job detail, then read the saved message in that job's 'Cold DM' section. Use THAT Cold DM as the LinkedIn connection note; Dashboard's 'View Draft' is a follow-up draft and must not be substituted. Verify the card's company/job and Tracker ID match the detail. Recheck its saved follow_up_date in Asia/Kolkata immediately before sending. Only due or overdue, nonterminal records are eligible. Missing/future dates, load errors, missing Cold DM drafts or ambiguous records are blocked; never change a date to make a job eligible. Do not scan all Tracker jobs for immediate cold outreach. A stored cold draft is preparation, not permission to send early.
 
-For each snapshotted Tracker job with a current Cold DM draft, open that exact persisted Tracker detail and its 'Send it to' section. Start with 'Recruiters at [company]'; use 'Hiring managers at [company]' if needed. These are search links, not verified people. Open candidate profiles and verify current employment at the exact company and hiring relevance for the role/location. Inspect up to five relevant profiles per job. Select one appropriate HR/recruiter, or a relevant hiring manager if no recruiter is found. If none is verified, report blocked; never guess a person or use the email finder.
+For each snapshotted Tracker job with a current Cold DM draft, use that same detail's 'Send it to' section. Start with 'Recruiters at [company]'; use 'Hiring managers at [company]' if needed. These are search links, not verified people. Open candidate profiles and verify current employment at the exact company and hiring relevance for the role/location. Inspect up to five relevant profiles per job. Select one appropriate HR/recruiter, or a relevant hiring manager if no recruiter is found. If none is verified, report blocked; never guess a person or use the email finder.
 
 Use my authenticated LinkedIn account. This workflow sends Connect → Add a note → Send invitation, not Gmail, InMail or a normal direct message. Open the person's profile and choose a flow that lets you review the note before sending. Never use a one-click Connect control that sends an invitation without a note. If Add a note is unavailable, report blocked instead of sending a blank invitation or switching channels.
 
-Personalize the stored Cold DM into a short connection note: recipient's verified name, exact role/company and one relevant verified resume fact or a simple reason to connect. Do not invent prior acquaintance, qualifications or a conversation. Keep it within the character limit displayed by LinkedIn, including spaces and any link; Premium documentation lists up to 300 characters, but the live composer limit takes precedence. Shorten and recheck before sending. Connection notes cannot attach a resume PDF: do not claim an attachment. Do not force a demo URL into a note if it prevents a useful concise introduction.
+Use the text stored in that exact job's 'Cold DM' section as the basis of a short connection note. Adjust it only for the recipient's verified name, exact role/company, truthfulness and the live character limit; do not replace it with a newly invented note. Do not invent prior acquaintance, qualifications or a conversation. Keep it within the character limit displayed by LinkedIn, including spaces and any link; Premium documentation lists up to 300 characters, but the live composer limit takes precedence. Shorten and recheck before sending. Connection notes cannot attach a resume PDF: do not claim an attachment. Do not force a demo URL into a note if it prevents a useful concise introduction.
 
 Check the profile's connection state, sent invitations and conversation history first. If already connected, report 'already connected'; do not send a new invitation or substitute a DM. If Pending or previously sent, skip; never withdraw/reinvite as a workaround. Keep a run-level set of canonical recipient profile URLs across all jobs so the same person is invited at most once; report the other jobs as covered/deferred. Do not contact multiple people for one job in this run.
 
@@ -167,12 +167,14 @@ OUTREACH_DEFAULTS = {'hr_email_template': 'Open the app: {{page_url}}\n'
                      'capabilities; report unavailable capabilities. This task does not submit job '
                      'applications.\n'
                      'COLD DM — LINKEDIN CONNECTION NOTES, TRACKER ONLY\n'
-                     'Open Dashboard Follow-ups Due and snapshot only due records with a '
-                     'stored Cold DM draft, following available pagination once and deduplicating Tracker IDs. '
-                     'Stop on repeated pages or a load error and report incomplete coverage. Process each '
-                     'snapshotted record unless LinkedIn limits block further invitations. Use the persisted Tracker detail '
-                     'links; verify company, role and posting URL. Do not use untracked discovery '
-                     'jobs or substitute HR email/follow-up drafts.\n'
+                     "Open Dashboard → Follow-ups Due and snapshot the due cards, following available "
+                     'pagination once and deduplicating Tracker IDs. Click each individual card to open its '
+                     "Tracker job detail; find that job's 'Cold DM' section and use its stored message "
+                     'for the LinkedIn connection note. Dashboard View Draft is the follow-up draft, '
+                     'not this Cold DM. Stop on repeated pages or a load error and report incomplete '
+                     'coverage. Process each snapshotted record with a current Cold DM unless LinkedIn '
+                     'limits block further invitations. Verify company, role and posting URL. Do not use '
+                     'untracked discovery jobs or substitute HR email/follow-up drafts.\n'
                      "Use the stored Cold DM and the Tracker's Send it to recruiter/hiring-manager "
                      'search links to find a verified LinkedIn recipient. Follow the connection-note '
                      'rules above. If the draft is missing or the contact remains ambiguous, report blocked. Never guess a '
