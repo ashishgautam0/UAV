@@ -268,9 +268,12 @@ cold notes can proceed before demo creation; HR emails follow the demo.
 The Claude routine stores drafts only and does not send outreach.
 Settings → **Cold DM prompt** → **Generate prompt** builds a fixed JSON batch
 from due Tracker follow-ups. Each entry carries the matched scraped job ID,
-Tracker ID, job details, current screening evidence, due date and stored Cold DM
-text. Missing or stale notes and screening that is not `pass` remain visibly
-blocked. The generated prompt does not require browsing Dashboard cards to
+Tracker ID, job details, due date and stored Cold DM text. Screening results
+are used by the backend but omitted from the job JSON. Missing or stale notes
+and jobs without a current passing screen are excluded and counted separately.
+The Today Todo application prompt also includes only backend-confirmed passing
+jobs and omits screening results from its JSON batch. The generated Cold DM
+prompt does not require browsing Dashboard cards to
 retrieve drafts, and generating it does not send invitations or alter the
 Claude schedule. Recheck the live Tracker follow-up date and history before
 sending. A confirmed LinkedIn invitation with its note is recorded

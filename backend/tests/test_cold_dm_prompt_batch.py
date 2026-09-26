@@ -55,11 +55,11 @@ class ColdDmPromptBatchTests(unittest.TestCase):
         ready = batch[-1]
         self.assertEqual((ready["title"], ready["location"], ready["source"]),
                          ("AI Engineer", "KA, IN", "Indeed"))
-        self.assertEqual((ready["screening_status"], ready["screening_reason"]),
-                         ("pass", "Verified Python overlap"))
+        self.assertNotIn("screening_status", ready)
+        self.assertNotIn("screening_reason", ready)
         self.assertEqual((ready["cold_dm"], ready["blocked_reason"]),
                          ("Hello — real voice agent work.", ""))
-        self.assertEqual(batch[0]["screening_status"], "pending")
+        self.assertNotIn("screening_status", batch[0])
         self.assertIsNone(batch[0]["cold_dm"])
         self.assertIn("No current Cold DM", batch[0]["blocked_reason"])
         self.assertTrue(all(item["cold_dm"] is None for item in batch[1:3]))
@@ -76,7 +76,7 @@ class ColdDmPromptBatchTests(unittest.TestCase):
             tracker, "_user_now", return_value=datetime.fromisoformat("2026-09-27T12:00:00+05:30")
         ):
             batch = tracker.get_cold_dm_prompt_jobs(5)
-        self.assertEqual(batch[0]["screening_status"], "pending")
+        self.assertNotIn("screening_status", batch[0])
         self.assertEqual(batch[0]["blocked_reason"], "Screening is not pass")
 
     def test_more_than_limit_fails_before_reading_note_data(self):

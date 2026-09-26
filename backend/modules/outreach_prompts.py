@@ -21,7 +21,7 @@ These Gmail and evidence requirements override any older generic-mail or recipie
 """
 
 LINKEDIN_CONNECTION_RULES = """LINKEDIN COLD DM = CONNECTION REQUEST WITH A NOTE:
-USE THE FIXED COLD DM JOBS SNAPSHOT INCLUDED IN THIS PROMPT. Each JSON item contains the persisted Tracker ID, job ID, screening evidence, due date and stored cold_dm text. Use only that job's cold_dm as the basis for its LinkedIn connection note; do not search Dashboard cards for draft text or substitute an HR email or follow-up draft. Before sending, open the item's direct tracker_url to verify its status and follow_up_date in Asia/Kolkata and check its outreach history. Only still-due, nonterminal records with screening_status pass, a current Cold DM and verified identity are eligible. Missing/future dates, stale snapshots, changed resume, load errors or ambiguous records are blocked; never change a date to make a job eligible. A stored cold draft is preparation, not permission to send early.
+USE THE FIXED COLD DM JOBS SNAPSHOT INCLUDED IN THIS PROMPT. The backend includes only due jobs with a current passing screen and current stored cold_dm. Each JSON item contains the persisted Tracker ID, job ID, due date and stored cold_dm text. Use only that job's cold_dm as the basis for its LinkedIn connection note; do not search Dashboard cards for draft text or substitute an HR email or follow-up draft. Before sending, open the item's direct tracker_url to verify its status and follow_up_date in Asia/Kolkata and check its outreach history. Only still-due, nonterminal records with current eligibility and verified identity are eligible. Missing/future dates, stale snapshots, changed resume, load errors or ambiguous records are blocked; never change a date to make a job eligible. A stored cold draft is preparation, not permission to send early.
 
 For each eligible batch job, start with its recruiters_search_url; use hiring_managers_search_url if needed. These are search links, not verified people. Open candidate profiles and verify current employment at the exact company and hiring relevance for the role/location. Inspect up to five relevant profiles per job. Select one appropriate HR/recruiter, or a relevant hiring manager if no recruiter is found. If none is verified, report blocked; never guess a person or use the email finder.
 
@@ -35,7 +35,7 @@ Show the recipient name/profile URL, current company/role evidence, exact note a
 
 LinkedIn Premium removes the separate personalized-note allowance, not the overall connection-invitation limits. Do not assume an unlimited invitation budget or a fixed weekly quota. If LinkedIn shows an invitation limit, restriction, CAPTCHA or unavailable access, stop invitation sending and report remaining jobs as deferred/blocked. Do not evade limits using different accounts, InMail, email or repeated attempts.
 
-After a confirmed new invitation with its note, return to the SAME Tracker record. In 'Record completed outreach', paste the exact note plus the recipient profile URL, select 'LinkedIn connection', and click 'Record sent follow-up'. This invitation is the completed action for the current follow-up slot. Verify the new history entry, channel, count and updated follow-up date, then verify Dashboard reflects it. Do not also mark HR emailed or manually change status/date. The existing cadence is day 7, 14 and 21 from application date; recording advances one slot and the last slot ends that cadence. An overdue next date never permits another send in this run.
+After a confirmed new invitation with its note, open that exact job's tracker_url. In its 'Record completed outreach' section, enter the exact sent note and recipient profile URL in 'Sent follow-up message', choose 'LinkedIn connection' in 'Sent via' (not the generic 'LinkedIn' option), and click 'Record sent follow-up'. Do this separately for each job with a confirmed send. This invitation is the completed action for the current follow-up slot. Verify the saved history entry contains the message, recipient, channel and timestamp, and verify the updated follow-up count and date on that job and Dashboard. Do not record anything for an unconfirmed send. Do not also mark HR emailed or manually change status/date. The existing cadence is day 7, 14 and 21 from application date; recording advances one slot and the last slot ends that cadence. An overdue next date never permits another send in this run.
 
 If sending failed, is blocked, uncertain, or the invitation was already pending/connected, do not record a new follow-up or advance the schedule. For a just-confirmed send whose logging failed, inspect history and retry only missing logging; never resend. Stop and report if history was saved but the schedule did not update rather than logging twice. There is no separate invitation-state table; use LinkedIn state and the recorded 'LinkedIn connection' history together for duplicate prevention. Process at most one outreach action per Tracker record per run; after recording the connection note, do not also send an email follow-up for that slot. Include Tracker ID, company/job, recipient profile, exact note, observed result, timestamp and next date in the report.
 
@@ -167,9 +167,9 @@ OUTREACH_DEFAULTS = {'hr_email_template': 'Open the app: {{page_url}}\n'
                      'capabilities; report unavailable capabilities. This task does not submit job '
                      'applications.\n'
                      'COLD DM — LINKEDIN CONNECTION NOTES, TRACKER ONLY\n'
-                     'The fixed batch below comes from the saved due follow-up queue. Process only '
-                     'items with screening_status pass, an unblocked current cold_dm and a live due '
-                     'date; report blocked items rather than inventing a draft. Use the stored cold_dm '
+                     'The fixed batch below comes from the saved due follow-up queue. The backend '
+                     'includes only jobs with passing screening and current stored cold_dm text. '
+                     'Recheck the live due date and eligibility before sending. Use the stored cold_dm '
                      'in each item for its LinkedIn connection note. Recheck the direct tracker_url '
                      'before sending, and verify company, role, and posting URL. Do not include '
                      'new jobs appearing after this snapshot or substitute HR email/follow-up drafts.\n'
@@ -187,9 +187,11 @@ OUTREACH_DEFAULTS = {'hr_email_template': 'Open the app: {{page_url}}\n'
                      'Show recipient, company and exact message and obtain confirmation '
                      'immediately before Send. Only report sent after observing confirmation or '
                      'the Pending/sent invitation state. For uncertain results, inspect sent invitations '
-                     'before retrying; never blindly resend. After a confirmed new invitation, use Record '
-                     'sent follow-up with channel LinkedIn connection on the same Tracker record to '
-                     'advance one scheduled slot. Do not click Mark emailed. Verify history and the next date.\n'
+                     'before retrying; never blindly resend. After a confirmed new invitation, open that '
+                     "job's Tracker page and use Record completed outreach: enter the exact note and "
+                     "recipient profile URL in Sent follow-up message, select LinkedIn connection in Sent via, "
+                     'then click Record sent follow-up to advance one scheduled slot. Do not click Mark '
+                     'emailed. Verify saved history and the next date.\n'
                      'Report each record: sent with observed evidence, already sent, awaiting '
                      'confirmation, missing draft/contact, or blocked. Do not run HR email, '
                      'application or follow-up workflows in this task.\n'

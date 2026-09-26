@@ -236,7 +236,7 @@ export default function SettingsPage() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="font-medium">Ready-to-paste Codex prompt</h3>
-              <p className="text-xs text-muted-foreground">Generated from the current Today Todo batch, saved answers, and latest Settings PDF.</p>
+              <p className="text-xs text-muted-foreground">Generated from jobs that passed backend screening, saved answers, and the latest Settings PDF. Screening results are omitted from job JSON.</p>
             </div>
 
           </div>
@@ -252,7 +252,7 @@ export default function SettingsPage() {
     {!loadError && <>
       <OutreachPrompt kind="hr_email" title="Initial HR email prompt" description="Send through your Gmail. Use Dashboard’s HR todos; verify recipients and research official hiring contacts if Claude’s address is invalid or unverified." initialValue={applicationSettings.hr_email_template} />
       <OutreachPrompt kind="followup" title="HR follow-up email prompt" description="Use your Gmail and Dashboard’s Follow-ups Due queue. Check recipient evidence, dates, Sent history and bounces before sending." initialValue={applicationSettings.followup_template} />
-      <OutreachPrompt kind="cold_dm" title="Cold DM prompt" description="Generate a fixed batch of due jobs with their saved Cold DM text and screening evidence. Verify each job is still due before sending a LinkedIn connection note; record a confirmed send to advance its existing follow-up schedule." initialValue={applicationSettings.cold_dm_template} />
+      <OutreachPrompt kind="cold_dm" title="Cold DM prompt" description="Generate a fixed batch of eligible due jobs with their saved Cold DM text. Verify each job is still due before sending a LinkedIn connection note; record a confirmed send to advance its existing follow-up schedule." initialValue={applicationSettings.cold_dm_template} />
     </>}
     <Card>
       <CardHeader><CardTitle>Exclude companies from scraped jobs</CardTitle><p className="text-sm text-muted-foreground">Enter one employer per line. The Claude hourly scraper skips new jobs from these companies before saving or including them in digests. Existing Tracker jobs and history stay intact.</p></CardHeader>
