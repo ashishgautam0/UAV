@@ -210,9 +210,79 @@ def get_cold_dm_todos():
                      if isinstance(message.get("content"), str) and message["content"].strip())
     return [{"id": row["id"], "company": row["company"], "role": row["role"],
              "follow_up_date": row["follow_up_date"],
-             "scraped_job_id": row.get("scraped_job_id"),
-             "cold_dm_ready": row.get("scraped_job_id") in ready}
+             "scraped_job_id": int(row["scraped_job_id"]) if row.get("scraped_job_id") is not None else None,
+             "cold_dm_ready": (row.get("scraped_job_id") is not None and
+                               int(row["scraped_job_id"]) in ready)}
             for row in rows]
+
+
+def get_cold_dm_prompt_jobs(resume_version=None, limit=100):
+    """Build a bounded, fixed batch of due Tracker jobs and their stored notes.
+
+    Keep blocked records in the output so missing or stale drafts are visible.
+    Reuse the same URL-to-job mapping and Asia/Kolkata due filter as Dashboard.
+    """
+    due = get_follow_ups_due()
+    if due.empty:
+        return []
+    rows = due.astype(object).where(due.notna(), None).to_dict("records")
+    if len(rows) > limit:
+        raise ValueError(f"{len(rows)} Cold DMs are due; the prompt limit is {limit}. Resolve due jobs before generating the batch.")
+
+    job_ids = sorted({int(row["scraped_job_id"]) for row in rows if row.get("scraped_job_id")})
+    jobs, messages = {}, {"cold_dm": {}, "screen": {}}
+    if job_ids:
+        db = _get_client()
+        for start in range(0, len(job_ids), 200):
+            chunk = job_ids[start:start + 200]
+            for job in (db.table("scraped_jobs")
+                        .select("id,title,company,location,source,url")
+                        .in_("id", chunk).execute()).data or []:
+                jobs[job["id"]] = job
+            for kind in messages:
+                for message in (db.table("job_messages")
+                                .select("scraped_job_id,content,is_stale,profile_version,generated_at")
+                                .eq("message_type", kind).in_("scraped_job_id", chunk)
+                                .execute()).data or []:
+                    messages[kind][message["scraped_job_id"]] = message
+
+    batch = []
+    for row in rows:
+        job_id = int(row["scraped_job_id"]) if row.get("scraped_job_id") is not None else None
+        job = jobs.get(job_id) or {}
+        screen = messages["screen"].get(job_id) or {}
+        cold_dm = messages["cold_dm"].get(job_id) or {}
+        tag, separator, reason = (screen.get("content") or "").partition(":")
+        screen_current = (resume_version is not None and not screen.get("is_stale")
+                          and screen.get("profile_version") == resume_version)
+        status = tag.strip().lower() if separator and screen_current else "pending"
+        if status not in {"pass", "fail", "review"}:
+            status = "pending"
+        current = (bool(cold_dm.get("content", "").strip()) and not cold_dm.get("is_stale")
+                   and resume_version is not None and cold_dm.get("profile_version") == resume_version)
+        match = bool(job and job.get("url") == row.get("url")
+                     and str(job.get("company") or "").strip().casefold() ==
+                     str(row.get("company") or "").strip().casefold())
+        blocked = ("No matching scraped job" if not match else
+                   "No current Cold DM for the latest Settings PDF" if not current else
+                   "Screening is not pass" if status != "pass" else "")
+        batch.append({
+            "job_id": job_id if match else None,
+            "tracker_id": int(row["id"]),
+            "title": job.get("title") or row.get("role") or "",
+            "company": row.get("company") or "",
+            "location": job.get("location") or "",
+            "source": job.get("source") or "",
+            "url": row.get("url") or "",
+            "screening_status": status if match else "pending",
+            "screening_reason": reason.strip() if status != "pending" and match else "",
+            "follow_up_date": row["follow_up_date"],
+            "cold_dm": cold_dm["content"] if match and current else None,
+            "cold_dm_generated_at": cold_dm.get("generated_at") if match and current else None,
+            "resume_version": resume_version if match and current else None,
+            "blocked_reason": blocked,
+        })
+    return batch
 
 
 def get_hr_email_todos():

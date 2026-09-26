@@ -4,7 +4,7 @@ Other modules import from here to get dynamic profile/skills/projects instead
 of using hardcoded values.
 """
 
-from outreach_prompts import OUTREACH_DEFAULTS
+from outreach_prompts import OUTREACH_DEFAULTS, remove_legacy_cold_dm_navigation
 
 import hashlib
 import os
@@ -176,6 +176,7 @@ def get_application_prompt_settings(username="subidh"):
     result["automation_rules"] = result["automation_rules"] or DEFAULT_AUTOMATION_RULES
     for key, default in OUTREACH_DEFAULTS.items():
         result[key] = result[key] or default
+    result["cold_dm_template"] = remove_legacy_cold_dm_navigation(result["cold_dm_template"])
     return result
 
 
@@ -202,6 +203,7 @@ def save_application_prompt_settings(username="subidh", data=None):
     cleaned["automation_rules"] = cleaned["automation_rules"] or DEFAULT_AUTOMATION_RULES
     for key, default in OUTREACH_DEFAULTS.items():
         cleaned[key] = cleaned[key] or default
+    cleaned["cold_dm_template"] = remove_legacy_cold_dm_navigation(cleaned["cold_dm_template"])
     saved = upsert_profile(username, {
         "scoring_weights": {**weights, _APPLICATION_PROMPT_KEY: cleaned},
     })
