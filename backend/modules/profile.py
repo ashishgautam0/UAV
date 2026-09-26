@@ -59,9 +59,11 @@ Use only facts from my resume or answers I supplied. Do not invent experience, s
 
 I authorize you to read and accept required application terms, privacy/data-processing consents, acknowledgements and submission confirmations on my behalf. Check the required acceptance boxes and proceed to the next step without asking me to approve each one. Do not opt into optional marketing. If acceptance requires a factual statement that my resume/answers do not support, payment, or an agreement unrelated to applying for this job, leave that job unmarked and report the exact blocker.
 
-If login, CAPTCHA, missing mandatory answers, fees or an unsupported step blocks a job, record the blocker, leave its card unmarked and continue with the next job. Required application terms and consent alone are not blockers. Do not bypass controls or pay fees.
+If a CAPTCHA appears, attempt to complete the on-page challenge using the browser's supported interactions and verify the application continues. Do not bypass the challenge or use a third-party solving service. If it cannot be completed, request my help with that challenge; leave the job unmarked and continue with the other jobs.
 
-If the original job listing clearly says applications are closed/no longer accepted, or its page is permanently not found, return to Today Todo and remove that exact job's card (match job ID and URL; swipe left to Remove). Verify the card disappears. Do not mark it Applied or delete its database record. If the page is temporarily unavailable, requires login, or shows CAPTCHA, leave the card in place and report the blocker instead.
+If login, an unsolved CAPTCHA, missing mandatory answers, fees or an unsupported step blocks a job, record the blocker, leave its card unmarked and continue with the next job. Required application terms and consent alone are not blockers. Do not bypass controls or pay fees.
+
+If the original job listing clearly says applications are closed/no longer accepted, or its page is permanently not found, return to Today Todo and remove that exact job's card (match job ID and URL; swipe left to Remove). Verify the card disappears. Do not mark it Applied or delete its database record. If the page is temporarily unavailable, requires login, or shows only an unsolved CAPTCHA, leave the card in place and report the blocker instead.
 
 Only after observing an explicit submission confirmation, return to the matching card (match job ID and URL) and click its 'Applied — move to Tracker' tick button. Verify it disappears from Best Matches and appears in Tracker.
 
