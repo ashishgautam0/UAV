@@ -240,6 +240,17 @@ export async function getApplicationPromptSettings(): Promise<ApplicationPromptS
   return apiFetch<ApplicationPromptSettings>("/api/profile/application-settings");
 }
 
+export async function getCompanyExclusions(): Promise<{ companies: string[] }> {
+  return apiFetch<{ companies: string[] }>("/api/profile/company-exclusions");
+}
+
+export async function updateCompanyExclusions(companies: string[]): Promise<{ companies: string[] }> {
+  return apiFetch<{ companies: string[] }>("/api/profile/company-exclusions", {
+    method: "PUT",
+    body: JSON.stringify({ companies }),
+  });
+}
+
 export async function updateApplicationPromptSettings(
   data: Partial<ApplicationPromptSettings>,
 ): Promise<ApplicationPromptSettings> {

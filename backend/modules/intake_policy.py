@@ -49,8 +49,11 @@ def normalize_employer(value):
 
 _EXCLUDED = {normalize_employer(name) for name in LARGE_MNC_ALIASES}
 
-def excluded_employer(company):
-    return normalize_employer(company) in _EXCLUDED
+def excluded_employer(company, company_exclusions=()):
+    normalized = normalize_employer(company)
+    return normalized in _EXCLUDED or bool(normalized and normalized in {
+        normalize_employer(name) for name in company_exclusions
+    })
 
 _NUMBER = r"\d+(?:\.\d+)?"
 _DURATION = (
@@ -115,18 +118,20 @@ def experience_exclusion(description):
                         return match.group().strip()
     return None
 
-def exclusion_reason(job):
-    if excluded_employer(job.get("company")):
-        return "excluded large multinational employer"
+def exclusion_reason(job, company_exclusions=()):
+    if excluded_employer(job.get("company"), company_exclusions):
+        if normalize_employer(job.get("company")) in _EXCLUDED:
+            return "excluded large multinational employer"
+        return "excluded by Settings company list"
     evidence = experience_exclusion(job.get("description"))
     if evidence:
         return "experience requirement above two years: " + evidence
     return None
 
-def filter_jobs(jobs):
+def filter_jobs(jobs, company_exclusions=()):
     kept, excluded = [], []
     for job in jobs:
-        reason = exclusion_reason(job)
+        reason = exclusion_reason(job, company_exclusions)
         if reason:
             excluded.append((job, reason))
         else:

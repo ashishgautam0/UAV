@@ -5,7 +5,7 @@ from typing import Literal
 from unittest.mock import patch
 
 from test_settings_profile import ROOT, function, profile_data
-from app.models.schemas import ApplicationPromptSettings, RenderedApplicationPrompt
+from app.models.schemas import ApplicationPromptSettings, CompanyExclusionsSettings, RenderedApplicationPrompt
 
 
 class OutreachSettingsTests(unittest.TestCase):
@@ -36,6 +36,8 @@ class OutreachSettingsTests(unittest.TestCase):
                         {"automation_rules": "x" * 12001}, {"unknown_template": "no"}):
             with self.assertRaises(ValidationError):
                 ApplicationPromptSettings(**payload)
+        with self.assertRaises(ValidationError):
+            CompanyExclusionsSettings(companies=["Example"] * 101)
 
     def renderer(self):
         return function(ROOT / "app/routers/profile.py", "_render_outreach_prompt",

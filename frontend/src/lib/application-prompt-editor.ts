@@ -2,6 +2,9 @@ import type { ApplicationPromptSettings } from "./types";
 
 const fields = [
   ["submission_authorization", "Submission authorization"],
+  ["total_work_experience", "Total work experience (years, user-provided)"],
+  ["skill_experience", "Python, MLOps, LLM, RAG or another supplied/resume-supported skill (years)"],
+  ["onsite_any_location", "Comfortable working onsite at any location (not work authorization)"],
   ["notice_period", "Notice period"],
   ["current_ctc", "Current compensation"],
   ["expected_ctc", "Expected compensation"],

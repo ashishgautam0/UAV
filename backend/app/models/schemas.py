@@ -56,12 +56,21 @@ class ApplicationPromptSettings(BaseModel):
     followup_template: str = Field(default="", max_length=12_000)
     cold_dm_template: str = Field(default="", max_length=12_000)
     submission_authorization: str = Field(default="", max_length=500)
+    total_work_experience: str = Field(default="", max_length=500)
+    skill_experience: str = Field(default="", max_length=500)
+    onsite_any_location: str = Field(default="", max_length=500)
     notice_period: str = Field(default="", max_length=500)
     current_ctc: str = Field(default="", max_length=500)
     expected_ctc: str = Field(default="", max_length=500)
     expected_start_date: str = Field(default="", max_length=500)
     current_location: str = Field(default="", max_length=500)
     relocation_preference: str = Field(default="", max_length=500)
+
+
+class CompanyExclusionsSettings(BaseModel):
+    """User-managed employer names omitted from future scraped job intake."""
+    model_config = ConfigDict(extra="forbid")
+    companies: list[str] = Field(default_factory=list, max_length=100)
 
 
 class RenderedApplicationPrompt(BaseModel):

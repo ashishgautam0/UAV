@@ -617,7 +617,7 @@ def scrape_partner_ats():
     return jobs
 
 
-def run_all_scrapers():
+def run_all_scrapers(company_exclusions=None):
     """Run the active India-focused scrapers with error tracking.
 
     Other scraper functions remain available for future use, but are not part
@@ -658,7 +658,10 @@ def run_all_scrapers():
 
     # Apply user preferences before any caller can persist or digest results.
     from intake_policy import filter_jobs
-    all_jobs, excluded = filter_jobs(all_jobs)
+    if company_exclusions is None:
+        from profile import get_company_exclusions
+        company_exclusions = get_company_exclusions()
+    all_jobs, excluded = filter_jobs(all_jobs, company_exclusions)
     for job, reason in excluded:
         print(f"  Excluded {job.get('company', '')}: {reason}")
     print(f"Intake policy: kept {len(all_jobs)}, excluded {len(excluded)}")

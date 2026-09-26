@@ -2,6 +2,7 @@ import ast
 import pathlib
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "modules"))
@@ -19,6 +20,21 @@ class IntakePolicyTests(unittest.TestCase):
         for company in ["Global AI Startup", "VisaBuddy", "Amazonia AI", "TCS Labs Startup", "", None]:
             with self.subTest(company=company):
                 self.assertFalse(excluded_employer(company))
+
+    def test_settings_company_names_match_exact_employer_and_legal_suffixes(self):
+        names = ["Blue Harbor AI", "ReveonAI Lifesciences Solutions"]
+        for company in ["Blue Harbor AI Pvt. Ltd.", "BLUE-HARBOR AI", "ReveonAI Lifesciences Solutions LLP"]:
+            with self.subTest(company=company):
+                self.assertTrue(excluded_employer(company, names))
+        for company in ["Blue Harbor AI Labs", "Blue Harbor Analytics", "ReveonAI Partner", ""]:
+            with self.subTest(company=company):
+                self.assertFalse(excluded_employer(company, names))
+        kept, removed = filter_jobs([
+            {"company": "Blue Harbor AI Ltd", "description": ""},
+            {"company": "Small Startup", "description": "Blue Harbor AI Python experience"},
+        ], names)
+        self.assertEqual([job["company"] for job in kept], ["Small Startup"])
+        self.assertEqual(removed[0][1], "excluded by Settings company list")
 
     def test_required_experience(self):
         for text in ["3+ years of experience required", "2.5 years experience",
@@ -62,17 +78,24 @@ class IntakePolicyTests(unittest.TestCase):
                            {"company": "Small Startup", "description": "30 months experience"},
                            {"company": "Small Startup", "description": "1 year experience"}]
         import os
-        from unittest.mock import patch
         env = {"os": os, "scrape_indeed_india": fixture, "scrape_linkedin": fixture}
         # No inactive-source bindings: including Gulf, Partner ATS, Naukri,
         # Google Jobs, or Amazon would fail this integration test.
         exec(compile(ast.Module(body=[node], type_ignores=[]), "<aggregator>", "exec"), env)
         with patch.dict(os.environ, {}, clear=True):
-            jobs, counts, errors = env["run_all_scrapers"]()
+            jobs, counts, errors = env["run_all_scrapers"](company_exclusions=[])
         self.assertEqual(len(jobs), 2)
         self.assertEqual(counts, {"Indeed India": 3, "LinkedIn AI/ML": 3})
         self.assertFalse(errors)
         self.assertTrue(all(j["description"] == "1 year experience" for j in jobs))
+        with patch.dict(os.environ, {}, clear=True):
+            excluded_jobs, _, _ = env["run_all_scrapers"](company_exclusions=["Small Startup"])
+        self.assertEqual(excluded_jobs, [])
+        with patch("profile.get_company_exclusions", return_value=["Small Startup"]) as load, \
+             patch.dict(os.environ, {}, clear=True):
+            loaded_jobs, _, _ = env["run_all_scrapers"]()
+        self.assertEqual(loaded_jobs, [])
+        load.assert_called_once_with()
 
     def test_persistence_guard_before_database_access(self):
         source = (ROOT / "modules" / "tracker.py").read_text()
@@ -85,6 +108,10 @@ class IntakePolicyTests(unittest.TestCase):
         env["save_scraped_job"]("AI Engineer", "TCS", "", "", "https://example.test")
         env["save_scraped_job"]("AI Engineer", "Startup", "", "", "https://example.test",
                                 description="3 years experience")
+        env["save_scraped_job"]("AI Engineer", "Blue Harbor AI Ltd", "", "", "https://example.test",
+                                company_exclusions=["Blue Harbor AI"])
+        with patch("profile.get_company_exclusions", return_value=["Blue Harbor AI"]):
+            env["save_scraped_job"]("AI Engineer", "Blue Harbor AI Ltd", "", "", "https://example.test")
 
 if __name__ == "__main__":
     unittest.main()

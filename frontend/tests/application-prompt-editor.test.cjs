@@ -12,6 +12,7 @@ const saved = {
   prompt_template: "Apply using {{application_answers}}. Resume: {{resume_url}} Jobs: {{batch_jobs}}",
   automation_rules: "AUTOMATION RULES (authoritative):\n- My saved rule.",
   submission_authorization: "Ask before submitting.",
+  total_work_experience: "1 year", skill_experience: "1 year", onsite_any_location: "Yes",
   notice_period: "Two weeks\nAfter confirmation.",
   current_ctc: "", expected_ctc: "₹500,000", expected_start_date: "",
   current_location: "Pune", relocation_preference: "Ask me",
@@ -23,10 +24,14 @@ test("inline edits update backend fields and instructions; clearing an answer is
   const text = toPromptEditor(saved).replace("Apply using", "My instructions using")
     .replace("My saved rule.", "My edited rule for résumé.")
     .replace("Current location: Pune", "Current location:")
+    .replace("Total work experience (years, user-provided): 1 year", "Total work experience (years, user-provided): 18 months")
     .replace("Expected compensation: ₹500,000", "Expected compensation: ₹600,000");
   const result = fromPromptEditor(text, saved);
   assert.equal(result.current_location, "");
   assert.equal(result.expected_ctc, "₹600,000");
+  assert.equal(result.total_work_experience, "18 months");
+  assert.equal(result.skill_experience, "1 year");
+  assert.equal(result.onsite_any_location, "Yes");
   assert.ok(result.automation_rules.includes("My edited rule for résumé."));
   assert.ok(!result.prompt_template.includes("Automation rules"));
   assert.ok(result.prompt_template.startsWith("My instructions"));

@@ -72,6 +72,8 @@ class SettingsProfileTests(unittest.TestCase):
         with patch.object(profile_data, "get_profile", return_value=stored):
             result = profile_data.get_application_prompt_settings()
         self.assertEqual(result["notice_period"], "One month")
+        self.assertEqual((result["total_work_experience"], result["skill_experience"], result["onsite_any_location"]),
+                         ("1 year", "1 year", "Yes"))
         self.assertIn("{{batch_jobs}}", result["prompt_template"])
         self.assertTrue(result["automation_rules"].startswith("AUTOMATION RULES (authoritative):"))
         self.assertNotIn("unsupported", result)
@@ -93,7 +95,35 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertEqual(captured["scoring_weights"]["skill"], 44)
         self.assertEqual(result["notice_period"], "Two weeks")
         self.assertIn("Apply only when screening_status is pass", result["automation_rules"])
+        self.assertEqual(result["total_work_experience"], "1 year")
+        self.assertEqual(result["onsite_any_location"], "Yes")
         self.assertNotIn("unknown", captured["scoring_weights"]["application_prompt"])
+
+    def test_company_exclusions_roundtrip_without_erasing_profile_settings(self):
+        rows = [{"scoring_weights": {"skill": 44, "application_prompt": {"notice_period": "old"}}}]
+        db = MagicMock()
+        db.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = rows
+
+        def upsert(_username, data):
+            rows[0] = data
+            return data
+
+        with patch.object(profile_data, "_get_client", return_value=db), patch.object(
+            profile_data, "upsert_profile", side_effect=upsert
+        ):
+            self.assertEqual(profile_data.get_company_exclusions(), [])
+            saved = profile_data.save_company_exclusions(companies=[
+                " Rivet AI Ltd ", "RIVET AI", "Small Startup", "",
+            ])
+            self.assertEqual(profile_data.get_company_exclusions(), saved)
+        self.assertEqual(saved, ["Rivet AI Ltd", "Small Startup"])
+        self.assertEqual(rows[0]["scoring_weights"]["skill"], 44)
+        self.assertEqual(rows[0]["scoring_weights"]["application_prompt"]["notice_period"], "old")
+
+    def test_company_exclusion_read_errors_stop_intake(self):
+        with patch.object(profile_data, "_get_client", side_effect=RuntimeError("service unavailable")):
+            with self.assertRaisesRegex(RuntimeError, "service unavailable"):
+                profile_data.get_company_exclusions()
 
     def test_malformed_application_prompt_settings_are_treated_as_empty(self):
         with patch.object(profile_data, "get_profile", return_value={
@@ -101,13 +131,19 @@ class SettingsProfileTests(unittest.TestCase):
         }):
             result = profile_data.get_application_prompt_settings()
         self.assertTrue(all(
-            value == "" for key, value in result.items() if not key.endswith("template") and key != "automation_rules"
+            value == "" for key, value in result.items() if not key.endswith("template")
+            and key not in {"automation_rules", "total_work_experience", "skill_experience", "onsite_any_location"}
         ))
+        self.assertEqual((result["total_work_experience"], result["skill_experience"], result["onsite_any_location"]),
+                         ("1 year", "1 year", "Yes"))
         self.assertIn("AUTOMATION RULES (authoritative):", result["automation_rules"])
         self.assertIn("{{resume_url}}", result["prompt_template"])
         self.assertIn("No, I have not attended that company's selection process before", result["prompt_template"])
         self.assertIn("No, I have no commitment to another employer or organization", result["prompt_template"])
         self.assertIn("No, I have never worked for that company", result["prompt_template"])
+        self.assertIn("For application-form questions, my total work experience is 1 year", result["prompt_template"])
+        self.assertIn("answer Yes for any location", result["prompt_template"])
+        self.assertIn("For an unrelated skill with no supplied or resume evidence, ask me", result["prompt_template"])
 
     def test_ready_prompt_resolves_fixed_batch_resume_and_saved_answers(self):
         render = function(
@@ -216,7 +252,11 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertEqual(captured["scoring_weights"]["skill"], 33)
         self.assertEqual(saved["automation_rules"], stored["scoring_weights"]["application_prompt"]["automation_rules"])
         render = function(ROOT / "app/routers/profile.py", "_render_application_prompt", {
-            "json": json, "_APPLICATION_ANSWER_LABELS": {},
+            "json": json, "_APPLICATION_ANSWER_LABELS": {
+                "total_work_experience": "Total work experience (years, user-provided)",
+                "skill_experience": "Python, MLOps, LLM, RAG or another supplied/resume-supported skill (years)",
+                "onsite_any_location": "Comfortable working onsite at any location (not work authorization)",
+            },
             "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
             "DEFAULT_AUTOMATION_RULES": profile_data.DEFAULT_AUTOMATION_RULES,
         })
@@ -225,6 +265,9 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertFalse(unresolved)
         self.assertIn("- Visit https://app.example/tonight for this batch.", prompt)
         self.assertIn('"job_id": 42', prompt)
+        self.assertIn("Total work experience (years, user-provided): 1 year", prompt)
+        self.assertIn("Python, MLOps, LLM, RAG or another supplied/resume-supported skill (years): 1 year", prompt)
+        self.assertIn("Comfortable working onsite at any location (not work authorization): Yes", prompt)
         self.assertNotIn("Start working through the fixed batch immediately", prompt)
         custom, unresolved = render("Apply", {"automation_rules": "{{missing_rule_value}}"}, [], None,
                                     "https://app.example/tonight", "https://api.example/resume")
