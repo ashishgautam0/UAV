@@ -373,29 +373,44 @@ def get_existing_job_urls(since_days=None):
 
     `since_days` bounds the window: only URLs scraped within the last N days are
     treated as "already seen". This stops the all-time table (thousands of old,
-    mostly dismissed rows) from blocking genuinely re-listed roles, and keeps
-    the dedup set from growing without bound. None = all-time (legacy).
+    non-dismissed rows) from blocking genuinely re-listed roles.
+
+    Dismissed URLs are always excluded regardless of age — a dismissal is
+    permanent and a re-scrape of a dismissed posting must never recount it as
+    "new" or reset its dismissed state.
     """
-    try:
-        db = _get_client()
-        cutoff = None
-        if since_days:
-            from datetime import datetime, timedelta, timezone
-            cutoff = (datetime.now(timezone.utc) - timedelta(days=since_days)).isoformat()
+    def _paginate(query_fn):
         urls = set()
         page_size = 1000
         offset = 0
         while True:
-            query = db.table("scraped_jobs").select("url")
-            if cutoff:
-                query = query.gte("scraped_at", cutoff)
-            resp = query.range(offset, offset + page_size - 1).execute()
+            resp = query_fn(offset, offset + page_size - 1).execute()
             batch = resp.data or []
             urls.update(row["url"] for row in batch if row.get("url"))
             if len(batch) < page_size:
                 break
             offset += page_size
         return urls
+
+    try:
+        db = _get_client()
+        cutoff = None
+        if since_days:
+            from datetime import datetime, timedelta, timezone
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=since_days)).isoformat()
+
+        # Windowed set: recent non-dismissed rows (prevents re-listing noise)
+        def recent_query(lo, hi):
+            q = db.table("scraped_jobs").select("url").eq("dismissed", False)
+            if cutoff:
+                q = q.gte("scraped_at", cutoff)
+            return q.range(lo, hi)
+
+        # All-time set: every dismissed URL regardless of age
+        def dismissed_query(lo, hi):
+            return db.table("scraped_jobs").select("url").eq("dismissed", True).range(lo, hi)
+
+        return _paginate(recent_query) | _paginate(dismissed_query)
     except Exception:
         return set()
 
