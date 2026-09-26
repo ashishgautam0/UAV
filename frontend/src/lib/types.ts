@@ -320,6 +320,7 @@ export interface ApplicationPromptSettings {
   followup_template: string;
   cold_dm_template: string;
   prompt_template: string;
+  automation_rules: string;
   submission_authorization: string;
   notice_period: string;
   current_ctc: string;
