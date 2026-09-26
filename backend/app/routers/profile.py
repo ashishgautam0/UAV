@@ -503,7 +503,8 @@ def download_application_resume():
 
 
 def _render_outreach_prompt(template, resume, page_url, resume_url, kind="hr_email",
-                            cold_dm_jobs=None, snapshot_at=None, excluded_count=0):
+                            cold_dm_jobs=None, snapshot_at=None, excluded_count=0,
+                            excluded_reasons=None):
     from outreach_prompts import (GMAIL_HR_DELIVERY_RULES, LINKEDIN_CONNECTION_RULES,
                                   remove_legacy_cold_dm_navigation)
     from urllib.parse import quote, urlsplit
@@ -533,6 +534,11 @@ def _render_outreach_prompt(template, resume, page_url, resume_url, kind="hr_ema
     if kind == "cold_dm":
         rules += (f"Fixed batch: {len(jobs)} eligible due jobs; {excluded_count} due jobs omitted by the "
                   "backend eligibility/current-draft check. Only process entries in the batch.\n\n")
+        if excluded_reasons:
+            reasons = "; ".join(f"{count} {reason}" for reason, count in sorted(excluded_reasons.items()))
+            rules += (f"Omitted because: {reasons}. A Dashboard card may show an older saved draft; "
+                      "review the active PDF, regenerate stale drafts, and re-screen as needed. "
+                      "Do not send notes for omitted jobs.\n\n")
     delivery = GMAIL_HR_DELIVERY_RULES if kind in {"hr_email", "followup"} else LINKEDIN_CONNECTION_RULES
     return rules + delivery + rendered, unresolved
 
@@ -545,7 +551,7 @@ def read_outreach_prompt(request: Request, page_url: str,
         raise HTTPException(status_code=422, detail="App page URL is invalid.")
     settings = get_application_prompt_settings(_DEFAULT_USERNAME)
     resume = _application_pdf_metadata()
-    jobs, snapshot_at, excluded_count = None, None, 0
+    jobs, snapshot_at, excluded_count, excluded_reasons = None, None, 0, {}
     if kind == "cold_dm":
         from tracker import _user_now, get_cold_dm_prompt_jobs
         try:
@@ -554,10 +560,14 @@ def read_outreach_prompt(request: Request, page_url: str,
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         jobs = [job for job in due_jobs if not job["blocked_reason"] and job.get("cold_dm")]
         excluded_count = len(due_jobs) - len(jobs)
+        for job in due_jobs:
+            if job["blocked_reason"]:
+                reason = job["blocked_reason"]
+                excluded_reasons[reason] = excluded_reasons.get(reason, 0) + 1
         snapshot_at = _user_now().isoformat()
     prompt, unresolved = _render_outreach_prompt(settings[kind + "_template"], resume, page_url,
                                                  str(request.url_for("download_application_resume")), kind,
-                                                 jobs, snapshot_at, excluded_count)
+                                                 jobs, snapshot_at, excluded_count, excluded_reasons)
     issues = []
     if not resume:
         issues.append("No latest Settings PDF is available.")
@@ -565,5 +575,9 @@ def read_outreach_prompt(request: Request, page_url: str,
         issues.append("The saved template contains unresolved placeholders.")
     if kind == "cold_dm" and not jobs:
         issues.append("No due Tracker jobs have a current Cold DM and passing screen.")
+    if kind == "cold_dm" and excluded_reasons:
+        reasons = "; ".join(f"{count} {reason}" for reason, count in sorted(excluded_reasons.items()))
+        issues.append(f"{excluded_count} due jobs omitted: {reasons}.")
     return RenderedApplicationPrompt(prompt=prompt, job_count=len(jobs or []), resume_available=bool(resume),
-                                     ready=not issues, issues=issues, unresolved_placeholders=unresolved)
+                                     ready=bool(resume) and not unresolved and (kind != "cold_dm" or bool(jobs)),
+                                     issues=issues, unresolved_placeholders=unresolved)

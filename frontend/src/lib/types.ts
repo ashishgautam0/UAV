@@ -59,6 +59,7 @@ export interface ColdDmTodo {
   follow_up_date: string;
   scraped_job_id: number | null;
   cold_dm_ready: boolean;
+  readiness_issue?: string | null;
 }
 
 export interface HrEmailTodo {

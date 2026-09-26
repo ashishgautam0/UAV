@@ -27,7 +27,10 @@ def follow_ups():
 
 @router.get("/cold-dm-todos")
 def cold_dm_todos():
-    return get_cold_dm_todos()
+    # Match the PDF version used by Settings' generated Cold DM batch.
+    from app.routers.profile import _application_pdf_metadata
+    resume = _application_pdf_metadata()
+    return get_cold_dm_todos((resume or {}).get("version"))
 
 
 @router.get("/hr-email-todos")
