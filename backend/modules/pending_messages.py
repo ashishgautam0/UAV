@@ -103,6 +103,58 @@ def _tracked_jobs_missing(message_type, limit):
     return need, len(tracked)
 
 
+def _company_intel_text(company_name):
+    """One-line company context from the research cache, or empty."""
+    try:
+        from tracker import get_cached_research
+        row = get_cached_research(company_name)
+        if not row:
+            return ""
+        parts = []
+        if row.get("product_url"):
+            parts.append(f"Website: {row['product_url']}")
+        if row.get("hiring_contact_name"):
+            title = row.get("hiring_contact_title") or ""
+            parts.append(f"Hiring contact: {row['hiring_contact_name']}"
+                         + (f" ({title})" if title else ""))
+        return "; ".join(parts)
+    except Exception:
+        return ""
+
+
+def _demo_url_for_job(job_id):
+    """Return the live demo URL if a demo exists for this job, else empty."""
+    try:
+        from tracker import get_job_message
+        if get_job_message(job_id, message_type="demo_html"):
+            api_base = os.environ.get(
+                "PUBLIC_API_URL", "https://uav-6qe7.vercel.app"
+            ).rstrip("/")
+            return f"{api_base}/api/demo/{job_id}"
+    except Exception:
+        pass
+    return ""
+
+
+def _demo_url_for_scraped_job_by_app_url(app_url):
+    """Look up the scraped job by application URL and return its demo URL."""
+    if not app_url:
+        return ""
+    try:
+        from tracker import _get_client, get_job_message
+        db = _get_client()
+        resp = (db.table("scraped_jobs")
+                .select("id")
+                .eq("url", app_url.strip())
+                .limit(1)
+                .execute())
+        if resp.data:
+            return _demo_url_for_job(resp.data[0]["id"])
+    except Exception:
+        pass
+    return ""
+
+
 def cmd_list(args):
     jobs, tracked_total = _tracked_jobs_missing(args.type, args.limit)
     profile = _profile_text()
@@ -113,7 +165,10 @@ def cmd_list(args):
             continue
         if args.type == "cold_dm":
             job["draft_spec"] = build_cold_dm_prompt(
-                job["company"], job["title"], job["description"], profile_text=profile)
+                job["company"], job["title"], job["description"],
+                profile_text=profile,
+                demo_url=_demo_url_for_job(job["id"]),
+                company_intel=_company_intel_text(job["company"]))
         elif args.type == "hr_email":
             job["draft_spec"] = build_hr_email_prompt(
                 job["company"], job["title"], job["description"], job["demo_url"], profile)
@@ -397,13 +452,19 @@ def cmd_followups(args):
             for h in sorted(history, key=lambda h: h.get("sent_at") or "")
         ][-3:]
 
+        company = app.get("company", "")
+        demo = _demo_url_for_scraped_job_by_app_url(app.get("url", ""))
+        intel = _company_intel_text(company)
+
         row = create_message_request("follow-up", {
-            "company_name": app.get("company", ""),
+            "company_name": company,
             "role_title": app.get("role", ""),
             "days_since_applied": days,
             "original_platform": app.get("platform") or "LinkedIn",
             "follow_up_number": number,
             "previous_messages": [m for m in previous if m],
+            "demo_url": demo,
+            "company_intel": intel,
             "_application_id": app["id"],
         })
         if row:
