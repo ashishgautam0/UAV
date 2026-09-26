@@ -68,7 +68,7 @@ export function OutreachPrompt({ kind, title, description, initialValue }: {
       {dirty && <p role="status" className="text-sm text-amber-600">Unsaved changes — save before copying.</p>}
       {generated && <>
         {generated.issues.length > 0 && <ul role="alert" className="list-disc pl-5 text-sm">{generated.issues.map(issue => <li key={issue}>{issue}</li>)}</ul>}
-        {kind === "cold_dm" && <p className="text-xs text-muted-foreground">Fixed batch: {generated.job_count} eligible due job{generated.job_count === 1 ? "" : "s"}. Ineligible or missing-draft jobs are omitted.</p>}
+        {kind === "cold_dm" && <p className="text-xs text-muted-foreground">Fixed batch: {generated.job_count} eligible due job{generated.job_count === 1 ? "" : "s"}. Outdated drafts and unmatched Tracker jobs are omitted.</p>}
         <details><summary className="cursor-pointer text-sm">Generated prompt preview{dirty ? " (previous version)" : ""}</summary>
           <Textarea readOnly value={generated.prompt} rows={14} aria-label={`Generated ${title.toLowerCase()}`} />
         </details>

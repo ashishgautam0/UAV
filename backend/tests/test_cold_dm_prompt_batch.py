@@ -13,7 +13,7 @@ from test_cold_dm_dashboard import Database
 
 
 class ColdDmPromptBatchTests(unittest.TestCase):
-    def test_includes_real_screening_and_note_with_exact_tracker_mapping(self):
+    def test_includes_current_note_with_exact_tracker_mapping(self):
         apps = [
             {"id": 31, "company": "TrueMeds Fixture", "role": "AI Engineer",
              "url": "https://jobs.test/54222", "status": "Applied", "follow_up_date": "2026-09-27"},
@@ -63,9 +63,9 @@ class ColdDmPromptBatchTests(unittest.TestCase):
         self.assertIsNone(batch[0]["cold_dm"])
         self.assertIn("No current Cold DM", batch[0]["blocked_reason"])
         self.assertTrue(all(item["cold_dm"] is None for item in batch[1:3]))
-        self.assertEqual(db.queries.count("job_messages"), 2)
+        self.assertEqual(db.queries.count("job_messages"), 1)
 
-    def test_unknown_screening_blocks_even_with_a_current_draft(self):
+    def test_already_tracked_due_followup_uses_current_note_without_new_job_screen(self):
         db = Database([{"id": 1, "company": "Fixture", "role": "Engineer", "url": "https://jobs.test/1",
                         "status": "Applied", "follow_up_date": "2026-09-27"}],
                       [{"id": 2, "company": "Fixture", "title": "Engineer", "location": "", "source": "Indeed",
@@ -77,7 +77,9 @@ class ColdDmPromptBatchTests(unittest.TestCase):
         ):
             batch = tracker.get_cold_dm_prompt_jobs(5)
         self.assertNotIn("screening_status", batch[0])
-        self.assertEqual(batch[0]["blocked_reason"], "Screening is not pass")
+        self.assertEqual(batch[0]["blocked_reason"], "")
+        self.assertEqual(batch[0]["cold_dm"], "Saved note")
+        self.assertEqual(db.queries.count("job_messages"), 1)
 
     def test_more_than_limit_fails_before_reading_note_data(self):
         db = Database([{"id": i, "company": "Fixture", "role": "Engineer", "url": "",

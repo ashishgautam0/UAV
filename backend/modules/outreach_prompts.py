@@ -21,7 +21,7 @@ These Gmail and evidence requirements override any older generic-mail or recipie
 """
 
 LINKEDIN_CONNECTION_RULES = """LINKEDIN COLD DM = CONNECTION REQUEST WITH A NOTE:
-USE THE FIXED COLD DM JOBS SNAPSHOT INCLUDED IN THIS PROMPT. The backend includes only due jobs with a current passing screen and current stored cold_dm. Each JSON item contains the persisted Tracker ID, job ID, due date and stored cold_dm text. Use only that job's cold_dm as the basis for its LinkedIn connection note; do not search Dashboard cards for draft text or substitute an HR email or follow-up draft. Before sending, open the item's direct tracker_url to verify its status and follow_up_date in Asia/Kolkata and check its outreach history. Only still-due, nonterminal records with current eligibility and verified identity are eligible. Missing/future dates, stale snapshots, changed resume, load errors or ambiguous records are blocked; never change a date to make a job eligible. A stored cold draft is preparation, not permission to send early.
+USE THE FIXED COLD DM JOBS SNAPSHOT INCLUDED IN THIS PROMPT. The backend includes only due Tracker records with a current PDF-versioned stored cold_dm and a matching scraped job. A new-job screening result is not required for an already tracked follow-up. Each JSON item contains the persisted Tracker ID, job ID, due date and stored cold_dm text. Use only that job's cold_dm as the basis for its LinkedIn connection note; do not search Dashboard cards for draft text or substitute an HR email or follow-up draft. Before sending, open the item's direct tracker_url to verify its status and follow_up_date in Asia/Kolkata and check its outreach history. Only still-due, nonterminal records with current drafts and verified identity are eligible. Missing/future dates, stale snapshots, changed resume, load errors or ambiguous records are blocked; never change a date to make a job eligible. A stored cold draft is preparation, not permission to send early.
 
 For each eligible batch job, start with its recruiters_search_url; use hiring_managers_search_url if needed. These are search links, not verified people. Open candidate profiles and verify current employment at the exact company and hiring relevance for the role/location. Inspect up to five relevant profiles per job. Select one appropriate HR/recruiter, or a relevant hiring manager if no recruiter is found. If none is verified, report blocked; never guess a person or use the email finder.
 
@@ -168,7 +168,7 @@ OUTREACH_DEFAULTS = {'hr_email_template': 'Open the app: {{page_url}}\n'
                      'applications.\n'
                      'COLD DM — LINKEDIN CONNECTION NOTES, TRACKER ONLY\n'
                      'The fixed batch below comes from the saved due follow-up queue. The backend '
-                     'includes only jobs with passing screening and current stored cold_dm text. '
+                     'includes only due tracked jobs with current PDF-versioned stored cold_dm text. '
                      'Recheck the live due date and eligibility before sending. Use the stored cold_dm '
                      'in each item for its LinkedIn connection note. Recheck the direct tracker_url '
                      'before sending, and verify company, role, and posting URL. Do not include '
@@ -208,7 +208,11 @@ _LEGACY_COLD_DM_END = 'untracked discovery jobs or substitute HR email/follow-up
 
 
 def remove_legacy_cold_dm_navigation(template):
-    """Remove only the known old default's navigation paragraph; keep user edits."""
+    """Update known obsolete default snippets without erasing user edits."""
+    template = template.replace(
+        'includes only jobs with passing screening and current stored cold_dm text.',
+        'includes only due tracked jobs with current PDF-versioned stored cold_dm text.',
+    )
     for start in _LEGACY_COLD_DM_STARTS:
         prefix, found, rest = template.partition(start)
         if found:

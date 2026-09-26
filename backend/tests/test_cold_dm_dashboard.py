@@ -66,8 +66,8 @@ class ColdDmDashboardTests(unittest.TestCase):
         captured = []
         endpoint = function(ROOT / "app/routers/stats.py", "cold_dm_todos", {
             "get_cold_dm_todos": lambda version: captured.append(version) or []})
-        metadata = SimpleNamespace(_application_pdf_metadata=lambda: {"version": 7})
-        with patch.dict(sys.modules, {"app.routers.profile": metadata}):
+        metadata = SimpleNamespace(get_latest_profile_snapshot=lambda: {"version": 7})
+        with patch.dict(sys.modules, {"profile": metadata}):
             self.assertEqual(endpoint(), [])
         self.assertEqual(captured, [7])
 
@@ -105,7 +105,7 @@ class ColdDmDashboardTests(unittest.TestCase):
         self.assertEqual(cards[1]["readiness_issue"], "No current Cold DM for the latest Settings PDF")
         self.assertEqual(cards[2]["readiness_issue"], "No matching scraped job")
         self.assertNotIn("content", cards[0])
-        self.assertEqual(db.queries.count("job_messages"), 2)
+        self.assertEqual(db.queries.count("job_messages"), 1)
 
     def test_empty_due_queue_does_not_query_drafts(self):
         db = Database([], [], [])
@@ -128,7 +128,7 @@ class ColdDmDashboardTests(unittest.TestCase):
         self.assertTrue(cards[-1]["cold_dm_ready"])
         self.assertEqual(db.queries.count("applications"), 2)
 
-    def test_saved_draft_without_current_screen_is_not_labelled_ready(self):
+    def test_current_draft_for_due_tracked_job_does_not_need_new_job_screen(self):
         db = Database([{"id": 10, "company": "Fixture", "role": "Engineer",
                         "url": "https://jobs/one", "status": "Applied", "follow_up_date": "2026-09-26"}],
                       [{"id": 901, "company": "Fixture", "url": "https://jobs/one"}],
@@ -136,8 +136,8 @@ class ColdDmDashboardTests(unittest.TestCase):
                         "is_stale": False, "profile_version": 5}])
         with patch.object(tracker, "_get_client", return_value=db):
             card = tracker.get_cold_dm_todos(5)[0]
-        self.assertFalse(card["cold_dm_ready"])
-        self.assertEqual(card["readiness_issue"], "Screening is not pass")
+        self.assertTrue(card["cold_dm_ready"])
+        self.assertIsNone(card["readiness_issue"])
         self.assertEqual(card["scraped_job_id"], 901)
 
 

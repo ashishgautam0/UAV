@@ -58,7 +58,7 @@ class OutreachSettingsTests(unittest.TestCase):
         self.assertNotIn("HR EMAIL —", profile_data.OUTREACH_DEFAULTS["followup_template"])
         self.assertIn("select LinkedIn connection in Sent via", profile_data.OUTREACH_DEFAULTS["cold_dm_template"])
         default_dm = profile_data.OUTREACH_DEFAULTS["cold_dm_template"]
-        for required in ("fixed batch below", "{{cold_dm_jobs}}", "passing screening",
+        for required in ("fixed batch below", "{{cold_dm_jobs}}", "current PDF-versioned",
                          "stored cold_dm"):
             self.assertIn(required, default_dm)
         self.assertNotIn("Open Dashboard → Cold DMs Due", default_dm)
@@ -66,7 +66,7 @@ class OutreachSettingsTests(unittest.TestCase):
     def test_connection_notes_use_due_queue_and_record_one_slot(self):
         prompt, _ = self.renderer()("Legacy scan all Tracker jobs", {}, "https://app", "https://pdf", "cold_dm")
         for required in ("USE THE FIXED COLD DM JOBS SNAPSHOT", "Asia/Kolkata", "Missing/future dates",
-                         "current passing screen", "stored cold_dm", "direct tracker_url",
+                         "already tracked follow-up", "stored cold_dm", "direct tracker_url",
                          "Record completed outreach", "choose 'LinkedIn connection' in 'Sent via'",
                          "exact sent note and recipient profile URL", "Do this separately for each job",
                          "Do not record anything for an unconfirmed send", "advance the schedule",
@@ -195,6 +195,16 @@ class OutreachSettingsTests(unittest.TestCase):
         self.assertIn("Keep my other instructions", prompt)
         self.assertNotIn("Open Dashboard → Cold DMs Due", prompt)
 
+    def test_saved_old_default_screening_sentence_is_updated(self):
+        older = ('My custom note. The backend includes only jobs with passing screening '
+                 'and current stored cold_dm text. Keep my contact preference.')
+        stored = {"scoring_weights": {"application_prompt": {"cold_dm_template": older}}}
+        with patch.object(profile_data, "get_profile", return_value=stored):
+            updated = profile_data.get_application_prompt_settings()["cold_dm_template"]
+        self.assertNotIn("passing screening", updated)
+        self.assertIn("current PDF-versioned stored cold_dm", updated)
+        self.assertIn("Keep my contact preference", updated)
+
     def test_no_eligible_due_job_is_not_a_ready_to_copy_prompt(self):
         blocked = [{"blocked_reason": "No current Cold DM for the latest Settings PDF", "job_id": 8, "tracker_id": 4,
                     "company": "Fixture", "cold_dm": None}]
@@ -217,8 +227,8 @@ class OutreachSettingsTests(unittest.TestCase):
         self.assertIn("No due Tracker jobs have a current Cold DM", result.issues[0])
 
     def test_omitted_due_jobs_report_reasons_without_blocking_eligible_jobs(self):
-        due = [{"blocked_reason": "Screening is not pass", "job_id": 1, "tracker_id": 11,
-                "company": "Needs review", "cold_dm": "Visible old note"},
+        due = [{"blocked_reason": "No matching scraped job", "job_id": 1, "tracker_id": 11,
+                "company": "Unmatched", "cold_dm": "Visible old note"},
                {"blocked_reason": "", "job_id": 2, "tracker_id": 12,
                 "company": "Eligible", "cold_dm": "Current grounded note"}]
         fake_tracker = SimpleNamespace(get_cold_dm_prompt_jobs=lambda _: due,
@@ -234,7 +244,7 @@ class OutreachSettingsTests(unittest.TestCase):
             result = endpoint(SimpleNamespace(url_for=lambda _: "https://api/pdf"), "https://app/dashboard", "cold_dm")
         self.assertTrue(result.ready)
         self.assertEqual(result.job_count, 1)
-        self.assertIn("1 due jobs omitted: 1 Screening is not pass", result.issues[-1])
+        self.assertIn("1 due jobs omitted: 1 No matching scraped job", result.issues[-1])
         batch = json.loads(result.prompt[result.prompt.index("[\n  {"):])
         self.assertEqual([job["job_id"] for job in batch], [2])
 

@@ -212,7 +212,7 @@ def get_cold_dm_prompt_jobs(resume_version=None, limit=100):
         raise ValueError(f"{len(rows)} Cold DMs are due; the prompt limit is {limit}. Resolve due jobs before generating the batch.")
 
     job_ids = sorted({int(row["scraped_job_id"]) for row in rows if row.get("scraped_job_id")})
-    jobs, messages = {}, {"cold_dm": {}, "screen": {}}
+    jobs, messages = {}, {}
     if job_ids:
         db = _get_client()
         for start in range(0, len(job_ids), 200):
@@ -221,33 +221,27 @@ def get_cold_dm_prompt_jobs(resume_version=None, limit=100):
                         .select("id,title,company,location,source,url")
                         .in_("id", chunk).execute()).data or []:
                 jobs[job["id"]] = job
-            for kind in messages:
-                for message in (db.table("job_messages")
-                                .select("scraped_job_id,content,is_stale,profile_version,generated_at")
-                                .eq("message_type", kind).in_("scraped_job_id", chunk)
-                                .execute()).data or []:
-                    messages[kind][message["scraped_job_id"]] = message
+            for message in (db.table("job_messages")
+                            .select("scraped_job_id,content,is_stale,profile_version,generated_at")
+                            .eq("message_type", "cold_dm").in_("scraped_job_id", chunk)
+                            .execute()).data or []:
+                messages[message["scraped_job_id"]] = message
 
     batch = []
     for row in rows:
         job_id = int(row["scraped_job_id"]) if row.get("scraped_job_id") is not None else None
         job = jobs.get(job_id) or {}
-        screen = messages["screen"].get(job_id) or {}
-        cold_dm = messages["cold_dm"].get(job_id) or {}
-        tag, separator, _ = (screen.get("content") or "").partition(":")
-        screen_current = (resume_version is not None and not screen.get("is_stale")
-                          and screen.get("profile_version") == resume_version)
-        status = tag.strip().lower() if separator and screen_current else "pending"
-        if status not in {"pass", "fail", "review"}:
-            status = "pending"
+        cold_dm = messages.get(job_id) or {}
         current = (bool(cold_dm.get("content", "").strip()) and not cold_dm.get("is_stale")
                    and resume_version is not None and cold_dm.get("profile_version") == resume_version)
         match = bool(job and job.get("url") == row.get("url")
                      and str(job.get("company") or "").strip().casefold() ==
                      str(row.get("company") or "").strip().casefold())
+        # These are already tracked, due follow-ups. A saved screen is required
+        # for new application discovery, not for a current draft on an existing
+        # Tracker record. Retain the PDF-version and exact-job safeguards.
         blocked = ("No matching scraped job" if not match else
-                   "No current Cold DM for the latest Settings PDF" if not current else
-                   "Screening is not pass" if status != "pass" else "")
+                   "No current Cold DM for the latest Settings PDF" if not current else "")
         batch.append({
             "job_id": job_id if match else None,
             "tracker_id": int(row["id"]),
