@@ -12,7 +12,10 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "modules"))
 from resume_profile import profile_text
 import profile as profile_data
-from app.models.schemas import RenderedApplicationPrompt
+
+# The settings-profile CI lane intentionally runs without the API dependencies.
+# Endpoints are extracted with the response constructor supplied by the test.
+RenderedApplicationPrompt = SimpleNamespace
 
 def function(path, name, env):
     node = next(n for n in ast.parse(path.read_text()).body
