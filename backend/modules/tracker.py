@@ -252,7 +252,7 @@ def get_cold_dm_prompt_jobs(resume_version=None, limit=100):
         job = jobs.get(job_id) or {}
         screen = messages["screen"].get(job_id) or {}
         cold_dm = messages["cold_dm"].get(job_id) or {}
-        tag, separator, reason = (screen.get("content") or "").partition(":")
+        tag, separator, _ = (screen.get("content") or "").partition(":")
         screen_current = (resume_version is not None and not screen.get("is_stale")
                           and screen.get("profile_version") == resume_version)
         status = tag.strip().lower() if separator and screen_current else "pending"
@@ -274,8 +274,6 @@ def get_cold_dm_prompt_jobs(resume_version=None, limit=100):
             "location": job.get("location") or "",
             "source": job.get("source") or "",
             "url": row.get("url") or "",
-            "screening_status": status if match else "pending",
-            "screening_reason": reason.strip() if status != "pending" and match else "",
             "follow_up_date": row["follow_up_date"],
             "cold_dm": cold_dm["content"] if match and current else None,
             "cold_dm_generated_at": cold_dm.get("generated_at") if match and current else None,

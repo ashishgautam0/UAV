@@ -56,9 +56,9 @@ class OutreachSettingsTests(unittest.TestCase):
                 self.assertIn("explicit confirmation immediately before sending", prompt)
                 self.assertNotIn("{{", prompt)
         self.assertNotIn("HR EMAIL —", profile_data.OUTREACH_DEFAULTS["followup_template"])
-        self.assertIn("channel LinkedIn connection", profile_data.OUTREACH_DEFAULTS["cold_dm_template"])
+        self.assertIn("select LinkedIn connection in Sent via", profile_data.OUTREACH_DEFAULTS["cold_dm_template"])
         default_dm = profile_data.OUTREACH_DEFAULTS["cold_dm_template"]
-        for required in ("fixed batch below", "{{cold_dm_jobs}}", "screening_status pass",
+        for required in ("fixed batch below", "{{cold_dm_jobs}}", "passing screening",
                          "stored cold_dm"):
             self.assertIn(required, default_dm)
         self.assertNotIn("Open Dashboard → Cold DMs Due", default_dm)
@@ -66,8 +66,10 @@ class OutreachSettingsTests(unittest.TestCase):
     def test_connection_notes_use_due_queue_and_record_one_slot(self):
         prompt, _ = self.renderer()("Legacy scan all Tracker jobs", {}, "https://app", "https://pdf", "cold_dm")
         for required in ("USE THE FIXED COLD DM JOBS SNAPSHOT", "Asia/Kolkata", "Missing/future dates",
-                         "screening_status pass", "stored cold_dm", "direct tracker_url",
-                         "Record completed outreach", "select 'LinkedIn connection'", "advance the schedule",
+                         "current passing screen", "stored cold_dm", "direct tracker_url",
+                         "Record completed outreach", "choose 'LinkedIn connection' in 'Sent via'",
+                         "exact sent note and recipient profile URL", "Do this separately for each job",
+                         "Do not record anything for an unconfirmed send", "advance the schedule",
                          "retry only missing logging", "day 7, 14 and 21", "at most one outreach action"):
             self.assertIn(required, prompt)
 
@@ -107,7 +109,7 @@ class OutreachSettingsTests(unittest.TestCase):
 
     def test_endpoint_passes_selected_workflow_to_renderer(self):
         seen = []
-        def render(template, resume, page_url, resume_url, kind, jobs, snapshot_at):
+        def render(template, resume, page_url, resume_url, kind, jobs, snapshot_at, excluded_count):
             seen.append(kind)
             return "prompt", []
         endpoint = function(ROOT / "app/routers/profile.py", "read_outreach_prompt", {
@@ -170,7 +172,9 @@ class OutreachSettingsTests(unittest.TestCase):
         payload = json.loads(prompt[prompt.index("[\n  {"):])
         self.assertEqual(payload[0]["job_id"], 54222)
         self.assertEqual(payload[0]["tracker_id"], 31)
-        self.assertEqual(payload[0]["screening_reason"], "Verified Python overlap")
+        self.assertNotIn("screening_reason", payload[0])
+        self.assertNotIn("screening_status", payload[0])
+        self.assertNotIn("blocked_reason", payload[0])
         self.assertEqual(payload[0]["cold_dm"], batch[0]["cold_dm"])
         self.assertEqual(payload[0]["tracker_url"], "https://app.test/jobs/54222")
         self.assertIn("TrueMeds%20Fixture%20recruiter", payload[0]["recruiters_search_url"])
@@ -206,7 +210,8 @@ class OutreachSettingsTests(unittest.TestCase):
         with patch.dict(sys.modules, {"tracker": fake_tracker}):
             result = endpoint(SimpleNamespace(url_for=lambda _: "https://api/pdf"), "https://app/dashboard", "cold_dm")
         self.assertFalse(result.ready)
-        self.assertEqual(result.job_count, 1)
+        self.assertEqual(result.job_count, 0)
+        self.assertIn("1 due jobs omitted", result.prompt)
         self.assertIn("No due Tracker jobs have a current Cold DM", result.issues[0])
 
 

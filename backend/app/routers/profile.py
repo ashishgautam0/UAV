@@ -193,8 +193,6 @@ def _render_application_prompt(template, settings, jobs, resume, page_url, resum
         "location": job.get("location") or "",
         "source": job.get("source") or "",
         "url": job.get("url") or "",
-        "screening_status": job.get("screening_status") or "pending",
-        "screening_reason": job.get("screening_reason") or "",
     } for job in jobs]
     values = {
         "application_answers": "\n".join(answer_lines) or "- No application-form answers are saved.",
@@ -204,7 +202,11 @@ def _render_application_prompt(template, settings, jobs, resume, page_url, resum
         "resume_sha256": (resume or {}).get("sha256") or "unavailable",
         "batch_jobs": json.dumps(batch, ensure_ascii=False, indent=2, default=str),
     }
-    rules = (settings.get("automation_rules") or DEFAULT_AUTOMATION_RULES).rstrip()
+    rules = ("BATCH ELIGIBILITY (authoritative): The backend includes only jobs with "
+             "a current passing screen and posting URL. Screening results are omitted "
+             "from job JSON; older saved wording that expects those fields is fulfilled "
+             "by this server check. Recheck each listing for new mandatory requirements.\n\n" +
+             (settings.get("automation_rules") or DEFAULT_AUTOMATION_RULES).rstrip())
     if "{{application_answers}}" not in rules + template:
         template = template.rstrip() + "\n\nUser-provided application answers:\n{{application_answers}}"
     rendered = rules + "\n\n" + template
@@ -225,7 +227,11 @@ def read_rendered_application_prompt(request: Request, page_url: str):
 
     settings = get_application_prompt_settings(_DEFAULT_USERNAME)
     frame = get_scraped_jobs()
-    jobs = frame.to_dict("records") if hasattr(frame, "to_dict") else list(frame or [])
+    visible_jobs = frame.to_dict("records") if hasattr(frame, "to_dict") else list(frame or [])
+    # The browser batch omits screening results, so the server must enforce the
+    # pass gate before rendering instead of asking an agent to infer eligibility.
+    jobs = [job for job in visible_jobs if job.get("screening_status") == "pass"
+            and isinstance(job.get("url"), str) and job["url"].strip()]
     resume = _application_pdf_metadata()
     resume_url = str(request.url_for("download_application_resume"))
     prompt, unresolved = _render_application_prompt(
@@ -233,7 +239,7 @@ def read_rendered_application_prompt(request: Request, page_url: str):
     )
     issues = []
     if not jobs:
-        issues.append("No current Today Todo jobs are available.")
+        issues.append("No current Today Todo jobs have a passing screen and posting URL.")
     if not resume:
         issues.append("No latest Settings PDF is available.")
     if not settings.get("submission_authorization"):
@@ -497,7 +503,7 @@ def download_application_resume():
 
 
 def _render_outreach_prompt(template, resume, page_url, resume_url, kind="hr_email",
-                            cold_dm_jobs=None, snapshot_at=None):
+                            cold_dm_jobs=None, snapshot_at=None, excluded_count=0):
     from outreach_prompts import (GMAIL_HR_DELIVERY_RULES, LINKEDIN_CONNECTION_RULES,
                                   remove_legacy_cold_dm_navigation)
     from urllib.parse import quote, urlsplit
@@ -506,13 +512,14 @@ def _render_outreach_prompt(template, resume, page_url, resume_url, kind="hr_ema
     if kind == "cold_dm":
         template = remove_legacy_cold_dm_navigation(template)
         base = urlsplit(page_url)
-        jobs = [{**job,
+        jobs = [{**{key: value for key, value in job.items()
+                    if key not in {"screening_status", "screening_reason", "blocked_reason"}},
                  "tracker_url": f"{base.scheme}://{base.netloc}/jobs/{job['job_id']}" if job.get("job_id") else None,
                  "recruiters_search_url": "https://www.linkedin.com/search/results/people/?keywords=" +
                  quote(f"{job['company']} recruiter") if job.get("job_id") else None,
                  "hiring_managers_search_url": "https://www.linkedin.com/search/results/people/?keywords=" +
                  quote(f"{job['company']} hiring manager") if job.get("job_id") else None}
-                for job in (cold_dm_jobs or [])]
+                for job in (cold_dm_jobs or []) if not job.get("blocked_reason") and job.get("cold_dm")]
         values.update({"cold_dm_jobs": json.dumps(jobs, ensure_ascii=False, indent=2),
                        "cold_dm_snapshot_at": snapshot_at or "unavailable"})
         if "{{cold_dm_jobs}}" not in template:
@@ -523,6 +530,9 @@ def _render_outreach_prompt(template, resume, page_url, resume_url, kind="hr_ema
              "Use verified facts and recipients only. Check conversation/Sent history to avoid duplicates. "
              "Obtain explicit confirmation immediately before sending. Never record success without observed send evidence. "
              "Report missing tools, login or assets rather than guessing or bypassing controls.\n\n")
+    if kind == "cold_dm":
+        rules += (f"Fixed batch: {len(jobs)} eligible due jobs; {excluded_count} due jobs omitted by the "
+                  "backend eligibility/current-draft check. Only process entries in the batch.\n\n")
     delivery = GMAIL_HR_DELIVERY_RULES if kind in {"hr_email", "followup"} else LINKEDIN_CONNECTION_RULES
     return rules + delivery + rendered, unresolved
 
@@ -535,23 +545,25 @@ def read_outreach_prompt(request: Request, page_url: str,
         raise HTTPException(status_code=422, detail="App page URL is invalid.")
     settings = get_application_prompt_settings(_DEFAULT_USERNAME)
     resume = _application_pdf_metadata()
-    jobs, snapshot_at = None, None
+    jobs, snapshot_at, excluded_count = None, None, 0
     if kind == "cold_dm":
         from tracker import _user_now, get_cold_dm_prompt_jobs
         try:
-            jobs = get_cold_dm_prompt_jobs((resume or {}).get("version"))
+            due_jobs = get_cold_dm_prompt_jobs((resume or {}).get("version"))
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+        jobs = [job for job in due_jobs if not job["blocked_reason"] and job.get("cold_dm")]
+        excluded_count = len(due_jobs) - len(jobs)
         snapshot_at = _user_now().isoformat()
     prompt, unresolved = _render_outreach_prompt(settings[kind + "_template"], resume, page_url,
                                                  str(request.url_for("download_application_resume")), kind,
-                                                 jobs, snapshot_at)
+                                                 jobs, snapshot_at, excluded_count)
     issues = []
     if not resume:
         issues.append("No latest Settings PDF is available.")
     if unresolved:
         issues.append("The saved template contains unresolved placeholders.")
-    if kind == "cold_dm" and not any(not row["blocked_reason"] for row in jobs):
+    if kind == "cold_dm" and not jobs:
         issues.append("No due Tracker jobs have a current Cold DM and passing screen.")
     return RenderedApplicationPrompt(prompt=prompt, job_count=len(jobs or []), resume_available=bool(resume),
                                      ready=not issues, issues=issues, unresolved_placeholders=unresolved)

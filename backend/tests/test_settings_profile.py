@@ -4,12 +4,18 @@ import pathlib
 import re
 import sys
 import unittest
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "modules"))
 from resume_profile import profile_text
 import profile as profile_data
+
+# The settings-profile CI lane intentionally runs without the API dependencies.
+# Endpoints are extracted with the response constructor supplied by the test.
+RenderedApplicationPrompt = SimpleNamespace
 
 def function(path, name, env):
     node = next(n for n in ast.parse(path.read_text()).body
@@ -94,7 +100,7 @@ class SettingsProfileTests(unittest.TestCase):
             )
         self.assertEqual(captured["scoring_weights"]["skill"], 44)
         self.assertEqual(result["notice_period"], "Two weeks")
-        self.assertIn("Apply only when screening_status is pass", result["automation_rules"])
+        self.assertIn("backend includes only jobs that passed current screening", result["automation_rules"])
         self.assertEqual(result["total_work_experience"], "1 year")
         self.assertEqual(result["onsite_any_location"], "Yes")
         self.assertNotIn("unknown", captured["scoring_weights"]["application_prompt"])
@@ -188,7 +194,9 @@ class SettingsProfileTests(unittest.TestCase):
         )
         self.assertFalse(unresolved)
         self.assertIn("Start working through the fixed batch immediately", prompt)
-        self.assertIn("Apply only when screening_status is pass", prompt)
+        self.assertIn("backend includes only jobs that passed current screening", prompt)
+        self.assertNotIn('"screening_status"', prompt)
+        self.assertNotIn('"screening_reason"', prompt)
         self.assertIn("No to having attended that employer's selection process before", prompt)
         self.assertIn("No to having a commitment to another employer", prompt)
         self.assertIn("No to having ever worked for that employer", prompt)
@@ -217,6 +225,54 @@ class SettingsProfileTests(unittest.TestCase):
         for placeholder in ("application_answers", "page_url", "resume_filename",
                             "resume_url", "resume_sha256", "batch_jobs"):
             self.assertNotIn("{{" + placeholder + "}}", prompt)
+
+    def test_application_endpoint_excludes_nonpassing_jobs_before_omitting_results(self):
+        renderer = function(ROOT / "app/routers/profile.py", "_render_application_prompt", {
+            "json": json, "_APPLICATION_ANSWER_LABELS": {"submission_authorization": "Submission authorization"},
+            "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
+            "DEFAULT_AUTOMATION_RULES": profile_data.DEFAULT_AUTOMATION_RULES,
+        })
+        settings = {"prompt_template": "{{application_answers}}\nFixed batch:\n{{batch_jobs}}",
+                    "automation_rules": profile_data.DEFAULT_AUTOMATION_RULES,
+                    "submission_authorization": "Approved for eligible jobs"}
+        endpoint = function(ROOT / "app/routers/profile.py", "read_rendered_application_prompt", {
+            "Request": object, "RenderedApplicationPrompt": RenderedApplicationPrompt,
+            "_clean_text": lambda value, maximum: value, "_DEFAULT_USERNAME": "fixture",
+            "get_application_prompt_settings": lambda _: settings,
+            "_application_pdf_metadata": lambda: {"filename": "active.pdf", "sha256": "abc"},
+            "_render_application_prompt": renderer,
+        })
+        jobs = [{"id": i, "title": f"Job {i}", "company": "Fixture", "url": f"https://jobs.test/{i}",
+                 "screening_status": status, "screening_reason": f"Private {status} reason"}
+                for i, status in enumerate(("pass", "pending", "review", "fail"), 1)]
+        with patch.dict(sys.modules, {"tracker": SimpleNamespace(get_scraped_jobs=lambda: jobs)}):
+            result = endpoint(SimpleNamespace(url_for=lambda _: "https://api.test/pdf"),
+                              "https://app.test/tonight")
+        self.assertTrue(result.ready)
+        self.assertEqual(result.job_count, 1)
+        batch = json.loads(result.prompt[result.prompt.index("[\n  {"):])
+        self.assertEqual([job["job_id"] for job in batch], [1])
+        self.assertNotIn("screening_status", batch[0])
+        self.assertNotIn("screening_reason", batch[0])
+        self.assertNotIn("Private", result.prompt)
+        with patch.dict(sys.modules, {"tracker": SimpleNamespace(get_scraped_jobs=lambda: jobs[1:])}):
+            blocked = endpoint(SimpleNamespace(url_for=lambda _: "https://api.test/pdf"),
+                               "https://app.test/tonight")
+        self.assertFalse(blocked.ready)
+        self.assertEqual(blocked.job_count, 0)
+
+    def test_legacy_screening_wording_is_migrated_without_erasing_other_rules(self):
+        old_rules = ("AUTOMATION RULES (authoritative):\n" + profile_data._OLD_APPLICATION_RULE_SCREENING +
+                     "\nKeep my custom rule.")
+        old_template = ("Custom intro\n" + profile_data._OLD_APPLICATION_TEMPLATE_SCREENING +
+                        "\n{{batch_jobs}}")
+        stored = {"scoring_weights": {"application_prompt": {
+            "automation_rules": old_rules, "prompt_template": old_template}}}
+        with patch.object(profile_data, "get_profile", return_value=stored):
+            settings = profile_data.get_application_prompt_settings()
+        self.assertNotIn("screening_status", settings["automation_rules"] + settings["prompt_template"])
+        self.assertIn("Keep my custom rule", settings["automation_rules"])
+        self.assertIn("Custom intro", settings["prompt_template"])
 
     def test_ready_prompt_reports_unknown_placeholder(self):
         render = function(
