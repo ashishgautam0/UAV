@@ -210,6 +210,12 @@ export default function JobDetailPage() {
     else setNotFound(true);
   }, [jobId, load]);
 
+  useEffect(() => {
+    if (!loading && !notFound && window.location.hash === "#cold-dm") {
+      document.getElementById("cold-dm")?.scrollIntoView({ block: "start" });
+    }
+  }, [loading, notFound]);
+
   function handleCopy(type: string) {
     navigator.clipboard.writeText(messages[type] || "");
     setCopied(type);
@@ -658,7 +664,7 @@ export default function JobDetailPage() {
 
       {/* Generated content sections */}
       {SECTIONS.map((s) => (
-        <Card key={s.type}>
+        <Card key={s.type} id={s.type === "cold_dm" ? "cold-dm" : undefined} className="scroll-mt-24">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
