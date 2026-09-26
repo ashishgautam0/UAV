@@ -26,6 +26,7 @@ const EMPTY_APPLICATION_SETTINGS: ApplicationPromptSettings = {
   followup_template: "",
   cold_dm_template: "",
   prompt_template: "",
+  automation_rules: "",
   submission_authorization: "",
   notice_period: "",
   current_ctc: "",
@@ -173,7 +174,7 @@ export default function SettingsPage() {
     <Card>
       <CardHeader>
         <CardTitle>Today Todo application prompt</CardTitle>
-        <p className="text-sm text-muted-foreground">Applications only. Edit instructions and answers together. HR emails, follow-ups and cold DMs have separate prompts below.</p>
+        <p className="text-sm text-muted-foreground">Applications only. Edit automation rules, instructions, and answers together. HR emails, follow-ups and cold DMs have separate prompts below.</p>
       </CardHeader>
       <CardContent className="grid gap-4 md:grid-cols-2">
         <div className="md:col-span-2 overflow-hidden rounded-lg border p-3">
@@ -200,7 +201,7 @@ export default function SettingsPage() {
             onChange={(event) => { setPromptEditor(event.target.value); setPromptDirty(true); }}
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            Keep the answer labels and section markers; edit values after each colon and leave unknown answers blank. Dynamic placeholders: {"{{application_answers}}"}, {"{{page_url}}"}, {"{{resume_filename}}"}, {"{{resume_url}}"}, {"{{resume_sha256}}"}, and {"{{batch_jobs}}"}.
+            Edit the AUTOMATION RULES (authoritative) text at the top. Keep both section markers and the answer labels; edit values after each colon and leave unknown answers blank. Clear the rules text between its markers to restore the defaults. Dynamic placeholders: {"{{application_answers}}"}, {"{{page_url}}"}, {"{{resume_filename}}"}, {"{{resume_url}}"}, {"{{resume_sha256}}"}, and {"{{batch_jobs}}"}.
           </p>
         </div>
         <div className="md:col-span-2 space-y-3 border-t pt-4">

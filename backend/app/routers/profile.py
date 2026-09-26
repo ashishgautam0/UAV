@@ -18,6 +18,7 @@ from ..models.schemas import (
     UserProfileResponse,
 )
 from profile import (
+    DEFAULT_AUTOMATION_RULES,
     activate_resume_profile,
     create_resume_profile,
     get_active_profile_snapshot,
@@ -149,7 +150,7 @@ def read_application_settings():
 @router.put("/application-settings", response_model=ApplicationPromptSettings)
 def update_application_settings(body: ApplicationPromptSettings):
     payload = {
-        key: _clean_text(value, 12_000 if key.endswith("template") else 500)
+        key: _clean_text(value, 12_000 if key.endswith("template") or key == "automation_rules" else 500)
         for key, value in body.model_dump(exclude_unset=True).items()
     }
     saved = save_application_prompt_settings(_DEFAULT_USERNAME, payload)
@@ -183,41 +184,11 @@ def _render_application_prompt(template, settings, jobs, resume, page_url, resum
         "resume_sha256": (resume or {}).get("sha256") or "unavailable",
         "batch_jobs": json.dumps(batch, ensure_ascii=False, indent=2, default=str),
     }
-    rendered = template
+    rendered = (settings.get("automation_rules") or DEFAULT_AUTOMATION_RULES).rstrip() + "\n\n" + template
     for key, value in values.items():
         rendered = rendered.replace("{{" + key + "}}", value)
     unresolved = sorted(set(_PROMPT_PLACEHOLDER.findall(rendered)))
-    envelope = (
-        "AUTOMATION RULES (authoritative):\n"
-        "- Start working through the fixed batch immediately; do not stop after only describing a plan.\n"
-        "- Apply only when screening_status is pass. Treat pending, review, fail, missing URLs, "
-        "or unclear mandatory eligibility as blocked and do not submit them.\n"
-        "- User-provided answers for every employer on its application form: No to having attended "
-        "that employer's selection process before; No to having a commitment to another employer "
-        "or organization that might affect working there; No to having ever worked for that "
-        "employer. Use No for these questions or equivalent wording even in a saved custom "
-        "template. Do not extrapolate to different questions (such as prior applications or "
-        "employment with affiliates). Ask if the question is ambiguous or the user updates a fact.\n"
-        "- Read and accept required application terms, privacy/data-processing consents, "
-        "acknowledgements and submission confirmations on the user's behalf; proceed without "
-        "pausing for these acceptance steps, including when a saved custom template says to pause. "
-        "Do not opt into optional marketing. If acceptance entails an unsupported factual assertion, "
-        "payment, or an unrelated agreement, leave the job unmarked and report the exact blocker. "
-        "If a CAPTCHA appears, attempt the normal on-page challenge using supported browser "
-        "interactions and verify that the application proceeds. Never bypass the challenge or "
-        "use a third-party solver. If it cannot be completed, request the user's help, leave "
-        "that job unmarked and continue other jobs. Pause for login or a missing truthful "
-        "answer required by the platform.\n"
-        "- If the original job listing definitively says it is no longer accepting applications "
-        "or its page is permanently not found, return to Today Todo and remove only its matching "
-        "job card (match job ID and URL; swipe left to Remove). Verify the card disappears, "
-        "then continue the batch. Do not mark it Applied or delete the database record. "
-        "For a temporary page error, login, unsolved CAPTCHA, or uncertain availability, leave its card "
-        "in place and report the blocker.\n"
-        "- Never invent an answer, bypass a control, pay a fee, or apply outside this batch. "
-        "Do not send HR emails, cold DMs or follow-ups in this application task; use their separate Settings prompts.\n\n"
-    )
-    return envelope + rendered, unresolved
+    return rendered, unresolved
 
 
 @router.get("/application-prompt", response_model=RenderedApplicationPrompt)
@@ -245,7 +216,7 @@ def read_rendered_application_prompt(request: Request, page_url: str):
     if not settings.get("submission_authorization"):
         issues.append("Submission authorization is blank in Settings.")
     if unresolved:
-        issues.append("The saved template contains unresolved placeholders.")
+        issues.append("The saved prompt or automation rules contain unresolved placeholders.")
     return RenderedApplicationPrompt(
         prompt=prompt,
         job_count=len(jobs),

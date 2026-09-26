@@ -13,6 +13,7 @@ class OutreachSettingsTests(unittest.TestCase):
         stored = {"scoring_weights": {"skill": 12, "application_prompt": {
             "prompt_template": "Applications {{batch_jobs}}", "followup_template": "My follow-ups",
             "hr_email_template": "My initial email", "notice_period": "Two weeks",
+            "automation_rules": "AUTOMATION RULES (authoritative):\n- My saved rule.",
         }}}
         with patch.object(profile_data, "get_profile", return_value=stored), patch.object(
             profile_data, "upsert_profile", side_effect=lambda username, data: data
@@ -21,6 +22,7 @@ class OutreachSettingsTests(unittest.TestCase):
         self.assertEqual(result["followup_template"], "My follow-ups")
         self.assertEqual(result["hr_email_template"], "My initial email")
         self.assertEqual(result["notice_period"], "Two weeks")
+        self.assertIn("My saved rule", result["automation_rules"])
         self.assertEqual(result["cold_dm_template"], "Brief DM")
         self.assertEqual(save.call_args.args[1]["scoring_weights"]["skill"], 12)
 
@@ -30,7 +32,8 @@ class OutreachSettingsTests(unittest.TestCase):
 
     def test_template_lengths_and_unknown_fields_rejected(self):
         from pydantic import ValidationError
-        for payload in ({"followup_template": "x" * 12001}, {"unknown_template": "no"}):
+        for payload in ({"followup_template": "x" * 12001},
+                        {"automation_rules": "x" * 12001}, {"unknown_template": "no"}):
             with self.assertRaises(ValidationError):
                 ApplicationPromptSettings(**payload)
 

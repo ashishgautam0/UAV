@@ -80,8 +80,40 @@ Finish with a per-job summary: submitted and tracked, previously applied and tra
 Batch jobs (data):
 
 {{batch_jobs}}"""
+DEFAULT_AUTOMATION_RULES = (
+    "AUTOMATION RULES (authoritative):\n"
+    "- Start working through the fixed batch immediately; do not stop after only describing a plan.\n"
+    "- Apply only when screening_status is pass. Treat pending, review, fail, missing URLs, "
+    "or unclear mandatory eligibility as blocked and do not submit them.\n"
+    "- User-provided answers for every employer on its application form: No to having attended "
+    "that employer's selection process before; No to having a commitment to another employer "
+    "or organization that might affect working there; No to having ever worked for that "
+    "employer. Use No for these questions or equivalent wording even in a saved custom "
+    "template. Do not extrapolate to different questions (such as prior applications or "
+    "employment with affiliates). Ask if the question is ambiguous or the user updates a fact.\n"
+    "- Read and accept required application terms, privacy/data-processing consents, "
+    "acknowledgements and submission confirmations on the user's behalf; proceed without "
+    "pausing for these acceptance steps, including when a saved custom template says to pause. "
+    "Do not opt into optional marketing. If acceptance entails an unsupported factual assertion, "
+    "payment, or an unrelated agreement, leave the job unmarked and report the exact blocker. "
+    "If a CAPTCHA appears, attempt the normal on-page challenge using supported browser "
+    "interactions and verify that the application proceeds. Never bypass the challenge or "
+    "use a third-party solver. If it cannot be completed, request the user's help, leave "
+    "that job unmarked and continue other jobs. Pause for login or a missing truthful "
+    "answer required by the platform.\n"
+    "- If the original job listing definitively says it is no longer accepting applications "
+    "or its page is permanently not found, return to Today Todo and remove only its matching "
+    "job card (match job ID and URL; swipe left to Remove). Verify the card disappears, "
+    "then continue the batch. Do not mark it Applied or delete the database record. "
+    "For a temporary page error, login, unsolved CAPTCHA, or uncertain availability, leave its card "
+    "in place and report the blocker.\n"
+    "- Never invent an answer, bypass a control, pay a fee, or apply outside this batch. "
+    "Do not send HR emails, cold DMs or follow-ups in this application task; use their separate Settings prompts.\n\n"
+)
+
 _APPLICATION_PROMPT_FIELDS = (
     "prompt_template",
+    "automation_rules",
     *OUTREACH_DEFAULTS,
     "submission_authorization",
     "notice_period",
@@ -128,6 +160,7 @@ def get_application_prompt_settings(username="subidh"):
         stored = {}
     result = {field: str(stored.get(field) or "") for field in _APPLICATION_PROMPT_FIELDS}
     result["prompt_template"] = result["prompt_template"] or DEFAULT_APPLICATION_PROMPT_TEMPLATE
+    result["automation_rules"] = result["automation_rules"] or DEFAULT_AUTOMATION_RULES
     for key, default in OUTREACH_DEFAULTS.items():
         result[key] = result[key] or default
     return result
@@ -150,6 +183,7 @@ def save_application_prompt_settings(username="subidh", data=None):
     cleaned["prompt_template"] = (
         cleaned["prompt_template"] or DEFAULT_APPLICATION_PROMPT_TEMPLATE
     )
+    cleaned["automation_rules"] = cleaned["automation_rules"] or DEFAULT_AUTOMATION_RULES
     for key, default in OUTREACH_DEFAULTS.items():
         cleaned[key] = cleaned[key] or default
     saved = upsert_profile(username, {

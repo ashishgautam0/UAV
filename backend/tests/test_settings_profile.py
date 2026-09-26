@@ -73,6 +73,7 @@ class SettingsProfileTests(unittest.TestCase):
             result = profile_data.get_application_prompt_settings()
         self.assertEqual(result["notice_period"], "One month")
         self.assertIn("{{batch_jobs}}", result["prompt_template"])
+        self.assertTrue(result["automation_rules"].startswith("AUTOMATION RULES (authoritative):"))
         self.assertNotIn("unsupported", result)
         self.assertEqual(result["current_location"], "")
 
@@ -91,6 +92,7 @@ class SettingsProfileTests(unittest.TestCase):
             )
         self.assertEqual(captured["scoring_weights"]["skill"], 44)
         self.assertEqual(result["notice_period"], "Two weeks")
+        self.assertIn("Apply only when screening_status is pass", result["automation_rules"])
         self.assertNotIn("unknown", captured["scoring_weights"]["application_prompt"])
 
     def test_malformed_application_prompt_settings_are_treated_as_empty(self):
@@ -99,8 +101,9 @@ class SettingsProfileTests(unittest.TestCase):
         }):
             result = profile_data.get_application_prompt_settings()
         self.assertTrue(all(
-            value == "" for key, value in result.items() if not key.endswith("template")
+            value == "" for key, value in result.items() if not key.endswith("template") and key != "automation_rules"
         ))
+        self.assertIn("AUTOMATION RULES (authoritative):", result["automation_rules"])
         self.assertIn("{{resume_url}}", result["prompt_template"])
         self.assertIn("No, I have not attended that company's selection process before", result["prompt_template"])
         self.assertIn("No, I have no commitment to another employer or organization", result["prompt_template"])
@@ -117,6 +120,7 @@ class SettingsProfileTests(unittest.TestCase):
                     "notice_period": "Notice period",
                 },
                 "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
+                "DEFAULT_AUTOMATION_RULES": profile_data.DEFAULT_AUTOMATION_RULES,
             },
         )
         settings = {
@@ -186,6 +190,7 @@ class SettingsProfileTests(unittest.TestCase):
                 "json": json,
                 "_APPLICATION_ANSWER_LABELS": {},
                 "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
+                "DEFAULT_AUTOMATION_RULES": profile_data.DEFAULT_AUTOMATION_RULES,
             },
         )
         _, unresolved = render(
@@ -197,6 +202,34 @@ class SettingsProfileTests(unittest.TestCase):
             "https://api.example/api/profile/resume/pdf",
         )
         self.assertEqual(unresolved, ["unsupported_field"])
+
+    def test_saved_automation_rules_replace_defaults_and_render_placeholders(self):
+        stored = {"scoring_weights": {"skill": 33, "application_prompt": {
+            "automation_rules": "AUTOMATION RULES (authoritative):\n- Visit {{page_url}} for this batch.",
+            "prompt_template": "Apply to {{batch_jobs}}",
+        }}}
+        captured = {}
+        with patch.object(profile_data, "get_profile", return_value=stored), patch.object(
+            profile_data, "upsert_profile", side_effect=lambda username, data: captured.update(data) or data
+        ):
+            saved = profile_data.save_application_prompt_settings(data={"notice_period": "Tomorrow"})
+        self.assertEqual(captured["scoring_weights"]["skill"], 33)
+        self.assertEqual(saved["automation_rules"], stored["scoring_weights"]["application_prompt"]["automation_rules"])
+        render = function(ROOT / "app/routers/profile.py", "_render_application_prompt", {
+            "json": json, "_APPLICATION_ANSWER_LABELS": {},
+            "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
+            "DEFAULT_AUTOMATION_RULES": profile_data.DEFAULT_AUTOMATION_RULES,
+        })
+        prompt, unresolved = render(saved["prompt_template"], saved, [{"id": 42}], None,
+                                    "https://app.example/tonight", "https://api.example/resume")
+        self.assertFalse(unresolved)
+        self.assertIn("- Visit https://app.example/tonight for this batch.", prompt)
+        self.assertIn('"job_id": 42', prompt)
+        self.assertNotIn("Start working through the fixed batch immediately", prompt)
+        custom, unresolved = render("Apply", {"automation_rules": "{{missing_rule_value}}"}, [], None,
+                                    "https://app.example/tonight", "https://api.example/resume")
+        self.assertIn("{{missing_rule_value}}", custom)
+        self.assertEqual(unresolved, ["missing_rule_value"])
 
     def test_standalone_hr_workflow_retains_queue_and_send_guards(self):
         prompt = profile_data.OUTREACH_DEFAULTS["hr_email_template"]
