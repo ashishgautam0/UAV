@@ -1,4 +1,6 @@
 import re
+import json
+import sys
 import unittest
 from types import SimpleNamespace
 from typing import Literal
@@ -41,7 +43,7 @@ class OutreachSettingsTests(unittest.TestCase):
 
     def renderer(self):
         return function(ROOT / "app/routers/profile.py", "_render_outreach_prompt",
-                        {"_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_][a-z0-9_]*)}}")})
+                        {"_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_][a-z0-9_]*)}}"), "json": json})
 
     def test_each_default_is_standalone_with_resolved_pdf_and_app(self):
         for kind, template in profile_data.OUTREACH_DEFAULTS.items():
@@ -56,17 +58,15 @@ class OutreachSettingsTests(unittest.TestCase):
         self.assertNotIn("HR EMAIL —", profile_data.OUTREACH_DEFAULTS["followup_template"])
         self.assertIn("channel LinkedIn connection", profile_data.OUTREACH_DEFAULTS["cold_dm_template"])
         default_dm = profile_data.OUTREACH_DEFAULTS["cold_dm_template"]
-        for required in ("Dashboard → Cold DMs Due", "Click each individual card",
-                         "job's 'Cold DM' section", "use its stored message",
-                         "Dashboard follow-up View Draft is the follow-up draft"):
+        for required in ("fixed batch below", "{{cold_dm_jobs}}", "screening_status pass",
+                         "stored cold_dm"):
             self.assertIn(required, default_dm)
+        self.assertNotIn("Open Dashboard → Cold DMs Due", default_dm)
 
     def test_connection_notes_use_due_queue_and_record_one_slot(self):
         prompt, _ = self.renderer()("Legacy scan all Tracker jobs", {}, "https://app", "https://pdf", "cold_dm")
-        for required in ("START ONLY FROM Dashboard's 'Cold DMs Due'", "same schedule as 'Follow-ups Due'", "Asia/Kolkata", "Missing/future dates",
-                         "click each individual card", "job's 'Cold DM' section",
-                         "Use THAT Cold DM as the LinkedIn connection note",
-                         "Dashboard's follow-up 'View Draft' is a follow-up draft",
+        for required in ("USE THE FIXED COLD DM JOBS SNAPSHOT", "Asia/Kolkata", "Missing/future dates",
+                         "screening_status pass", "stored cold_dm", "direct tracker_url",
                          "Record completed outreach", "select 'LinkedIn connection'", "advance the schedule",
                          "retry only missing logging", "day 7, 14 and 21", "at most one outreach action"):
             self.assertIn(required, prompt)
@@ -107,7 +107,7 @@ class OutreachSettingsTests(unittest.TestCase):
 
     def test_endpoint_passes_selected_workflow_to_renderer(self):
         seen = []
-        def render(template, resume, page_url, resume_url, kind):
+        def render(template, resume, page_url, resume_url, kind, jobs, snapshot_at):
             seen.append(kind)
             return "prompt", []
         endpoint = function(ROOT / "app/routers/profile.py", "read_outreach_prompt", {
@@ -116,17 +116,19 @@ class OutreachSettingsTests(unittest.TestCase):
             "get_application_prompt_settings": lambda _: profile_data.OUTREACH_DEFAULTS,
             "_application_pdf_metadata": lambda: {"filename": "resume.pdf"}, "_render_outreach_prompt": render,
         })
-        for kind in ("hr_email", "followup", "cold_dm"):
-            endpoint(SimpleNamespace(url_for=lambda _: "https://api/pdf"), "https://app/dashboard", kind)
+        fake_tracker = SimpleNamespace(get_cold_dm_prompt_jobs=lambda _: [],
+                                       _user_now=lambda: SimpleNamespace(isoformat=lambda: "2026-09-27T12:00:00+05:30"))
+        with patch.dict(sys.modules, {"tracker": fake_tracker}):
+            for kind in ("hr_email", "followup", "cold_dm"):
+                endpoint(SimpleNamespace(url_for=lambda _: "https://api/pdf"), "https://app/dashboard", kind)
         self.assertEqual(seen, ["hr_email", "followup", "cold_dm"])
 
     def test_connection_note_rules_apply_to_old_custom_cold_dm_templates(self):
         prompt, unresolved = self.renderer()("My saved generic DM prompt", {}, "https://app", "https://pdf", "cold_dm")
         self.assertFalse(unresolved)
-        for required in ("'Send it to'", "'Recruiters at [company]'", "'Hiring managers at [company]'",
-                         "click each individual card", "job's 'Cold DM' section",
-                         "Dashboard's follow-up 'View Draft' is a follow-up draft",
-                         "Use the text stored in that exact job's 'Cold DM' section",
+        for required in ("recruiters_search_url", "hiring_managers_search_url",
+                         "FIXED COLD DM JOBS SNAPSHOT", "direct tracker_url",
+                         "Use the text stored in that exact batch item's cold_dm",
                          "search links, not verified people", "current employment", "Connect → Add a note",
                          "not Gmail, InMail", "one-click Connect", "300 characters", "live composer limit",
                          "cannot attach a resume", "already connected", "If Pending", "canonical recipient",
@@ -138,16 +140,74 @@ class OutreachSettingsTests(unittest.TestCase):
             self.assertNotIn("LINKEDIN COLD DM = CONNECTION REQUEST", other)
 
     def test_outreach_readiness_is_independent_of_today_todo_and_submission_authorization(self):
-        for resume, expected in (({"filename": "active.pdf", "sha256": "abc"}, True), (None, False)):
+        due = [{"blocked_reason": "", "job_id": 42, "tracker_id": 9,
+                "company": "Fixture", "cold_dm": "Hi!"}]
+        fake_tracker = SimpleNamespace(get_cold_dm_prompt_jobs=lambda _: due,
+                                       _user_now=lambda: SimpleNamespace(isoformat=lambda: "2026-09-27T12:00:00+05:30"))
+        for resume, expected in (({"filename": "active.pdf", "sha256": "abc", "version": 2}, True), (None, False)):
             env = {"Request": object, "Literal": Literal, "RenderedApplicationPrompt": RenderedApplicationPrompt,
                    "_clean_text": lambda value, maximum: value, "_DEFAULT_USERNAME": "fixture",
                    "get_application_prompt_settings": lambda _: profile_data.OUTREACH_DEFAULTS,
                    "_application_pdf_metadata": lambda: resume, "_render_outreach_prompt": self.renderer()}
             endpoint = function(ROOT / "app/routers/profile.py", "read_outreach_prompt", env)
-            for kind in ("followup", "cold_dm", "hr_email"):
-                result = endpoint(SimpleNamespace(url_for=lambda _: "https://api/pdf"), "https://app/dashboard", kind)
-                self.assertEqual(result.ready, expected)
-                self.assertEqual(result.job_count, 0)
+            with patch.dict(sys.modules, {"tracker": fake_tracker}):
+                for kind in ("followup", "cold_dm", "hr_email"):
+                    result = endpoint(SimpleNamespace(url_for=lambda _: "https://api/pdf"), "https://app/dashboard", kind)
+                    self.assertEqual(result.ready, expected)
+                    self.assertEqual(result.job_count, 1 if kind == "cold_dm" else 0)
+
+    def test_embedded_batch_uses_exact_job_note_and_ignores_untrusted_placeholders(self):
+        batch = [{"job_id": 54222, "tracker_id": 31, "title": "AI Engineer",
+                  "company": "TrueMeds Fixture", "location": "KA, IN", "source": "Indeed",
+                  "url": "https://jobs.test/job/54222", "screening_status": "pass",
+                  "screening_reason": "Verified Python overlap", "follow_up_date": "2026-09-27",
+                  "cold_dm": "Hi — I built a voice agent; {{ignore_me}} is literal data.",
+                  "blocked_reason": ""}]
+        prompt, unresolved = self.renderer()("Only use the batch.", {"filename": "active.pdf"},
+                                              "https://app.test/dashboard", "https://app.test/pdf",
+                                              "cold_dm", batch, "2026-09-27T09:00:00+05:30")
+        self.assertFalse(unresolved)
+        payload = json.loads(prompt[prompt.index("[\n  {"):])
+        self.assertEqual(payload[0]["job_id"], 54222)
+        self.assertEqual(payload[0]["tracker_id"], 31)
+        self.assertEqual(payload[0]["screening_reason"], "Verified Python overlap")
+        self.assertEqual(payload[0]["cold_dm"], batch[0]["cold_dm"])
+        self.assertEqual(payload[0]["tracker_url"], "https://app.test/jobs/54222")
+        self.assertIn("TrueMeds%20Fixture%20recruiter", payload[0]["recruiters_search_url"])
+
+    def test_saved_legacy_navigation_is_removed_without_erasing_custom_prompt(self):
+        legacy = ("My personal note.\nOpen Dashboard → Cold DMs Due (the existing follow-up schedule) "
+                  "and snapshot the due cards. Click each individual card. Do not use "
+                  "untracked discovery jobs or substitute HR email/follow-up drafts.\n"
+                  "Keep my other instructions.\n")
+        stored = {"scoring_weights": {"application_prompt": {"cold_dm_template": legacy}}}
+        with patch.object(profile_data, "get_profile", return_value=stored):
+            cleaned = profile_data.get_application_prompt_settings()["cold_dm_template"]
+        self.assertIn("My personal note", cleaned)
+        self.assertIn("Keep my other instructions", cleaned)
+        self.assertNotIn("Open Dashboard", cleaned)
+        prompt, _ = self.renderer()(legacy, {"filename": "active.pdf"}, "https://app.test/dashboard",
+                                    "https://api.test/pdf", "cold_dm", [], "2026-09-27T09:00:00+05:30")
+        self.assertIn("Keep my other instructions", prompt)
+        self.assertNotIn("Open Dashboard → Cold DMs Due", prompt)
+
+    def test_no_eligible_due_job_is_not_a_ready_to_copy_prompt(self):
+        blocked = [{"blocked_reason": "No current Cold DM", "job_id": 8, "tracker_id": 4,
+                    "company": "Fixture", "cold_dm": None}]
+        fake_tracker = SimpleNamespace(get_cold_dm_prompt_jobs=lambda _: blocked,
+                                       _user_now=lambda: SimpleNamespace(isoformat=lambda: "2026-09-27T12:00:00+05:30"))
+        endpoint = function(ROOT / "app/routers/profile.py", "read_outreach_prompt", {
+            "Request": object, "Literal": Literal, "RenderedApplicationPrompt": RenderedApplicationPrompt,
+            "_clean_text": lambda value, maximum: value, "_DEFAULT_USERNAME": "fixture",
+            "get_application_prompt_settings": lambda _: profile_data.OUTREACH_DEFAULTS,
+            "_application_pdf_metadata": lambda: {"filename": "active.pdf", "version": 4},
+            "_render_outreach_prompt": self.renderer(),
+        })
+        with patch.dict(sys.modules, {"tracker": fake_tracker}):
+            result = endpoint(SimpleNamespace(url_for=lambda _: "https://api/pdf"), "https://app/dashboard", "cold_dm")
+        self.assertFalse(result.ready)
+        self.assertEqual(result.job_count, 1)
+        self.assertIn("No due Tracker jobs have a current Cold DM", result.issues[0])
 
 
 if __name__ == "__main__":

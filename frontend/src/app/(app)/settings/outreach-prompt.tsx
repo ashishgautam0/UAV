@@ -46,10 +46,13 @@ export function OutreachPrompt({ kind, title, description, initialValue }: {
         <Textarea id={`prompt-${kind}`} value={text} rows={14} maxLength={12000} disabled={busy}
           onChange={(e) => { setText(e.target.value); setDirty(true); }} />
       </div>
-      <p className="text-xs text-muted-foreground">Only this workflow runs. Generate refreshes the app and PDF links. It checks the live queue or records when executed; it does not send anything from Settings.</p>
+      <p className="text-xs text-muted-foreground">{kind === "cold_dm"
+        ? "Generate embeds the currently due Tracker jobs, screening evidence, and saved Cold DM notes in a fixed batch. Generate again to refresh it; recheck each job’s due date before sending. Nothing is sent from Settings."
+        : "Only this workflow runs. Generate refreshes the app and PDF links. It checks the live queue or records when executed; it does not send anything from Settings."}</p>
       {dirty && <p role="status" className="text-sm text-amber-600">Unsaved changes — save before copying.</p>}
       {generated && <>
         {generated.issues.length > 0 && <ul role="alert" className="list-disc pl-5 text-sm">{generated.issues.map(issue => <li key={issue}>{issue}</li>)}</ul>}
+        {kind === "cold_dm" && <p className="text-xs text-muted-foreground">Fixed batch: {generated.job_count} due job{generated.job_count === 1 ? "" : "s"}. Entries without a current, screened draft are marked blocked.</p>}
         <details><summary className="cursor-pointer text-sm">Generated prompt preview{dirty ? " (previous version)" : ""}</summary>
           <Textarea readOnly value={generated.prompt} rows={14} aria-label={`Generated ${title.toLowerCase()}`} />
         </details>

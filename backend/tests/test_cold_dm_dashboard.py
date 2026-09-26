@@ -87,6 +87,7 @@ class ColdDmDashboardTests(unittest.TestCase):
         self.assertEqual([(row["id"], row["scraped_job_id"], row["cold_dm_ready"]) for row in cards],
                          [(10, 901, True), (11, 902, False), (12, None, False)])
         self.assertEqual(cards[0]["follow_up_date"], "2026-09-26")
+        self.assertIsInstance(cards[0]["scraped_job_id"], int)
         self.assertEqual(cards[1]["follow_up_date"], "2026-09-27")
         self.assertNotIn("content", cards[0])
         self.assertEqual(db.queries.count("job_messages"), 1)

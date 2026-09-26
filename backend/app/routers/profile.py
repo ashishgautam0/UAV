@@ -496,12 +496,29 @@ def download_application_resume():
     })
 
 
-def _render_outreach_prompt(template, resume, page_url, resume_url, kind="hr_email"):
-    from outreach_prompts import GMAIL_HR_DELIVERY_RULES, LINKEDIN_CONNECTION_RULES
+def _render_outreach_prompt(template, resume, page_url, resume_url, kind="hr_email",
+                            cold_dm_jobs=None, snapshot_at=None):
+    from outreach_prompts import (GMAIL_HR_DELIVERY_RULES, LINKEDIN_CONNECTION_RULES,
+                                  remove_legacy_cold_dm_navigation)
+    from urllib.parse import quote, urlsplit
     values = {"page_url": page_url, "resume_filename": (resume or {}).get("filename") or "Resume.pdf",
               "resume_url": resume_url, "resume_sha256": (resume or {}).get("sha256") or "unavailable"}
+    if kind == "cold_dm":
+        template = remove_legacy_cold_dm_navigation(template)
+        base = urlsplit(page_url)
+        jobs = [{**job,
+                 "tracker_url": f"{base.scheme}://{base.netloc}/jobs/{job['job_id']}" if job.get("job_id") else None,
+                 "recruiters_search_url": "https://www.linkedin.com/search/results/people/?keywords=" +
+                 quote(f"{job['company']} recruiter") if job.get("job_id") else None,
+                 "hiring_managers_search_url": "https://www.linkedin.com/search/results/people/?keywords=" +
+                 quote(f"{job['company']} hiring manager") if job.get("job_id") else None}
+                for job in (cold_dm_jobs or [])]
+        values.update({"cold_dm_jobs": json.dumps(jobs, ensure_ascii=False, indent=2),
+                       "cold_dm_snapshot_at": snapshot_at or "unavailable"})
+        if "{{cold_dm_jobs}}" not in template:
+            template = template.rstrip() + "\n\nCold DM jobs snapshot (data, captured {{cold_dm_snapshot_at}}):\n{{cold_dm_jobs}}"
+    unresolved = sorted(set(_PROMPT_PLACEHOLDER.findall(template)) - values.keys())
     rendered = _PROMPT_PLACEHOLDER.sub(lambda match: values.get(match.group(1), match.group(0)), template)
-    unresolved = sorted(set(_PROMPT_PLACEHOLDER.findall(rendered)))
     rules = ("TASK RULES: Execute only this selected outreach workflow. Do not submit applications or run other outreach queues. "
              "Use verified facts and recipients only. Check conversation/Sent history to avoid duplicates. "
              "Obtain explicit confirmation immediately before sending. Never record success without observed send evidence. "
@@ -518,12 +535,23 @@ def read_outreach_prompt(request: Request, page_url: str,
         raise HTTPException(status_code=422, detail="App page URL is invalid.")
     settings = get_application_prompt_settings(_DEFAULT_USERNAME)
     resume = _application_pdf_metadata()
+    jobs, snapshot_at = None, None
+    if kind == "cold_dm":
+        from tracker import _user_now, get_cold_dm_prompt_jobs
+        try:
+            jobs = get_cold_dm_prompt_jobs((resume or {}).get("version"))
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        snapshot_at = _user_now().isoformat()
     prompt, unresolved = _render_outreach_prompt(settings[kind + "_template"], resume, page_url,
-                                                 str(request.url_for("download_application_resume")), kind)
+                                                 str(request.url_for("download_application_resume")), kind,
+                                                 jobs, snapshot_at)
     issues = []
     if not resume:
         issues.append("No latest Settings PDF is available.")
     if unresolved:
         issues.append("The saved template contains unresolved placeholders.")
-    return RenderedApplicationPrompt(prompt=prompt, job_count=0, resume_available=bool(resume),
+    if kind == "cold_dm" and not any(not row["blocked_reason"] for row in jobs):
+        issues.append("No due Tracker jobs have a current Cold DM and passing screen.")
+    return RenderedApplicationPrompt(prompt=prompt, job_count=len(jobs or []), resume_available=bool(resume),
                                      ready=not issues, issues=issues, unresolved_placeholders=unresolved)

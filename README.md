@@ -266,8 +266,14 @@ to connect. They do not need a demo or claim attachments. Direct save and queued
 fulfil reject long/variant drafts; rewrite rather than truncate. Research and
 cold notes can proceed before demo creation; HR emails follow the demo.
 The Claude routine stores drafts only and does not send outreach.
-The user-run cold-DM prompt starts from Dashboard **Follow-ups Due**, not from
-all newly tracked jobs. A confirmed LinkedIn invitation with its note is recorded
+Settings → **Cold DM prompt** → **Generate prompt** builds a fixed JSON batch
+from due Tracker follow-ups. Each entry carries the matched scraped job ID,
+Tracker ID, job details, current screening evidence, due date and stored Cold DM
+text. Missing or stale notes and screening that is not `pass` remain visibly
+blocked. The generated prompt does not require browsing Dashboard cards to
+retrieve drafts, and generating it does not send invitations or alter the
+Claude schedule. Recheck the live Tracker follow-up date and history before
+sending. A confirmed LinkedIn invitation with its note is recorded
 in Tracker as **LinkedIn connection** using **Record sent follow-up**, advancing
 one existing cadence slot (days 7/14/21 from application). Blocked, future,
 already-pending or uncertain sends do not advance it. Recording is available
