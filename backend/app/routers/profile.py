@@ -536,8 +536,8 @@ def _render_outreach_prompt(template, resume, page_url, resume_url, kind="hr_ema
                   "backend eligibility/current-draft check. Only process entries in the batch.\n\n")
         if excluded_reasons:
             reasons = "; ".join(f"{count} {reason}" for reason, count in sorted(excluded_reasons.items()))
-            rules += (f"Omitted because: {reasons}. A Dashboard card may show an older saved draft; "
-                      "review the active PDF, regenerate stale drafts, and re-screen as needed. "
+            rules += (f"Omitted because: {reasons}. An older saved draft may still be visible; "
+                      "review the active PDF and regenerate stale drafts as needed. "
                       "Do not send notes for omitted jobs.\n\n")
     delivery = GMAIL_HR_DELIVERY_RULES if kind in {"hr_email", "followup"} else LINKEDIN_CONNECTION_RULES
     return rules + delivery + rendered, unresolved
@@ -574,7 +574,7 @@ def read_outreach_prompt(request: Request, page_url: str,
     if unresolved:
         issues.append("The saved template contains unresolved placeholders.")
     if kind == "cold_dm" and not jobs:
-        issues.append("No due Tracker jobs have a current Cold DM and passing screen.")
+        issues.append("No due Tracker jobs have a current Cold DM for the latest Settings PDF and matching Tracker record.")
     if kind == "cold_dm" and excluded_reasons:
         reasons = "; ".join(f"{count} {reason}" for reason, count in sorted(excluded_reasons.items()))
         issues.append(f"{excluded_count} due jobs omitted: {reasons}.")

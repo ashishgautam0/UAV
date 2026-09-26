@@ -27,9 +27,10 @@ def follow_ups():
 
 @router.get("/cold-dm-todos")
 def cold_dm_todos():
-    # Match the PDF version used by Settings' generated Cold DM batch.
-    from app.routers.profile import _application_pdf_metadata
-    resume = _application_pdf_metadata()
+    # The dashboard only needs the latest persisted PDF profile version; avoid
+    # a private Storage list call on every Dashboard refresh.
+    from profile import get_latest_profile_snapshot
+    resume = get_latest_profile_snapshot()
     return get_cold_dm_todos((resume or {}).get("version"))
 
 
