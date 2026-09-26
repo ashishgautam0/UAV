@@ -102,6 +102,9 @@ class SettingsProfileTests(unittest.TestCase):
             value == "" for key, value in result.items() if not key.endswith("template")
         ))
         self.assertIn("{{resume_url}}", result["prompt_template"])
+        self.assertIn("No, I have not attended that company's selection process before", result["prompt_template"])
+        self.assertIn("No, I have no commitment to another employer or organization", result["prompt_template"])
+        self.assertIn("No, I have never worked for that company", result["prompt_template"])
 
     def test_ready_prompt_resolves_fixed_batch_resume_and_saved_answers(self):
         render = function(
@@ -146,6 +149,10 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertFalse(unresolved)
         self.assertIn("Start working through the fixed batch immediately", prompt)
         self.assertIn("Apply only when screening_status is pass", prompt)
+        self.assertIn("No to having attended that employer's selection process before", prompt)
+        self.assertIn("No to having a commitment to another employer", prompt)
+        self.assertIn("No to having ever worked for that employer", prompt)
+        self.assertIn("such as prior applications or employment with affiliates", prompt)
         self.assertIn("Read and accept required application terms, privacy/data-processing consents", prompt)
         self.assertIn("including when a saved custom template says to pause", prompt)
         self.assertIn("Do not opt into optional marketing", prompt)

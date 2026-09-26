@@ -57,6 +57,8 @@ Only submit jobs whose screening_status is pass. Treat pending, review and fail 
 
 Use only facts from my resume or answers I supplied. Do not invent experience, salary, notice period, eligibility, or demographic answers.
 
+My answers for every company's application form are: No, I have not attended that company's selection process before; No, I have no commitment to another employer or organization that might affect working there; and No, I have never worked for that company. Use No for these three questions or equivalent wording, with the company on the form as the subject. Do not extend these answers to different questions (such as whether I have merely applied before or worked for an affiliate); ask me if the question's meaning is unclear.
+
 I authorize you to read and accept required application terms, privacy/data-processing consents, acknowledgements and submission confirmations on my behalf. Check the required acceptance boxes and proceed to the next step without asking me to approve each one. Do not opt into optional marketing. If acceptance requires a factual statement that my resume/answers do not support, payment, or an agreement unrelated to applying for this job, leave that job unmarked and report the exact blocker.
 
 If a CAPTCHA appears, attempt to complete the on-page challenge using the browser's supported interactions and verify the application continues. Do not bypass the challenge or use a third-party solving service. If it cannot be completed, request my help with that challenge; leave the job unmarked and continue with the other jobs.
