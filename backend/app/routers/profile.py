@@ -194,6 +194,12 @@ def _render_application_prompt(template, settings, jobs, resume, page_url, resum
         "or unclear mandatory eligibility as blocked and do not submit them.\n"
         "- Complete browser work autonomously where supported, but pause for any confirmation, "
         "login, CAPTCHA, sensitive-data approval, or missing truthful answer required by the platform.\n"
+        "- If the original job listing definitively says it is no longer accepting applications "
+        "or its page is permanently not found, return to Today Todo and remove only its matching "
+        "job card (match job ID and URL; swipe left to Remove). Verify the card disappears, "
+        "then continue the batch. Do not mark it Applied or delete the database record. "
+        "For a temporary page error, login, CAPTCHA, or uncertain availability, leave its card "
+        "in place and report the blocker.\n"
         "- Never invent an answer, bypass a control, pay a fee, or apply outside this batch. "
         "Do not send HR emails, cold DMs or follow-ups in this application task; use their separate Settings prompts.\n\n"
     )
