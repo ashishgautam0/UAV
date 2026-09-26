@@ -1,38 +1,12 @@
 """User's intake preferences, independent of resume-match scoring.
 
-Company exclusions are an explicit, maintained list, not a claim that every
-international startup is a large MNC. Unknown employers remain eligible.
+Company exclusions come solely from the user's Settings page (stored in the
+database). Unknown employers remain eligible.
 """
 import html
 import re
 import unicodedata
 
-# Match employer names only, never technologies or clients mentioned in a JD.
-LARGE_MNC_ALIASES = (
-    "Accenture", "TCS", "Tata Consultancy Services", "Infosys", "Wipro",
-    "HCL", "HCLTech", "HCL Technologies", "Tech Mahindra", "Cognizant",
-    "Capgemini", "IBM", "International Business Machines", "DXC Technology",
-    "LTIMindtree", "LTI Mindtree", "Larsen & Toubro Infotech", "Mindtree",
-    "Mphasis", "NTT", "NTT Data", "NTT Data Services", "NTT Data Information Processing",
-    "Deloitte", "Deloitte USI", "EY", "Ernst & Young", "KPMG", "PwC",
-    "PricewaterhouseCoopers", "Amazon", "Amazon Web Services", "AWS",
-    "Amazon Development Centre", "Amazon Development Center",
-    "Amazon Development Centre India", "Amazon Development Center India",
-    "Google", "Google India", "Microsoft", "Microsoft India", "Meta",
-    "Meta Platforms", "Apple", "Oracle", "SAP", "Salesforce", "Adobe",
-    "Cisco", "Intel", "Nvidia", "Qualcomm", "Samsung", "Samsung Electronics",
-    "Dell", "Dell Technologies", "HP", "Hewlett Packard", "Hewlett Packard Enterprise",
-    "HPE", "ServiceNow", "VMware", "Broadcom", "Siemens", "Bosch",
-    "Robert Bosch", "Robert Bosch Engineering and Business Solutions",
-    "Philips", "Roche", "Novartis", "Pfizer", "AstraZeneca",
-    "Barclays", "HSBC", "Standard Chartered", "JPMorgan Chase",
-    "JP Morgan", "J P Morgan", "J P Morgan Chase", "JPMorgan Chase & Co",
-    "Goldman Sachs", "Morgan Stanley", "Citi", "Citibank", "Deutsche Bank",
-    "UBS", "BNP Paribas", "Wells Fargo", "Bank of America",
-    "American Express", "Mastercard", "Visa", "PayPal", "Genpact",
-    "HTC Global Services", "UST", "UST Global", "Persistent Systems",
-    "Virtusa", "EPAM", "EPAM Systems", "Publicis Sapient",
-)
 _SUFFIX = re.compile(
     r"\s+(?:private limited|pvt ltd|pvt limited|private ltd|limited|ltd|incorporated|inc|"
     r"corporation|corp|llc|llp|plc|gmbh|india)$"
@@ -47,11 +21,9 @@ def normalize_employer(value):
             return value
         value = trimmed
 
-_EXCLUDED = {normalize_employer(name) for name in LARGE_MNC_ALIASES}
-
 def excluded_employer(company, company_exclusions=()):
     normalized = normalize_employer(company)
-    return normalized in _EXCLUDED or bool(normalized and normalized in {
+    return bool(normalized and normalized in {
         normalize_employer(name) for name in company_exclusions
     })
 
@@ -120,8 +92,6 @@ def experience_exclusion(description):
 
 def exclusion_reason(job, company_exclusions=()):
     if excluded_employer(job.get("company"), company_exclusions):
-        if normalize_employer(job.get("company")) in _EXCLUDED:
-            return "excluded large multinational employer"
         return "excluded by Settings company list"
     evidence = experience_exclusion(job.get("description"))
     if evidence:
