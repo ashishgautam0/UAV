@@ -353,15 +353,16 @@ def cmd_followups(args):
     The queued requests are then written by the normal `requests`/`fulfil`
     flow in the same routine run.
     """
-    from datetime import date, datetime
+    from datetime import datetime
 
     from tracker import (
         create_message_request,
         get_follow_up_history,
-        get_follow_ups_due,
+        get_post_connection_follow_ups_due,
+        _user_now,
     )
 
-    df = get_follow_ups_due()
+    df = get_post_connection_follow_ups_due()
     apps = [] if df is None or df.empty else df.to_dict("records")
 
     existing = get_message_requests(limit=200)
@@ -388,7 +389,7 @@ def cmd_followups(args):
             applied = datetime.strptime(
                 str(app.get("date_applied", ""))[:10], "%Y-%m-%d"
             ).date()
-            days = max((date.today() - applied).days, 1)
+            days = max((_user_now().date() - applied).days, 1)
         except (ValueError, TypeError):
             pass
 

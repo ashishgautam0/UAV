@@ -13,7 +13,7 @@ from supabase import create_client
 import json
 
 # --- Follow-up cadence (global defaults) ---
-APPLICATION_CADENCE = [7, 14, 21]   # days from date_applied
+APPLICATION_CADENCE = [7, 14, 21]   # first outreach on day 7; at most 3 rounds
 INTERVIEW_FOLLOW_UP_DAYS = 3
 TERMINAL_STATUSES = ["Offer", "Rejected", "Ghosted", "Not Interested"]
 USER_TIMEZONE = ZoneInfo("Asia/Kolkata")
@@ -81,15 +81,16 @@ def update_status(app_id, new_status):
         update_data["follow_up_date"] = None
     elif new_status == "Follow-up Sent":
         resp = (db.table("applications")
-                .select("follow_up_count, date_applied")
+                .select("follow_up_count")
                 .eq("id", app_id).single().execute())
         app = resp.data
         count = (app.get("follow_up_count") or 0) + 1
         update_data["follow_up_count"] = count
         if count < len(APPLICATION_CADENCE):
-            base = datetime.strptime(app["date_applied"], "%Y-%m-%d")
-            next_date = base + timedelta(days=APPLICATION_CADENCE[count])
-            update_data["follow_up_date"] = next_date.strftime("%Y-%m-%d")
+            # Start the next seven-day window when outreach is recorded, not
+            # from the original application date. Late sends must not make the
+            # next follow-up immediately overdue.
+            update_data["follow_up_date"] = (_user_now().date() + timedelta(days=7)).isoformat()
         else:
             # Cadence exhausted — auto-mark as Ghosted
             update_data["follow_up_date"] = None
@@ -188,6 +189,56 @@ def get_follow_ups_due():
     return df
 
 
+def _linkedin_connection_dates(application_ids):
+    """Latest recorded connection date per Tracker ID in the user's timezone.
+
+    Include IDs with malformed sent_at as None: a recorded connection still
+    prevents another invitation, but cannot authorize a timed follow-up.
+    """
+    ids = sorted({int(value) for value in application_ids if value is not None})
+    dates = {}
+    if not ids:
+        return dates
+    db = _get_client()
+    for offset in range(0, len(ids), 200):
+        chunk = ids[offset:offset + 200]
+        for start in range(0, 1000000, 1000):
+            rows = (db.table("follow_up_history")
+                    .select("id,entity_id,sent_at")
+                    .eq("entity_type", "application")
+                    .eq("channel", "LinkedIn connection")
+                    .in_("entity_id", chunk).order("id")
+                    .range(start, start + 999).execute()).data or []
+            for row in rows:
+                app_id = int(row["entity_id"])
+                dates.setdefault(app_id, None)
+                try:
+                    sent_at = datetime.fromisoformat(str(row["sent_at"]).replace("Z", "+00:00"))
+                    if sent_at.tzinfo is None:
+                        continue
+                    sent_day = sent_at.astimezone(USER_TIMEZONE).date()
+                except (TypeError, ValueError):
+                    continue
+                if dates[app_id] is None or dates[app_id] < sent_day:
+                    dates[app_id] = sent_day
+            if len(rows) < 1000:
+                break
+        else:
+            raise RuntimeError("LinkedIn connection history exceeds pagination limit")
+    return dates
+
+
+def get_post_connection_follow_ups_due():
+    """Only follow-ups due at least seven Kolkata calendar days after a sent connection."""
+    due = get_follow_ups_due()
+    if due.empty:
+        return due
+    dates = _linkedin_connection_dates(due["id"].tolist())
+    today = _user_now().date()
+    return due[due["id"].map(lambda app_id: dates.get(int(app_id)) is not None
+               and today >= dates[int(app_id)] + timedelta(days=7))]
+
+
 def get_cold_dm_todos(resume_version=None):
     """Use the same eligibility check for Dashboard badges and the copied batch."""
     rows = get_cold_dm_prompt_jobs(resume_version, limit=None)
@@ -208,6 +259,10 @@ def get_cold_dm_prompt_jobs(resume_version=None, limit=100):
     if due.empty:
         return []
     rows = due.astype(object).where(due.notna(), None).to_dict("records")
+    # Once a connection has been logged, this job moves to the later follow-up
+    # stage; never present it as a fresh invitation again.
+    connected = _linkedin_connection_dates(row["id"] for row in rows)
+    rows = [row for row in rows if int(row["id"]) not in connected]
     if limit is not None and len(rows) > limit:
         raise ValueError(f"{len(rows)} Cold DMs are due; the prompt limit is {limit}. Resolve due jobs before generating the batch.")
 

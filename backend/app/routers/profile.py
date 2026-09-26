@@ -506,6 +506,7 @@ def _render_outreach_prompt(template, resume, page_url, resume_url, kind="hr_ema
                             cold_dm_jobs=None, snapshot_at=None, excluded_count=0,
                             excluded_reasons=None):
     from outreach_prompts import (GMAIL_HR_DELIVERY_RULES, LINKEDIN_CONNECTION_RULES,
+                                  FOLLOW_UP_AFTER_CONNECTION_RULES,
                                   remove_legacy_cold_dm_navigation)
     from urllib.parse import quote, urlsplit
     values = {"page_url": page_url, "resume_filename": (resume or {}).get("filename") or "Resume.pdf",
@@ -540,7 +541,8 @@ def _render_outreach_prompt(template, resume, page_url, resume_url, kind="hr_ema
                       "review the active PDF and regenerate stale drafts as needed. "
                       "Do not send notes for omitted jobs.\n\n")
     delivery = GMAIL_HR_DELIVERY_RULES if kind in {"hr_email", "followup"} else LINKEDIN_CONNECTION_RULES
-    return rules + delivery + rendered, unresolved
+    timing = FOLLOW_UP_AFTER_CONNECTION_RULES if kind == "followup" else ""
+    return rules + delivery + timing + rendered, unresolved
 
 
 @router.get("/outreach-prompt", response_model=RenderedApplicationPrompt)

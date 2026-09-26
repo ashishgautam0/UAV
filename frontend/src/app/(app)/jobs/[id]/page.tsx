@@ -122,6 +122,14 @@ const STATUSES = [
   "Not Interested",
 ] as const;
 
+function kolkataDay(value: Date): string | null {
+  if (Number.isNaN(value.getTime())) return null;
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(value).map(({ type, value: text }) => [type, text]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 export default function JobDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -330,23 +338,36 @@ export default function JobDetailPage() {
     }
   }
 
-  const connectionDue = Boolean(application?.follow_up_date && application.follow_up_date <= new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) && !["Offer", "Rejected", "Ghosted", "Not Interested"].includes(application.status));
+  const todayInKolkata = kolkataDay(new Date()) || "";
+  const connectionHistory = history.filter((event) => event.channel === "LinkedIn connection");
+  const connectionDue = Boolean(application?.follow_up_date && application.follow_up_date <= todayInKolkata && !["Offer", "Rejected", "Ghosted", "Not Interested"].includes(application.status) && connectionHistory.length === 0);
+  const latestConnectionDay = connectionHistory.map((event) => kolkataDay(new Date(event.sent_at))).filter((day): day is string => Boolean(day)).sort().at(-1);
+  const followUpDue = Boolean(latestConnectionDay &&
+    Date.parse(todayInKolkata) - Date.parse(latestConnectionDay) >= 7 * 86400000 &&
+    application?.follow_up_date && application.follow_up_date <= todayInKolkata &&
+    !["Offer", "Rejected", "Ghosted", "Not Interested"].includes(application.status));
 
   async function recordSentFollowUp() {
     if (!application || !sentFollowUp.trim() || followUpSaving || followUpRecordLocked) return;
     const isConnection = sentChannel === "LinkedIn connection";
-    if (isConnection ? !connectionDue : !followUpDraft?.follow_up_number) return;
+    if (isConnection ? !connectionDue : !followUpDue || !followUpDraft?.follow_up_number) return;
     setFollowUpSaving(true);
     try {
       if (isConnection) {
         const latest = job ? await lookupApplication(job.url) : null;
-        const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+        const today = kolkataDay(new Date()) || "";
         if (!latest || latest.id !== application.id || !latest.follow_up_date || latest.follow_up_date > today || ["Offer", "Rejected", "Ghosted", "Not Interested"].includes(latest.status)) {
           toast.error("This Tracker record is no longer due. Review its schedule before recording.");
           return;
         }
       }
       const currentHistory = await getFollowUpHistory("application", application.id);
+      if (isConnection && currentHistory.some((event) => event.channel === "LinkedIn connection")) {
+        setHistory(currentHistory);
+        setFollowUpRecordLocked(true);
+        toast.error("A LinkedIn connection is already recorded for this job. Do not send or log another invitation.");
+        return;
+      }
       if (currentHistory.length !== history.length || (!isConnection && currentHistory.some((event) => event.follow_up_number >= followUpDraft!.follow_up_number!))) {
         setHistory(currentHistory);
         setFollowUpRecordLocked(true);
@@ -527,15 +548,16 @@ export default function JobDetailPage() {
 
                     <div className="space-y-2 border-t pt-3">
                       <p className="text-sm font-medium">Record completed outreach</p>
-                      {!connectionDue && <p className="text-xs text-muted-foreground">Connection-note recording becomes available when this active job’s follow-up date is due.</p>}
-                      <p className="text-xs text-muted-foreground">Only record confirmed sending. A cold connection note must be due and counts as this follow-up slot. Paste its exact note and recipient profile URL, choose LinkedIn connection, then record once. This saves history and advances the existing schedule; it does not send anything.</p>
+                      {!connectionDue && <p className="text-xs text-muted-foreground">Connection-note recording is available only once, when this active job’s initial date is due and no connection was recorded.</p>}
+                      {!followUpDue && <p className="text-xs text-muted-foreground">Later follow-up recording becomes available seven days after the recorded LinkedIn connection and when the saved date is due.</p>}
+                      <p className="text-xs text-muted-foreground">Only record confirmed sending. A cold connection note counts as the first outreach slot. Paste the exact sent text and recipient profile URL, choose LinkedIn connection, then record once. This saves history and schedules the next round; it does not send anything.</p>
                       <label htmlFor="sent-follow-up" className="text-sm font-medium">Sent follow-up message</label>
                       <Textarea id="sent-follow-up" value={sentFollowUp} onChange={(event) => setSentFollowUp(event.target.value)} disabled={followUpSaving || followUpRecordLocked} placeholder="Paste the exact message you sent" />
                       <label htmlFor="sent-follow-up-channel" className="block text-sm font-medium">Sent via</label>
                       <select id="sent-follow-up-channel" className="rounded border bg-background p-2 text-sm" value={sentChannel} onChange={(event) => setSentChannel(event.target.value)} disabled={followUpSaving || followUpRecordLocked}>
                         <option>Email</option><option>LinkedIn</option><option>LinkedIn connection</option><option>WhatsApp</option><option>Other</option>
                       </select>
-                      <Button className="ml-2" size="sm" disabled={!sentFollowUp.trim() || (sentChannel === "LinkedIn connection" ? !connectionDue : !followUpDraft?.follow_up_number) || followUpSaving || followUpRecordLocked} onClick={recordSentFollowUp}>
+                      <Button className="ml-2" size="sm" disabled={!sentFollowUp.trim() || (sentChannel === "LinkedIn connection" ? !connectionDue : !followUpDue || !followUpDraft?.follow_up_number) || followUpSaving || followUpRecordLocked} onClick={recordSentFollowUp}>
                         {followUpSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Record sent follow-up
                       </Button>
                     </div>
