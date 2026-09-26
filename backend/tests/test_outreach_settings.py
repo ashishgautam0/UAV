@@ -55,10 +55,18 @@ class OutreachSettingsTests(unittest.TestCase):
                 self.assertNotIn("{{", prompt)
         self.assertNotIn("HR EMAIL —", profile_data.OUTREACH_DEFAULTS["followup_template"])
         self.assertIn("channel LinkedIn connection", profile_data.OUTREACH_DEFAULTS["cold_dm_template"])
+        default_dm = profile_data.OUTREACH_DEFAULTS["cold_dm_template"]
+        for required in ("Dashboard → Follow-ups Due", "Click each individual card",
+                         "job's 'Cold DM' section", "use its stored message",
+                         "Dashboard View Draft is the follow-up draft"):
+            self.assertIn(required, default_dm)
 
     def test_connection_notes_use_due_queue_and_record_one_slot(self):
         prompt, _ = self.renderer()("Legacy scan all Tracker jobs", {}, "https://app", "https://pdf", "cold_dm")
         for required in ("START ONLY FROM Dashboard's 'Follow-ups Due'", "Asia/Kolkata", "Missing/future dates",
+                         "click each individual card", "job's 'Cold DM' section",
+                         "Use THAT Cold DM as the LinkedIn connection note",
+                         "Dashboard's 'View Draft' is a follow-up draft",
                          "Record completed outreach", "select 'LinkedIn connection'", "advance the schedule",
                          "retry only missing logging", "day 7, 14 and 21", "at most one outreach action"):
             self.assertIn(required, prompt)
@@ -116,6 +124,9 @@ class OutreachSettingsTests(unittest.TestCase):
         prompt, unresolved = self.renderer()("My saved generic DM prompt", {}, "https://app", "https://pdf", "cold_dm")
         self.assertFalse(unresolved)
         for required in ("'Send it to'", "'Recruiters at [company]'", "'Hiring managers at [company]'",
+                         "click each individual card", "job's 'Cold DM' section",
+                         "Dashboard's 'View Draft' is a follow-up draft",
+                         "Use the text stored in that exact job's 'Cold DM' section",
                          "search links, not verified people", "current employment", "Connect → Add a note",
                          "not Gmail, InMail", "one-click Connect", "300 characters", "live composer limit",
                          "cannot attach a resume", "already connected", "If Pending", "canonical recipient",
