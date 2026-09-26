@@ -15,8 +15,12 @@ to connect. No call/referral/interview request, generic praise, skill lists,
 variants, subject, sign-off or explanation. Never invent prior acquaintance,
 application status, experience or metrics.
 
-Do not wait for a mini demo. Omit links by default. Connection invitations
-cannot attach a resume. Do not invent a recipient name: the sending workflow
+If a mini demo exists for this job (check `demo_url` in the draft spec or
+`https://uav-6qe7.vercel.app/api/demo/<job_id>`), include the link in the
+note — e.g. "I built a quick demo for the role: <url>". The link counts
+toward the 300-character limit; shorten surrounding text to fit. If no demo
+exists, omit links. Connection invitations cannot attach a resume. Do not
+invent a recipient name: the sending workflow
 uses this Tracker job's Send it to recruiter/hiring-manager LinkedIn searches
 and verifies current employment before personalizing and sending.
 
