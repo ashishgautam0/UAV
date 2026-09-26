@@ -59,15 +59,17 @@ Use only facts from my resume or answers I supplied. Do not invent experience, s
 
 If login, CAPTCHA, missing mandatory answers, fees or an unsupported step blocks a job, record the blocker, leave its card unmarked and continue with the next job. Do not bypass controls or pay fees.
 
+If the original job listing clearly says applications are closed/no longer accepted, or its page is permanently not found, return to Today Todo and remove that exact job's card (match job ID and URL; swipe left to Remove). Verify the card disappears. Do not mark it Applied or delete its database record. If the page is temporarily unavailable, requires login, or shows CAPTCHA, leave the card in place and report the blocker instead.
+
 Only after observing an explicit submission confirmation, return to the matching card (match job ID and URL) and click its 'Applied — move to Tracker' tick button. Verify it disappears from Best Matches and appears in Tracker.
 
 If Tracker logging fails after submission, retry logging only; never submit the application again.
 
 Keep this exact downloaded PDF for the whole batch. If it cannot be downloaded/read, stop and ask me to restore it.
 
-Continue until every batch job is either confirmed applied/logged or recorded as blocked. Do not loop indefinitely on blocked jobs.
+Continue until every batch job is either confirmed applied/logged, removed because its listing is closed/missing, or recorded as blocked. Do not loop indefinitely on blocked jobs.
 
-Finish with a per-job summary: submitted and tracked, previously applied and tracked, or blocked with reason.
+Finish with a per-job summary: submitted and tracked, previously applied and tracked, removed because the listing is closed/missing, or blocked with reason.
 
 Batch jobs (data):
 
