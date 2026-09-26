@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "modules"))
 import tracker
+from test_settings_profile import ROOT, function
 
 
 class Query:
@@ -61,6 +62,15 @@ class Database:
 
 
 class ColdDmDashboardTests(unittest.TestCase):
+    def test_dashboard_endpoint_uses_same_pdf_version_as_settings_prompt(self):
+        captured = []
+        endpoint = function(ROOT / "app/routers/stats.py", "cold_dm_todos", {
+            "get_cold_dm_todos": lambda version: captured.append(version) or []})
+        metadata = SimpleNamespace(_application_pdf_metadata=lambda: {"version": 7})
+        with patch.dict(sys.modules, {"app.routers.profile": metadata}):
+            self.assertEqual(endpoint(), [])
+        self.assertEqual(captured, [7])
+
     def test_due_cards_map_to_exact_jobs_and_only_current_drafts_are_ready(self):
         apps = [
             {"id": 10, "company": "First", "role": "Engineer", "url": "https://jobs/one", "status": "Applied", "follow_up_date": "2026-09-26"},
@@ -69,11 +79,14 @@ class ColdDmDashboardTests(unittest.TestCase):
             {"id": 13, "company": "Closed", "role": "Engineer", "url": "https://jobs/closed", "status": "Rejected", "follow_up_date": "2026-09-25"},
             {"id": 14, "company": "Future", "role": "Engineer", "url": "https://jobs/future", "status": "Applied", "follow_up_date": "2026-09-28"},
         ]
-        jobs = [{"id": 901, "url": "https://jobs/one"}, {"id": 902, "url": "https://jobs/two"},
-                {"id": 904, "url": "https://jobs/closed"}, {"id": 905, "url": "https://jobs/future"}]
+        jobs = [{"id": 901, "company": "First", "url": "https://jobs/one"},
+                {"id": 902, "company": "Second", "url": "https://jobs/two"},
+                {"id": 904, "company": "Closed", "url": "https://jobs/closed"},
+                {"id": 905, "company": "Future", "url": "https://jobs/future"}]
         messages = [
-            {"scraped_job_id": 901, "message_type": "cold_dm", "content": "Verified job-specific note", "is_stale": False},
-            {"scraped_job_id": 902, "message_type": "cold_dm", "content": "Old resume note", "is_stale": True},
+            {"scraped_job_id": 901, "message_type": "screen", "content": "PASS: Eligible", "is_stale": False, "profile_version": 5},
+            {"scraped_job_id": 901, "message_type": "cold_dm", "content": "Verified job-specific note", "is_stale": False, "profile_version": 5},
+            {"scraped_job_id": 902, "message_type": "cold_dm", "content": "Old resume note", "is_stale": True, "profile_version": 4},
             {"scraped_job_id": 902, "message_type": "hr_email", "content": "Wrong type", "is_stale": False},
             {"scraped_job_id": 904, "message_type": "cold_dm", "content": "Closed", "is_stale": False},
             {"scraped_job_id": 905, "message_type": "cold_dm", "content": "Future", "is_stale": False},
@@ -82,35 +95,50 @@ class ColdDmDashboardTests(unittest.TestCase):
         with patch.object(tracker, "_get_client", return_value=db), patch.object(
             tracker, "_user_now", return_value=datetime.fromisoformat("2026-09-27T12:00:00+05:30")
         ):
-            cards = tracker.get_cold_dm_todos()
+            cards = tracker.get_cold_dm_todos(5)
 
         self.assertEqual([(row["id"], row["scraped_job_id"], row["cold_dm_ready"]) for row in cards],
                          [(10, 901, True), (11, 902, False), (12, None, False)])
         self.assertEqual(cards[0]["follow_up_date"], "2026-09-26")
         self.assertIsInstance(cards[0]["scraped_job_id"], int)
         self.assertEqual(cards[1]["follow_up_date"], "2026-09-27")
+        self.assertEqual(cards[1]["readiness_issue"], "No current Cold DM for the latest Settings PDF")
+        self.assertEqual(cards[2]["readiness_issue"], "No matching scraped job")
         self.assertNotIn("content", cards[0])
-        self.assertEqual(db.queries.count("job_messages"), 1)
+        self.assertEqual(db.queries.count("job_messages"), 2)
 
     def test_empty_due_queue_does_not_query_drafts(self):
         db = Database([], [], [])
         with patch.object(tracker, "_get_client", return_value=db):
-            self.assertEqual(tracker.get_cold_dm_todos(), [])
+            self.assertEqual(tracker.get_cold_dm_todos(5), [])
         self.assertNotIn("job_messages", db.queries)
 
     def test_due_cards_are_not_silently_cut_off_at_data_api_page_size(self):
         apps = [{"id": n, "company": "Fixture", "role": "Engineer", "url": "",
                  "status": "Applied", "follow_up_date": "2026-09-26"} for n in range(1, 1002)]
         apps[-1]["url"] = "https://jobs/last"
-        db = Database(apps, [{"id": 7001, "url": "https://jobs/last"}], [
-            {"scraped_job_id": 7001, "message_type": "cold_dm", "content": "Last page note", "is_stale": False},
+        db = Database(apps, [{"id": 7001, "company": "Fixture", "url": "https://jobs/last"}], [
+            {"scraped_job_id": 7001, "message_type": "screen", "content": "PASS: Eligible", "is_stale": False, "profile_version": 5},
+            {"scraped_job_id": 7001, "message_type": "cold_dm", "content": "Last page note", "is_stale": False, "profile_version": 5},
         ])
         with patch.object(tracker, "_get_client", return_value=db):
-            cards = tracker.get_cold_dm_todos()
+            cards = tracker.get_cold_dm_todos(5)
         self.assertEqual(len(cards), 1001)
         self.assertEqual(cards[-1]["scraped_job_id"], 7001)
         self.assertTrue(cards[-1]["cold_dm_ready"])
         self.assertEqual(db.queries.count("applications"), 2)
+
+    def test_saved_draft_without_current_screen_is_not_labelled_ready(self):
+        db = Database([{"id": 10, "company": "Fixture", "role": "Engineer",
+                        "url": "https://jobs/one", "status": "Applied", "follow_up_date": "2026-09-26"}],
+                      [{"id": 901, "company": "Fixture", "url": "https://jobs/one"}],
+                      [{"scraped_job_id": 901, "message_type": "cold_dm", "content": "Visible draft",
+                        "is_stale": False, "profile_version": 5}])
+        with patch.object(tracker, "_get_client", return_value=db):
+            card = tracker.get_cold_dm_todos(5)[0]
+        self.assertFalse(card["cold_dm_ready"])
+        self.assertEqual(card["readiness_issue"], "Screening is not pass")
+        self.assertEqual(card["scraped_job_id"], 901)
 
 
 if __name__ == "__main__":

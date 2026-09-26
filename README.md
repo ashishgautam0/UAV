@@ -271,6 +271,12 @@ from due Tracker follow-ups. Each entry carries the matched scraped job ID,
 Tracker ID, job details, due date and stored Cold DM text. Screening results
 are used by the backend but omitted from the job JSON. Missing or stale notes
 and jobs without a current passing screen are excluded and counted separately.
+The Dashboard Cold DMs Due card uses the same PDF version, job mapping, draft
+and screening checks as the generated batch. An older draft may remain visible
+inside a Tracker job while its card shows **Not ready**; the card and Settings
+prompt show the blocking reason. A new PDF may require activation, rescreening
+and regeneration before that saved note can enter a new batch. Do not send an
+omitted note merely because its text is visible in Tracker.
 The Today Todo application prompt also includes only backend-confirmed passing
 jobs and omits screening results from its JSON batch. The generated Cold DM
 prompt does not require browsing Dashboard cards to

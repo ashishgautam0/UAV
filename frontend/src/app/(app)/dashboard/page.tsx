@@ -518,10 +518,11 @@ export default function DashboardPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div><p className="font-semibold">{todo.company}</p><p className="text-sm text-muted-foreground">{todo.role}</p></div>
                       <Badge variant="outline" className="shrink-0 border-violet-500/30 bg-violet-500/10 text-violet-400">
-                        {todo.cold_dm_ready ? "Draft ready" : "No current draft"}
+                        {todo.cold_dm_ready ? "Ready to review" : "Not ready"}
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">Due {todo.follow_up_date}</p>
+                    {todo.readiness_issue && <p className="text-xs text-amber-400">{todo.readiness_issue}</p>}
                     <span className="inline-flex items-center text-sm font-medium text-violet-400">Open Cold DM</span>
                   </Link>
                 ) : (

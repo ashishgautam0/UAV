@@ -188,31 +188,13 @@ def get_follow_ups_due():
     return df
 
 
-def get_cold_dm_todos():
-    """Due tracker follow-ups with availability of a current, stored Cold DM.
-
-    This is a view of the existing follow-up schedule, not a second send queue.
-    A missing or stale draft stays visible as unavailable so it cannot be mistaken
-    for permission to invent a message or send ahead of the scheduled date.
-    """
-    due = get_follow_ups_due()
-    if due.empty:
-        return []
-    rows = due.astype(object).where(due.notna(), None).to_dict("records")
-    job_ids = sorted({int(row["scraped_job_id"]) for row in rows if row.get("scraped_job_id")})
-    ready = set()
-    db = _get_client()
-    for start in range(0, len(job_ids), 200):
-        messages = (db.table("job_messages").select("scraped_job_id,content")
-                    .eq("message_type", "cold_dm").eq("is_stale", False)
-                    .in_("scraped_job_id", job_ids[start:start + 200]).execute()).data or []
-        ready.update(int(message["scraped_job_id"]) for message in messages
-                     if isinstance(message.get("content"), str) and message["content"].strip())
-    return [{"id": row["id"], "company": row["company"], "role": row["role"],
-             "follow_up_date": row["follow_up_date"],
-             "scraped_job_id": int(row["scraped_job_id"]) if row.get("scraped_job_id") is not None else None,
-             "cold_dm_ready": (row.get("scraped_job_id") is not None and
-                               int(row["scraped_job_id"]) in ready)}
+def get_cold_dm_todos(resume_version=None):
+    """Use the same eligibility check for Dashboard badges and the copied batch."""
+    rows = get_cold_dm_prompt_jobs(resume_version, limit=None)
+    return [{"id": row["tracker_id"], "company": row["company"], "role": row["title"],
+             "follow_up_date": row["follow_up_date"], "scraped_job_id": row["job_id"],
+             "cold_dm_ready": not bool(row["blocked_reason"]),
+             "readiness_issue": row["blocked_reason"] or None}
             for row in rows]
 
 
@@ -226,7 +208,7 @@ def get_cold_dm_prompt_jobs(resume_version=None, limit=100):
     if due.empty:
         return []
     rows = due.astype(object).where(due.notna(), None).to_dict("records")
-    if len(rows) > limit:
+    if limit is not None and len(rows) > limit:
         raise ValueError(f"{len(rows)} Cold DMs are due; the prompt limit is {limit}. Resolve due jobs before generating the batch.")
 
     job_ids = sorted({int(row["scraped_job_id"]) for row in rows if row.get("scraped_job_id")})

@@ -109,7 +109,7 @@ class OutreachSettingsTests(unittest.TestCase):
 
     def test_endpoint_passes_selected_workflow_to_renderer(self):
         seen = []
-        def render(template, resume, page_url, resume_url, kind, jobs, snapshot_at, excluded_count):
+        def render(template, resume, page_url, resume_url, kind, jobs, snapshot_at, excluded_count, excluded_reasons):
             seen.append(kind)
             return "prompt", []
         endpoint = function(ROOT / "app/routers/profile.py", "read_outreach_prompt", {
@@ -196,7 +196,7 @@ class OutreachSettingsTests(unittest.TestCase):
         self.assertNotIn("Open Dashboard → Cold DMs Due", prompt)
 
     def test_no_eligible_due_job_is_not_a_ready_to_copy_prompt(self):
-        blocked = [{"blocked_reason": "No current Cold DM", "job_id": 8, "tracker_id": 4,
+        blocked = [{"blocked_reason": "No current Cold DM for the latest Settings PDF", "job_id": 8, "tracker_id": 4,
                     "company": "Fixture", "cold_dm": None}]
         fake_tracker = SimpleNamespace(get_cold_dm_prompt_jobs=lambda _: blocked,
                                        _user_now=lambda: SimpleNamespace(isoformat=lambda: "2026-09-27T12:00:00+05:30"))
@@ -212,7 +212,31 @@ class OutreachSettingsTests(unittest.TestCase):
         self.assertFalse(result.ready)
         self.assertEqual(result.job_count, 0)
         self.assertIn("1 due jobs omitted", result.prompt)
+        self.assertIn("1 No current Cold DM for the latest Settings PDF", result.prompt)
+        self.assertIn("1 due jobs omitted: 1 No current Cold DM", result.issues[-1])
         self.assertIn("No due Tracker jobs have a current Cold DM", result.issues[0])
+
+    def test_omitted_due_jobs_report_reasons_without_blocking_eligible_jobs(self):
+        due = [{"blocked_reason": "Screening is not pass", "job_id": 1, "tracker_id": 11,
+                "company": "Needs review", "cold_dm": "Visible old note"},
+               {"blocked_reason": "", "job_id": 2, "tracker_id": 12,
+                "company": "Eligible", "cold_dm": "Current grounded note"}]
+        fake_tracker = SimpleNamespace(get_cold_dm_prompt_jobs=lambda _: due,
+                                       _user_now=lambda: SimpleNamespace(isoformat=lambda: "2026-09-27T12:00:00+05:30"))
+        endpoint = function(ROOT / "app/routers/profile.py", "read_outreach_prompt", {
+            "Request": object, "Literal": Literal, "RenderedApplicationPrompt": RenderedApplicationPrompt,
+            "_clean_text": lambda value, maximum: value, "_DEFAULT_USERNAME": "fixture",
+            "get_application_prompt_settings": lambda _: profile_data.OUTREACH_DEFAULTS,
+            "_application_pdf_metadata": lambda: {"filename": "active.pdf", "version": 5},
+            "_render_outreach_prompt": self.renderer(),
+        })
+        with patch.dict(sys.modules, {"tracker": fake_tracker}):
+            result = endpoint(SimpleNamespace(url_for=lambda _: "https://api/pdf"), "https://app/dashboard", "cold_dm")
+        self.assertTrue(result.ready)
+        self.assertEqual(result.job_count, 1)
+        self.assertIn("1 due jobs omitted: 1 Screening is not pass", result.issues[-1])
+        batch = json.loads(result.prompt[result.prompt.index("[\n  {"):])
+        self.assertEqual([job["job_id"] for job in batch], [2])
 
 
 if __name__ == "__main__":
