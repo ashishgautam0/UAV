@@ -35,11 +35,18 @@ Show the recipient name/profile URL, current company/role evidence, exact note a
 
 LinkedIn Premium removes the separate personalized-note allowance, not the overall connection-invitation limits. Do not assume an unlimited invitation budget or a fixed weekly quota. If LinkedIn shows an invitation limit, restriction, CAPTCHA or unavailable access, stop invitation sending and report remaining jobs as deferred/blocked. Do not evade limits using different accounts, InMail, email or repeated attempts.
 
-After a confirmed new invitation with its note, open that exact job's tracker_url. In its 'Record completed outreach' section, enter the exact sent note and recipient profile URL in 'Sent follow-up message', choose 'LinkedIn connection' in 'Sent via' (not the generic 'LinkedIn' option), and click 'Record sent follow-up'. Do this separately for each job with a confirmed send. This invitation is the completed action for the current follow-up slot. Verify the saved history entry contains the message, recipient, channel and timestamp, and verify the updated follow-up count and date on that job and Dashboard. Do not record anything for an unconfirmed send. Do not also mark HR emailed or manually change status/date. The existing cadence is day 7, 14 and 21 from application date; recording advances one slot and the last slot ends that cadence. An overdue next date never permits another send in this run.
+MY DAILY CAP: Send at most 10 LinkedIn connection invitations total per Asia/Kolkata calendar day (00:00–23:59), across this run, other runs and any invitations I sent manually. Count invitations with or without notes to any recipient, not just jobs in this batch. Before the first invitation, inspect LinkedIn sent invitations and the Tracker's recorded LinkedIn connection history for today; reconcile them so a missing Tracker entry does not hide a send. If the total already sent today cannot be verified, stop and report the count as unknown; do not assume zero or use only this run's count. Remaining allowance is max(0, 10 minus invitations already sent today). Check it again before each Send invitation; count a confirmed send immediately, even if recording it in Tracker fails. Treat an uncertain send as consuming one slot until LinkedIn confirms it was not sent. At 10, defer every remaining job until a later day; after midnight in Asia/Kolkata, verify the new date and recount before sending. If LinkedIn shows any tighter limit or restriction, stop earlier. This is my personal cap, not a guarantee against platform limits. Never split the batch into runs or use another account to exceed it.
+
+After a confirmed new invitation with its note, open that exact job's tracker_url. In its 'Record completed outreach' section, enter the exact sent note and recipient profile URL in 'Sent follow-up message', choose 'LinkedIn connection' in 'Sent via' (not the generic 'LinkedIn' option), and click 'Record sent follow-up'. Do this separately for each job with a confirmed send. This invitation is the completed action for the current follow-up slot. Verify the saved history entry contains the message, recipient, channel and timestamp. The Cold DM card for this job then leaves the due queue; the separate Follow-ups Due card must appear only after seven Asia/Kolkata calendar days from the recorded LinkedIn send, when the new saved follow-up date arrives. Verify the updated follow-up count and date on that job and Dashboard. Do not record anything for an unconfirmed send. Do not also mark HR emailed or manually change status/date. Subsequent confirmed follow-ups schedule the next round seven days after each recorded send, up to three rounds total. An overdue next date never permits another send in this run.
 
 If sending failed, is blocked, uncertain, or the invitation was already pending/connected, do not record a new follow-up or advance the schedule. For a just-confirmed send whose logging failed, inspect history and retry only missing logging; never resend. Stop and report if history was saved but the schedule did not update rather than logging twice. There is no separate invitation-state table; use LinkedIn state and the recorded 'LinkedIn connection' history together for duplicate prevention. Process at most one outreach action per Tracker record per run; after recording the connection note, do not also send an email follow-up for that slot. Include Tracker ID, company/job, recipient profile, exact note, observed result, timestamp and next date in the report.
 
-These connection-note, fixed-batch and due-date rules override older navigate-the-Dashboard or scan-all-Tracker wording below.
+These connection-note, daily-cap, fixed-batch and due-date rules override older navigate-the-Dashboard or scan-all-Tracker wording below.
+
+"""
+
+FOLLOW_UP_AFTER_CONNECTION_RULES = """FOLLOW-UP CARD TIMING (authoritative):
+Only use the Dashboard's Follow-ups Due cards after a confirmed LinkedIn connection invitation was recorded on that exact Tracker job. Verify the 'LinkedIn connection' history entry, its sent_at date in Asia/Kolkata, and that at least seven calendar days have passed since that send. The saved follow_up_date must also be due. If the connection is unrecorded, the seven days have not passed, or the saved date is future/missing, do not send an email follow-up; leave it pending. Never change the date to make a card due. A separate Company HR email todo is unaffected. After a confirmed follow-up, record it on that Tracker job; the next round is scheduled seven days after the recorded send, up to the existing three-round cap. Older wording based only on days since application does not override this timing.
 
 """
 
@@ -120,7 +127,9 @@ OUTREACH_DEFAULTS = {'hr_email_template': 'Open the app: {{page_url}}\n'
                       'dashboard follow-up card to open its linked Tracker detail; do not scan all '
                       'companies or guess IDs. Verify the company, role and posting URL. Report '
                       'broken links or load errors as blocked, not as an empty queue.\n'
-                      '2. Recheck the saved follow-up date in Asia/Kolkata and recorded history. '
+                      '2. Recheck the saved follow-up date in Asia/Kolkata and the recorded LinkedIn '
+                      'connection history. At least seven calendar days must have passed since '
+                      'that connection was sent. '
                       'Process only due or overdue follow-ups; skip future dates, terminal '
                       'records, or already-recorded follow-up numbers. Never change a date to make '
                       'a job due. If an initial HR email was just sent for this job during this '
@@ -147,8 +156,8 @@ OUTREACH_DEFAULTS = {'hr_email_template': 'Open the app: {{page_url}}\n'
                       'never blindly resend.\n'
                       "6. Only after verified sending, fill 'Sent follow-up message' with the "
                       "exact sent text, select 'Sent via', and click 'Record sent follow-up' on "
-                      'the same Tracker detail. This records history and advances the existing '
-                      "cadence; do not also change status to 'Follow-up Sent' or click 'Mark "
+                      'the same Tracker detail. This records history and schedules the next round '
+                      "seven days from this recorded send; do not also change status to 'Follow-up Sent' or click 'Mark "
                       "emailed', which belongs to the separate initial HR todo. Verify the new "
                       'history row, number, channel, message and timestamp, then return to '
                       'Dashboard and check the updated date/queue. If logging is uncertain, '

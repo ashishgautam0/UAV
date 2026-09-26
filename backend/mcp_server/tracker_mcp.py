@@ -93,7 +93,7 @@ def _t_snooze_follow_up(args):
 
 def _t_get_follow_ups_due(args):
     import tracker
-    return _df_records(tracker.get_follow_ups_due())
+    return _df_records(tracker.get_post_connection_follow_ups_due())
 
 
 def _t_get_stats(args):
@@ -226,7 +226,7 @@ TOOLS = [
     },
     {
         "name": "get_follow_ups_due",
-        "description": "Applications whose follow-up date has arrived (non-terminal), most overdue first.",
+        "description": "Applications whose follow-up date has arrived at least seven Asia/Kolkata calendar days after a recorded LinkedIn connection invitation (non-terminal), most overdue first.",
         "handler": _t_get_follow_ups_due,
         "inputSchema": {"type": "object", "properties": {}},
     },

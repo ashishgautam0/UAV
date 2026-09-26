@@ -546,7 +546,7 @@ export default function DashboardPage() {
             Follow-ups Due
           </CardTitle>
           <CardDescription>
-            Applications that need a follow-up soon.
+            Due seven days after a recorded LinkedIn connection note; opens the same Tracker job.
           </CardDescription>
         </CardHeader>
         <CardContent>

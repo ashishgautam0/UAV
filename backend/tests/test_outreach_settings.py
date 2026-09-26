@@ -70,7 +70,17 @@ class OutreachSettingsTests(unittest.TestCase):
                          "Record completed outreach", "choose 'LinkedIn connection' in 'Sent via'",
                          "exact sent note and recipient profile URL", "Do this separately for each job",
                          "Do not record anything for an unconfirmed send", "advance the schedule",
-                         "retry only missing logging", "day 7, 14 and 21", "at most one outreach action"):
+                         "retry only missing logging", "seven Asia/Kolkata calendar days",
+                         "Follow-ups Due card must appear only after", "at most one outreach action"):
+            self.assertIn(required, prompt)
+
+    def test_saved_followup_templates_also_require_a_recorded_connection_and_a_week(self):
+        prompt, unknown = self.renderer()("My old saved follow-up instructions", {},
+                                          "https://app", "https://pdf", "followup")
+        self.assertFalse(unknown)
+        for required in ("My old saved follow-up instructions", "FOLLOW-UP CARD TIMING (authoritative)",
+                         "recorded on that exact Tracker job", "at least seven calendar days",
+                         "saved follow_up_date must also be due", "do not send an email follow-up"):
             self.assertIn(required, prompt)
 
     def test_connection_recording_uses_existing_history_and_cadence(self):
@@ -135,7 +145,11 @@ class OutreachSettingsTests(unittest.TestCase):
                          "not Gmail, InMail", "one-click Connect", "300 characters", "live composer limit",
                          "cannot attach a resume", "already connected", "If Pending", "canonical recipient",
                          "at most once", "acceptance pending", "not the overall", "stop invitation sending",
-                         "Record completed outreach", "My saved generic DM prompt"):
+                         "Record completed outreach", "My saved generic DM prompt",
+                         "at most 10 LinkedIn connection invitations total per Asia/Kolkata calendar day",
+                         "other runs and any invitations I sent manually", "If the total already sent today cannot be verified",
+                         "count a confirmed send immediately", "Treat an uncertain send as consuming one slot",
+                         "defer every remaining job", "not a guarantee against platform limits"):
             self.assertIn(required, prompt)
         for kind in ("hr_email", "followup"):
             other, _ = self.renderer()("Email template", {}, "https://app", "https://pdf", kind)

@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from tracker import (
     get_cold_dm_todos,
-    get_follow_ups_due,
+    get_post_connection_follow_ups_due,
     get_hr_email_todos,
     get_platform_effectiveness,
     get_role_analysis,
@@ -21,7 +21,7 @@ def dashboard_stats():
 
 @router.get("/follow-ups")
 def follow_ups():
-    df = get_follow_ups_due()
+    df = get_post_connection_follow_ups_due()
     return df.astype(object).where(df.notna(), None).to_dict("records") if not df.empty else []
 
 

@@ -285,10 +285,19 @@ retrieve drafts, and generating it does not send invitations or alter the
 Claude schedule. Recheck the live Tracker follow-up date and history before
 sending. A confirmed LinkedIn invitation with its note is recorded
 in Tracker as **LinkedIn connection** using **Record sent follow-up**, advancing
-one existing cadence slot (days 7/14/21 from application). Blocked, future,
-already-pending or uncertain sends do not advance it. Recording is available
+one outreach slot. This removes the job from the Cold DMs Due card. Its separate
+Follow-ups Due card appears only when the new saved date is due and at least seven
+Asia/Kolkata calendar days have passed since the recorded LinkedIn send. Each
+later confirmed follow-up schedules the next round seven days from that send,
+up to three recorded rounds total. Blocked, future, already-pending or uncertain
+sends do not advance the schedule. Recording is available
 without an email follow-up draft. Existing history/status writes are separate;
 after uncertain logging, inspect both and do not blindly record twice.
+The authoritative Cold DM prompt limits LinkedIn connection invitations to 10
+per Asia/Kolkata calendar day across runs and manual sends. It checks sent
+invitations before sending, stops if today's count cannot be verified, and
+defers the rest at the cap. This personal cap cannot guarantee LinkedIn will
+allow 10 invitations on a given day.
 
 HR email candidates are emitted only after the job is in Tracker and its mini
 demo is live. Each brief stored draft must include that demo URL and say that
