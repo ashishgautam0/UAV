@@ -9,12 +9,10 @@ sys.path.insert(0, str(ROOT / "modules"))
 from intake_policy import excluded_employer, experience_exclusion, filter_jobs
 
 class IntakePolicyTests(unittest.TestCase):
-    def test_large_employer_aliases(self):
-        for company in ["TCS", "Tata Consultancy Services Ltd.", "Infosys Limited",
-                        "Amazon Development Centre (India) Pvt. Ltd.", "HCLTech",
-                        "Microsoft India Private Limited", "HTC Global Services"]:
+    def test_no_hardcoded_exclusions(self):
+        for company in ["TCS", "Infosys", "Amazon", "Google", "Microsoft", "HCLTech"]:
             with self.subTest(company=company):
-                self.assertTrue(excluded_employer(company))
+                self.assertFalse(excluded_employer(company))
 
     def test_unknown_and_similar_companies_are_kept(self):
         for company in ["Global AI Startup", "VisaBuddy", "Amazonia AI", "TCS Labs Startup", "", None]:
@@ -65,8 +63,8 @@ class IntakePolicyTests(unittest.TestCase):
                 {"company": "TCS", "description": ""},
                 {"company": "Small Startup", "description": "3 years experience"}]
         kept, removed = filter_jobs(jobs)
-        self.assertEqual(kept, jobs[:1])
-        self.assertEqual(len(removed), 2)
+        self.assertEqual(kept, jobs[:2])
+        self.assertEqual(len(removed), 1)
 
     def test_active_scraper_aggregator_excludes_gulf_and_partner_ats(self):
         # Execute the real aggregator with offline source fixtures; no third-party
@@ -84,17 +82,18 @@ class IntakePolicyTests(unittest.TestCase):
         exec(compile(ast.Module(body=[node], type_ignores=[]), "<aggregator>", "exec"), env)
         with patch.dict(os.environ, {}, clear=True):
             jobs, counts, errors = env["run_all_scrapers"](company_exclusions=[])
-        self.assertEqual(len(jobs), 2)
+        self.assertEqual(len(jobs), 4)
         self.assertEqual(counts, {"Indeed India": 3, "LinkedIn AI/ML": 3})
         self.assertFalse(errors)
-        self.assertTrue(all(j["description"] == "1 year experience" for j in jobs))
+        self.assertTrue(all(j["description"] in ("1 year experience", "") for j in jobs))
         with patch.dict(os.environ, {}, clear=True):
             excluded_jobs, _, _ = env["run_all_scrapers"](company_exclusions=["Small Startup"])
-        self.assertEqual(excluded_jobs, [])
+        self.assertEqual(len(excluded_jobs), 2)
+        self.assertTrue(all(j["company"] == "Infosys" for j in excluded_jobs))
         with patch("profile.get_company_exclusions", return_value=["Small Startup"]) as load, \
              patch.dict(os.environ, {}, clear=True):
             loaded_jobs, _, _ = env["run_all_scrapers"]()
-        self.assertEqual(loaded_jobs, [])
+        self.assertEqual(len(loaded_jobs), 2)
         load.assert_called_once_with()
 
     def test_persistence_guard_before_database_access(self):
@@ -105,7 +104,6 @@ class IntakePolicyTests(unittest.TestCase):
             raise AssertionError("Excluded job reached database")
         env = {"_get_client": fail}
         exec(compile(ast.Module(body=[node], type_ignores=[]), "<persistence>", "exec"), env)
-        env["save_scraped_job"]("AI Engineer", "TCS", "", "", "https://example.test")
         env["save_scraped_job"]("AI Engineer", "Startup", "", "", "https://example.test",
                                 description="3 years experience")
         env["save_scraped_job"]("AI Engineer", "Blue Harbor AI Ltd", "", "", "https://example.test",
