@@ -234,6 +234,17 @@ which checks out this repository, installs `backend/requirements.txt`, and runs:
 cd backend/modules && python hourly.py
 ```
 
+Settings → **Exclude companies from scraped jobs** saves employer names in the
+existing Supabase `user_profile.scoring_weights.company_exclusions` setting.
+Enter one employer per line. Each hourly run loads the list before scraping;
+the shared intake filter and final save guard skip those employers before
+persistence or digests. Matches use exact normalized employer names (case,
+punctuation and common legal suffixes are ignored), not substring matches in
+job descriptions. The existing large-MNC and experience filters remain active.
+Changing the list affects future runs and does not remove existing Tracker rows
+or application history. The routine must have its existing Supabase credentials
+to load this setting; a failed read stops intake rather than ignoring exclusions.
+
 It then writes the outreach messages itself — there is no hosted LLM call in
 this path. The routine lists jobs with no message yet, composes one per job, and
 saves it:

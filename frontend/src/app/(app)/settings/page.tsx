@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   activateResumeProfile,
   getApplicationPromptSettings,
+  getCompanyExclusions,
   getRenderedApplicationPrompt,
   getResumeProfileStatus,
   updateApplicationPromptSettings,
+  updateCompanyExclusions,
   uploadResumePdf,
 } from "@/lib/api";
 import type { ApplicationPromptSettings, RenderedApplicationPrompt, ResumeFact, ResumeProfile, ResumeProfileReview } from "@/lib/types";
@@ -15,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { CheckCircle2, Copy, FileText, Loader2, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
+import { CheckCircle2, Copy, Loader2, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 import styles from "./settings.module.css";
 import { toPromptEditor, fromPromptEditor } from "@/lib/application-prompt-editor";
 import { OutreachPrompt } from "./outreach-prompt";
@@ -28,6 +30,9 @@ const EMPTY_APPLICATION_SETTINGS: ApplicationPromptSettings = {
   prompt_template: "",
   automation_rules: "",
   submission_authorization: "",
+  total_work_experience: "1 year",
+  skill_experience: "1 year",
+  onsite_any_location: "Yes",
   notice_period: "",
   current_ctc: "",
   expected_ctc: "",
@@ -55,7 +60,10 @@ export default function SettingsPage() {
   const [pending, setPending] = useState<ResumeProfile | null>(null);
   const [busy, setBusy] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState("");
+  const [excludedCompaniesText, setExcludedCompaniesText] = useState("");
+  const [exclusionsLoaded, setExclusionsLoaded] = useState(false);
+  const [exclusionsDirty, setExclusionsDirty] = useState(false);
+  const [savingExclusions, setSavingExclusions] = useState(false);
   const [active, setActive] = useState<ResumeProfile | null>(null);
   const [candidate, setCandidate] = useState<ResumeProfile | null>(null);
   const [review, setReview] = useState<ResumeProfileReview | null>(null);
@@ -80,6 +88,13 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
+    getCompanyExclusions().then(({ companies }) => {
+      setExcludedCompaniesText(companies.join("\n"));
+      setExclusionsLoaded(true);
+    }).catch(() => toast.error("Could not load excluded companies. Retry Settings before saving changes."));
+  }, []);
+
+  useEffect(() => {
     Promise.all([
       getResumeProfileStatus(),
       getApplicationPromptSettings(),
@@ -95,12 +110,6 @@ export default function SettingsPage() {
       setRenderedPrompt(readyPrompt);
     }).catch(() => { setLoadError(true); toast.error("Failed to load resume status"); }).finally(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (!file) { setPreview(""); return; }
-    const url = URL.createObjectURL(file); setPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
 
   function choose(next?: File) {
     if (!next) return;
@@ -146,6 +155,25 @@ export default function SettingsPage() {
       toast.error(e instanceof Error ? e.message : "Application prompt details could not be saved");
     } finally {
       setSavingApplicationSettings(false);
+    }
+  }
+
+  async function saveCompanyExclusions() {
+    const companies = excludedCompaniesText.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
+    if (companies.length > 100 || companies.some((name) => name.length > 120)) {
+      toast.error("Use at most 100 company names, one per line, each up to 120 characters.");
+      return;
+    }
+    setSavingExclusions(true);
+    try {
+      const saved = await updateCompanyExclusions(companies);
+      setExcludedCompaniesText(saved.companies.join("\n"));
+      setExclusionsDirty(false);
+      toast.success("Company exclusions saved for the next Claude scraper run.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save company exclusions");
+    } finally {
+      setSavingExclusions(false);
     }
   }
 
@@ -226,14 +254,23 @@ export default function SettingsPage() {
       <OutreachPrompt kind="followup" title="HR follow-up email prompt" description="Use your Gmail and Dashboard’s Follow-ups Due queue. Check recipient evidence, dates, Sent history and bounces before sending." initialValue={applicationSettings.followup_template} />
       <OutreachPrompt kind="cold_dm" title="Cold DM prompt" description="Start from Dashboard’s Follow-ups Due only. Send a verified LinkedIn connection note, then record it as LinkedIn connection to advance that job’s follow-up schedule. Premium limits still apply." initialValue={applicationSettings.cold_dm_template} />
     </>}
-    <div className="grid gap-6 lg:grid-cols-2">
+    <Card>
+      <CardHeader><CardTitle>Exclude companies from scraped jobs</CardTitle><p className="text-sm text-muted-foreground">Enter one employer per line. The Claude hourly scraper skips new jobs from these companies before saving or including them in digests. Existing Tracker jobs and history stay intact.</p></CardHeader>
+      <CardContent className="space-y-3">
+        <label htmlFor="excluded-company-names" className="text-sm font-medium">Company names to skip</label>
+        <Textarea id="excluded-company-names" value={excludedCompaniesText} rows={8} disabled={!exclusionsLoaded || savingExclusions} onChange={(event) => { setExcludedCompaniesText(event.target.value); setExclusionsDirty(true); }} placeholder="Example Company\nAnother Company" />
+        <p className="text-xs text-muted-foreground">Matches the employer name after normalizing punctuation and common legal suffixes. It does not match companies merely mentioned in the job description. Existing large-company and experience filters still apply.</p>
+        <Button type="button" disabled={!exclusionsLoaded || !exclusionsDirty || savingExclusions} onClick={saveCompanyExclusions}>{savingExclusions && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save excluded companies</Button>
+        {!exclusionsLoaded && <p role="status" className="text-xs text-amber-600">Company list unavailable. Reload Settings to retry.</p>}
+      </CardContent>
+    </Card>
+    <div>
       <Card><CardHeader><CardTitle>Resume PDF</CardTitle></CardHeader><CardContent className="space-y-4">
         <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => choose(e.target.files?.[0])} />
         <button type="button" onClick={() => inputRef.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); choose(e.dataTransfer.files?.[0]); }} className="flex min-h-40 w-full flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center"><Upload className="mb-3 h-8 w-8 text-muted-foreground" /><span className="font-medium">{file?.name || "Choose or drop a PDF"}</span><span className="text-xs text-muted-foreground">PDF only · 10 MB · 30 pages</span></button>
         <Button className="w-full" disabled={!file || busy} onClick={upload}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}Extract for review</Button>
         <p className="text-xs text-muted-foreground">Uploading a valid PDF replaces the prior application PDF in cloud storage. Uploads are available only from Settings.</p>
       </CardContent></Card>
-      <Card><CardHeader><CardTitle>PDF preview</CardTitle></CardHeader><CardContent>{preview ? <iframe src={preview} title="Selected resume PDF" className="h-[55vh] w-full rounded border bg-white" /> : <div className="flex h-[55vh] items-center justify-center rounded border bg-muted/30"><FileText className="h-10 w-10 text-muted-foreground" /></div>}</CardContent></Card>
     </div>
     {candidate && review && <Card><CardHeader><CardTitle>{candidate.id === active?.id ? "Edit active profile" : "Review uploaded profile"} · v{candidate.version}</CardTitle><p className="text-sm text-muted-foreground">Corrections remain separate; the extracted PDF text and hash never change.</p></CardHeader><CardContent className="space-y-6">
       <div><label className="text-sm font-medium">Skills (comma separated)</label><Textarea value={review.skills.join(", ")} onChange={(e) => setReview({ ...review, skills: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) })} /><p className="mt-1 text-xs text-muted-foreground">Evidence: {(candidate.facts.skills || []).map(evidence).join(" · ") || "None extracted"}</p></div>

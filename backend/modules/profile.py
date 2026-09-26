@@ -57,6 +57,8 @@ Only submit jobs whose screening_status is pass. Treat pending, review and fail 
 
 Use only facts from my resume or answers I supplied. Do not invent experience, salary, notice period, eligibility, or demographic answers.
 
+For application-form questions, my total work experience is 1 year. For Python, MLOps, LLM, RAG, and any other skill I have supplied or that my active resume supports, answer 1 year when asked for years with that skill. For an unrelated skill with no supplied or resume evidence, ask me rather than claiming experience. If asked whether I am comfortable working onsite, answer Yes for any location; this does not answer separate questions about relocation, visa eligibility, or start date. Do not change my resume dates or job-screening results to fit these form answers.
+
 My answers for every company's application form are: No, I have not attended that company's selection process before; No, I have no commitment to another employer or organization that might affect working there; and No, I have never worked for that company. Use No for these three questions or equivalent wording, with the company on the form as the subject. Do not extend these answers to different questions (such as whether I have merely applied before or worked for an affiliate); ask me if the question's meaning is unclear.
 
 I authorize you to read and accept required application terms, privacy/data-processing consents, acknowledgements and submission confirmations on my behalf. Check the required acceptance boxes and proceed to the next step without asking me to approve each one. Do not opt into optional marketing. If acceptance requires a factual statement that my resume/answers do not support, payment, or an agreement unrelated to applying for this job, leave that job unmarked and report the exact blocker.
@@ -116,6 +118,9 @@ _APPLICATION_PROMPT_FIELDS = (
     "automation_rules",
     *OUTREACH_DEFAULTS,
     "submission_authorization",
+    "total_work_experience",
+    "skill_experience",
+    "onsite_any_location",
     "notice_period",
     "current_ctc",
     "expected_ctc",
@@ -123,6 +128,11 @@ _APPLICATION_PROMPT_FIELDS = (
     "current_location",
     "relocation_preference",
 )
+_DEFAULT_APPLICATION_ANSWERS = {
+    "total_work_experience": "1 year",
+    "skill_experience": "1 year",
+    "onsite_any_location": "Yes",
+}
 
 def get_profile(username="subidh"):
     """Get full profile dict from Supabase. Returns None if not found."""
@@ -159,6 +169,9 @@ def get_application_prompt_settings(username="subidh"):
     if not isinstance(stored, dict):
         stored = {}
     result = {field: str(stored.get(field) or "") for field in _APPLICATION_PROMPT_FIELDS}
+    for key, default in _DEFAULT_APPLICATION_ANSWERS.items():
+        if key not in stored:
+            result[key] = default
     result["prompt_template"] = result["prompt_template"] or DEFAULT_APPLICATION_PROMPT_TEMPLATE
     result["automation_rules"] = result["automation_rules"] or DEFAULT_AUTOMATION_RULES
     for key, default in OUTREACH_DEFAULTS.items():
@@ -180,6 +193,9 @@ def save_application_prompt_settings(username="subidh", data=None):
         field: str(merged.get(field) or "")
         for field in _APPLICATION_PROMPT_FIELDS
     }
+    for key, default in _DEFAULT_APPLICATION_ANSWERS.items():
+        if key not in merged:
+            cleaned[key] = default
     cleaned["prompt_template"] = (
         cleaned["prompt_template"] or DEFAULT_APPLICATION_PROMPT_TEMPLATE
     )
@@ -192,6 +208,37 @@ def save_application_prompt_settings(username="subidh", data=None):
     if not saved:
         return None
     return cleaned
+
+
+def get_company_exclusions(username="subidh"):
+    """Return the Settings exclusion list; propagate database errors to the scraper."""
+    rows = (_get_client().table("user_profile").select("scoring_weights")
+            .eq("username", username).limit(1).execute()).data or []
+    weights = (rows[0].get("scoring_weights") or {}) if rows else {}
+    names = weights.get("company_exclusions", []) if isinstance(weights, dict) else []
+    return names if isinstance(names, list) else []
+
+
+def save_company_exclusions(username="subidh", companies=None):
+    """Persist exact employer names alongside the existing profile settings."""
+    from intake_policy import normalize_employer
+
+    rows = (_get_client().table("user_profile").select("scoring_weights")
+            .eq("username", username).limit(1).execute()).data or []
+    weights = (rows[0].get("scoring_weights") or {}) if rows else {}
+    if not isinstance(weights, dict):
+        weights = {}
+    names, seen = [], set()
+    for raw in companies or []:
+        name = str(raw).strip()
+        normalized = normalize_employer(name)
+        if normalized and normalized not in seen:
+            names.append(name)
+            seen.add(normalized)
+    saved = upsert_profile(username, {"scoring_weights": {**weights, "company_exclusions": names}})
+    if not saved:
+        raise RuntimeError("Company exclusions could not be saved")
+    return names
 
 
 # ===================== VERSIONED PDF PROFILE =====================

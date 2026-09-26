@@ -307,7 +307,9 @@ def main():
 
     # Run all automated scrapers
     print("Running scrapers...")
-    jobs, sources_status, sources_errors = run_all_scrapers()
+    from profile import get_company_exclusions
+    company_exclusions = get_company_exclusions()
+    jobs, sources_status, sources_errors = run_all_scrapers(company_exclusions=company_exclusions)
     print(f"\nTotal jobs found: {len(jobs)}")
     for source, count in sources_status.items():
         print(f"  {source}: {count}")
@@ -410,6 +412,7 @@ def main():
                 analysis_details=job.get("analysis_details") or {},
                 analysis_version=job.get("analysis_version"),
                 profile_version=job.get("profile_version"),
+                company_exclusions=company_exclusions,
             )
         except Exception:
             pass

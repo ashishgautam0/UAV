@@ -10,6 +10,7 @@ from pypdf import PdfReader
 
 from ..models.schemas import (
     ApplicationPromptSettings,
+    CompanyExclusionsSettings,
     RenderedApplicationPrompt,
     ResumeProfileResponse,
     ResumeProfileReviewRequest,
@@ -23,11 +24,13 @@ from profile import (
     create_resume_profile,
     get_active_profile_snapshot,
     get_application_prompt_settings,
+    get_company_exclusions,
     get_latest_profile_snapshot,
     get_profile,
     get_resume_profile,
     prune_obsolete_resume_profiles,
     save_application_prompt_settings,
+    save_company_exclusions,
     upsert_profile,
 )
 from resume_profile import extract_profile_facts, reviewed_experience_months, profile_text
@@ -46,6 +49,9 @@ _MAX_RESUME_PAGES = 30
 _APPLICATION_PREFIX = "application-resumes"
 _APPLICATION_ANSWER_LABELS = {
     "submission_authorization": "Submission authorization",
+    "total_work_experience": "Total work experience (years, user-provided)",
+    "skill_experience": "Python, MLOps, LLM, RAG or another supplied/resume-supported skill (years)",
+    "onsite_any_location": "Comfortable working onsite at any location (not work authorization)",
     "notice_period": "Notice period",
     "current_ctc": "Current compensation",
     "expected_ctc": "Expected compensation",
@@ -159,6 +165,20 @@ def update_application_settings(body: ApplicationPromptSettings):
     return ApplicationPromptSettings(**saved)
 
 
+@router.get("/company-exclusions", response_model=CompanyExclusionsSettings)
+def read_company_exclusions():
+    return CompanyExclusionsSettings(companies=get_company_exclusions(_DEFAULT_USERNAME))
+
+
+@router.put("/company-exclusions", response_model=CompanyExclusionsSettings)
+def update_company_exclusions(body: CompanyExclusionsSettings):
+    if any(len(name.strip()) > 120 for name in body.companies):
+        raise HTTPException(status_code=422, detail="Each company name must be at most 120 characters.")
+    return CompanyExclusionsSettings(companies=save_company_exclusions(
+        _DEFAULT_USERNAME, body.companies,
+    ))
+
+
 def _render_application_prompt(template, settings, jobs, resume, page_url, resume_url):
     """Render one immutable browser-agent batch without browser-local state."""
     answer_lines = [
@@ -184,7 +204,10 @@ def _render_application_prompt(template, settings, jobs, resume, page_url, resum
         "resume_sha256": (resume or {}).get("sha256") or "unavailable",
         "batch_jobs": json.dumps(batch, ensure_ascii=False, indent=2, default=str),
     }
-    rendered = (settings.get("automation_rules") or DEFAULT_AUTOMATION_RULES).rstrip() + "\n\n" + template
+    rules = (settings.get("automation_rules") or DEFAULT_AUTOMATION_RULES).rstrip()
+    if "{{application_answers}}" not in rules + template:
+        template = template.rstrip() + "\n\nUser-provided application answers:\n{{application_answers}}"
+    rendered = rules + "\n\n" + template
     for key, value in values.items():
         rendered = rendered.replace("{{" + key + "}}", value)
     unresolved = sorted(set(_PROMPT_PLACEHOLDER.findall(rendered)))

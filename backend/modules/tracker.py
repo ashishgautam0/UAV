@@ -317,10 +317,17 @@ def get_existing_job_urls(since_days=None):
 def save_scraped_job(title, company, location, source, url, description="",
                      score=0, noc_verdict="", skill_match=None,
                      verdict="", ats_score=None, analysis_details=None,
-                     analysis_version=None, profile_version=None):
+                     analysis_version=None, profile_version=None,
+                     company_exclusions=None):
     # Guard direct/manual intake too; never delete existing application history.
     from intake_policy import exclusion_reason
-    reason = exclusion_reason({"company": company, "description": description})
+    job = {"company": company, "description": description}
+    reason = exclusion_reason(job)
+    if not reason and company_exclusions is None:
+        from profile import get_company_exclusions
+        company_exclusions = get_company_exclusions()
+    if not reason:
+        reason = exclusion_reason(job, company_exclusions or ())
     if reason:
         print(f"Skipped scraped job at {company}: {reason}")
         return
