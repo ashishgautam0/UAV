@@ -3,6 +3,7 @@ import type {
   Application,
   CachedCompanyIntel,
   DashboardStats,
+  ColdDmTodo,
   FollowUp,
   HrEmailTodo,
   FollowUpDraft,
@@ -105,6 +106,10 @@ export async function getDashboard(): Promise<DashboardStats> {
 
 export async function getFollowUps(): Promise<FollowUp[]> {
   return apiFetch<FollowUp[]>("/api/stats/follow-ups");
+}
+
+export async function getColdDmTodos(): Promise<ColdDmTodo[]> {
+  return apiFetch<ColdDmTodo[]>("/api/stats/cold-dm-todos");
 }
 
 export async function getHrEmailTodos(): Promise<HrEmailTodo[]> {

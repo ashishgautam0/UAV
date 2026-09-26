@@ -52,6 +52,15 @@ export interface FollowUp {
   scraped_job_id?: number | null;
 }
 
+export interface ColdDmTodo {
+  id: number;
+  company: string;
+  role: string;
+  follow_up_date: string;
+  scraped_job_id: number | null;
+  cold_dm_ready: boolean;
+}
+
 export interface HrEmailTodo {
   id: number;
   company: string;

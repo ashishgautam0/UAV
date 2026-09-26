@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   getDashboard,
   getFollowUps,
+  getColdDmTodos,
   getHrEmailTodos,
   setHrEmailTodoCompleted,
   getFollowUpDraft,
@@ -17,6 +18,7 @@ import {
 import type {
   DashboardStats,
   FollowUp,
+  ColdDmTodo,
   HrEmailTodo,
   FollowUpDraft,
   FollowUpEffectiveness,
@@ -129,6 +131,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [coldDmTodos, setColdDmTodos] = useState<ColdDmTodo[]>([]);
+  const [coldDmLoadError, setColdDmLoadError] = useState(false);
   const [hrEmailTodos, setHrEmailTodos] = useState<HrEmailTodo[]>([]);
   const [hrEmailSaving, setHrEmailSaving] = useState<number | null>(null);
   const [hrEmailLoadError, setHrEmailLoadError] = useState(false);
@@ -204,6 +208,7 @@ export default function DashboardPage() {
         const [
           dashboardRes,
           followUpsRes,
+          coldDmTodosRes,
           hrEmailTodosRes,
           weeklyTrendRes,
           platformRes,
@@ -213,6 +218,7 @@ export default function DashboardPage() {
         ] = await Promise.allSettled([
           getDashboard(),
           getFollowUps(),
+          getColdDmTodos(),
           getHrEmailTodos(),
           getWeeklyTrend(),
           getPlatformEffectiveness(),
@@ -223,6 +229,8 @@ export default function DashboardPage() {
 
         if (dashboardRes.status === "fulfilled") setStats(dashboardRes.value);
         if (followUpsRes.status === "fulfilled") setFollowUps(Array.isArray(followUpsRes.value) ? followUpsRes.value : []);
+        if (coldDmTodosRes.status === "fulfilled") setColdDmTodos(Array.isArray(coldDmTodosRes.value) ? coldDmTodosRes.value : []);
+        setColdDmLoadError(coldDmTodosRes.status === "rejected");
         if (hrEmailTodosRes.status === "fulfilled") setHrEmailTodos(Array.isArray(hrEmailTodosRes.value) ? hrEmailTodosRes.value : []);
         setHrEmailLoadError(hrEmailTodosRes.status === "rejected");
         if (weeklyTrendRes.status === "fulfilled") setWeeklyTrend(Array.isArray(weeklyTrendRes.value) ? weeklyTrendRes.value : []);
@@ -475,6 +483,54 @@ export default function DashboardPage() {
                     </Button>
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ---- Cold DMs Due: same existing follow-up schedule ---- */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquareText className="h-5 w-5 text-violet-400" />
+            Cold DMs Due
+          </CardTitle>
+          <CardDescription>
+            LinkedIn connection notes for jobs whose existing follow-up date is due. Sending one counts as that job&apos;s follow-up; record it only after a confirmed send.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {coldDmLoadError ? (
+            <p role="alert" className="text-sm text-red-400">Cold DM todos could not be loaded. Retry the dashboard before sending.</p>
+          ) : coldDmTodos.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No Cold DMs due.</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {coldDmTodos.map((todo) => (
+                todo.scraped_job_id ? (
+                  <Link
+                    key={todo.id}
+                    href={`/jobs/${todo.scraped_job_id}#cold-dm`}
+                    className="block space-y-3 rounded-lg border border-violet-500/40 bg-violet-500/5 p-4 transition-colors hover:border-primary/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    aria-label={`Open Cold DM for ${todo.role} at ${todo.company}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div><p className="font-semibold">{todo.company}</p><p className="text-sm text-muted-foreground">{todo.role}</p></div>
+                      <Badge variant="outline" className="shrink-0 border-violet-500/30 bg-violet-500/10 text-violet-400">
+                        {todo.cold_dm_ready ? "Draft ready" : "No current draft"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Due {todo.follow_up_date}</p>
+                    <span className="inline-flex items-center text-sm font-medium text-violet-400">Open Cold DM</span>
+                  </Link>
+                ) : (
+                  <div key={todo.id} className="space-y-2 rounded-lg border border-dashed p-4">
+                    <p className="font-semibold">{todo.company}</p>
+                    <p className="text-sm text-muted-foreground">{todo.role} · Due {todo.follow_up_date}</p>
+                    <p className="text-xs text-amber-400">Tracker detail unavailable; no matching scraped job. Do not guess a link or send a note.</p>
+                  </div>
+                )
               ))}
             </div>
           )}

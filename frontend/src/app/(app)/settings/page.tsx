@@ -252,7 +252,7 @@ export default function SettingsPage() {
     {!loadError && <>
       <OutreachPrompt kind="hr_email" title="Initial HR email prompt" description="Send through your Gmail. Use Dashboard’s HR todos; verify recipients and research official hiring contacts if Claude’s address is invalid or unverified." initialValue={applicationSettings.hr_email_template} />
       <OutreachPrompt kind="followup" title="HR follow-up email prompt" description="Use your Gmail and Dashboard’s Follow-ups Due queue. Check recipient evidence, dates, Sent history and bounces before sending." initialValue={applicationSettings.followup_template} />
-      <OutreachPrompt kind="cold_dm" title="Cold DM prompt" description="Dashboard → Follow-ups Due → click each job card → use that Tracker detail’s Cold DM for the LinkedIn connection note. Record a verified send as LinkedIn connection to advance that job’s follow-up schedule. Premium limits still apply." initialValue={applicationSettings.cold_dm_template} />
+      <OutreachPrompt kind="cold_dm" title="Cold DM prompt" description="Dashboard → Cold DMs Due (from the follow-up schedule) → click each job card → use that Tracker detail’s Cold DM for the LinkedIn connection note. Record a verified send as LinkedIn connection to advance that job’s follow-up schedule. Premium limits still apply." initialValue={applicationSettings.cold_dm_template} />
     </>}
     <Card>
       <CardHeader><CardTitle>Exclude companies from scraped jobs</CardTitle><p className="text-sm text-muted-foreground">Enter one employer per line. The Claude hourly scraper skips new jobs from these companies before saving or including them in digests. Existing Tracker jobs and history stay intact.</p></CardHeader>

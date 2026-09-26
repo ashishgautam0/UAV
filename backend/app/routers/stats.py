@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from tracker import (
+    get_cold_dm_todos,
     get_follow_ups_due,
     get_hr_email_todos,
     get_platform_effectiveness,
@@ -22,6 +23,11 @@ def dashboard_stats():
 def follow_ups():
     df = get_follow_ups_due()
     return df.astype(object).where(df.notna(), None).to_dict("records") if not df.empty else []
+
+
+@router.get("/cold-dm-todos")
+def cold_dm_todos():
+    return get_cold_dm_todos()
 
 
 @router.get("/hr-email-todos")
