@@ -8,14 +8,25 @@ from test_settings_profile import ROOT, function
 import profile as profile_data
 
 
-def stub_tracker(handled_urls=(), applied_urls=(), scraped_id=7):
-    """Replace the data layer so router logic is tested without Supabase."""
+def stub_tracker(handled_urls=(), applied_urls=(), scraped_id=None, insert_id=7):
+    """Replace the data layer so router logic is tested without Supabase.
+
+    scraped_id is the row the scraper already holds for this posting (None when
+    it never found it); insert_id is the row that exists after an insert, so the
+    lookup reflects the state change the way the real table does.
+    """
     calls = {"scraped": [], "applied": [], "marked": []}
+    state = {"id": scraped_id}
     module = ModuleType("tracker")
+
+    def save(**kw):
+        calls["scraped"].append(kw)
+        state["id"] = insert_id
+
     module.add_application = lambda **kw: calls["applied"].append(kw)
-    module.save_scraped_job = lambda **kw: calls["scraped"].append(kw)
+    module.save_scraped_job = save
     module.find_application_by_url = lambda url: {"id": 1} if url in applied_urls else None
-    module.find_scraped_job_by_url = lambda url: {"id": scraped_id} if scraped_id else None
+    module.find_scraped_job_by_url = lambda url: {"id": state["id"]} if state["id"] else None
     module.mark_scraped_job = lambda job_id, action: calls["marked"].append((job_id, action))
     module.get_handled_job_urls = lambda: set(handled_urls)
     module.dedup_window_days = lambda: 14
@@ -59,8 +70,32 @@ class RecordJobTests(unittest.TestCase):
             "status": "applied", "job_type": "Job", "notes": "Easy Apply", **overrides,
         })
 
+    def test_a_job_the_scraper_already_saved_is_never_overwritten(self):
+        """save_scraped_job replaces the whole row, so a known posting must not
+        be re-saved: that would swap the full JD for the agent's summary, wipe
+        the score and analysis, and mark the cover letter outdated."""
+        module, calls = stub_tracker(scraped_id=42)
+        result = self.endpoint(module)(self.job())
+        self.assertEqual(calls["scraped"], [])
+        self.assertTrue(result["applied"])
+        self.assertEqual(calls["marked"], [(42, "applied")])
+
+    def test_a_skip_on_a_known_job_also_leaves_the_row_alone(self):
+        module, calls = stub_tracker(scraped_id=42)
+        self.endpoint(module)(self.job(status="skipped"))
+        self.assertEqual(calls["scraped"], [])
+        self.assertEqual(calls["marked"], [(42, "dismissed")])
+
+    def test_a_posting_the_scraper_never_found_is_inserted(self):
+        module, calls = stub_tracker(scraped_id=None, insert_id=99)
+        result = self.endpoint(module)(self.job())
+        self.assertEqual(len(calls["scraped"]), 1)
+        self.assertEqual(calls["scraped"][0]["url"], "https://portal/job/1")
+        self.assertTrue(result["applied"])
+        self.assertEqual(calls["marked"], [(99, "applied")])
+
     def test_applied_job_reaches_both_the_job_list_and_the_tracker(self):
-        module, calls = stub_tracker()
+        module, calls = stub_tracker(scraped_id=None, insert_id=7)
         result = self.endpoint(module)(self.job())
         self.assertEqual(result, {"saved": True, "applied": True,
                                   "dismissed": False, "duplicate": False})
@@ -76,7 +111,7 @@ class RecordJobTests(unittest.TestCase):
     def test_every_portal_records_the_same_way(self):
         for portal in ("LinkedIn", "Indeed", "Naukri", "Instahyre", "Cutshort", "Wellfound"):
             with self.subTest(portal=portal):
-                module, calls = stub_tracker()
+                module, calls = stub_tracker(scraped_id=None, insert_id=7)
                 result = self.endpoint(module)(self.job(source=portal))
                 self.assertTrue(result["applied"])
                 self.assertEqual(calls["scraped"][0]["source"], portal)
@@ -84,17 +119,16 @@ class RecordJobTests(unittest.TestCase):
                 self.assertEqual(calls["marked"], [(7, "applied")])
 
     def test_repeat_of_an_applied_job_adds_no_second_tracker_row(self):
-        module, calls = stub_tracker(applied_urls={"https://portal/job/1"})
+        module, calls = stub_tracker(applied_urls={"https://portal/job/1"}, scraped_id=42)
         result = self.endpoint(module)(self.job())
         self.assertEqual(result, {"saved": True, "applied": False,
                                   "dismissed": False, "duplicate": True})
         self.assertEqual(calls["applied"], [])
         self.assertEqual(calls["marked"], [])
-        # The posting is still refreshed so its JD stays current.
-        self.assertEqual(len(calls["scraped"]), 1)
+        self.assertEqual(calls["scraped"], [])
 
     def test_skipped_job_is_dismissed_so_its_jd_is_never_reread(self):
-        module, calls = stub_tracker()
+        module, calls = stub_tracker(scraped_id=None, insert_id=7)
         result = self.endpoint(module)(self.job(status="skipped", notes="Senior-level title"))
         self.assertEqual(result, {"saved": True, "applied": False,
                                   "dismissed": True, "duplicate": False})
@@ -104,10 +138,11 @@ class RecordJobTests(unittest.TestCase):
 
     def test_a_posting_that_intake_policy_rejected_is_not_marked(self):
         # save_scraped_job drops excluded employers, so there is no row to flag.
-        module, calls = stub_tracker(scraped_id=None)
+        module, calls = stub_tracker(scraped_id=None, insert_id=None)
         result = self.endpoint(module)(self.job(status="skipped"))
         self.assertEqual(result["dismissed"], False)
         self.assertEqual(calls["marked"], [])
+        self.assertEqual(len(calls["scraped"]), 1)
 
 
 class DesktopPromptTests(unittest.TestCase):
@@ -192,6 +227,14 @@ class DesktopPromptTests(unittest.TestCase):
         for portal in ("LinkedIn", "Indeed", "Naukri", "Instahyre", "Cutshort", "Wellfound"):
             self.assertIn(portal, step2)
         self.assertIn("every portal", step2)
+
+    def test_prompt_asks_for_the_real_jd_not_a_summary(self):
+        """The outreach agents read this text as the JD, so a paraphrase degrades
+        every cold DM, HR email and demo written from it."""
+        step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## SESSION", 1)[0]
+        self.assertIn("actual job description text", step2)
+        self.assertIn("Do **not** send a summary or paraphrase", step2)
+        self.assertNotIn("1-2 sentence summary of what the role involves", step2)
 
     def test_prompt_guards_against_dismissing_unjudged_jobs(self):
         step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## SESSION", 1)[0]

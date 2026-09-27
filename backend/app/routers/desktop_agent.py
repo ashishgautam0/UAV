@@ -39,15 +39,21 @@ def record_job(body: DesktopAgentJobRequest):
     Applied postings reach the Tracker and leave Today Todo. Skipped ones are
     dismissed, which both hides them and puts them on the next run's skip list.
     """
-    save_scraped_job(
-        title=body.title,
-        company=body.company,
-        location=body.location,
-        source=body.source,
-        url=body.url,
-        description=body.description,
-    )
+    # Only insert a posting the scraper has not already saved. save_scraped_job
+    # overwrites the whole row, which on a known job would replace the full JD
+    # with the agent's summary, wipe the score and analysis the scraper built,
+    # and mark its cover letter outdated.
     scraped = find_scraped_job_by_url(body.url)
+    if not scraped:
+        save_scraped_job(
+            title=body.title,
+            company=body.company,
+            location=body.location,
+            source=body.source,
+            url=body.url,
+            description=body.description,
+        )
+        scraped = find_scraped_job_by_url(body.url)
 
     if body.status == "skipped":
         if scraped:

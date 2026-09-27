@@ -382,7 +382,7 @@ Content-Type: application/json
   "location": "Bangalore, India",
   "url": "<canonical posting URL, tracking parameters stripped>",
   "source": "<the portal you found it on>",
-  "description": "1-2 sentence summary of what the role involves",
+  "description": "<the job description text, copied from the posting>",
   "status": "applied",
   "notes": "How it was submitted, or why it was skipped"
 }
@@ -391,6 +391,11 @@ Content-Type: application/json
 Field rules:
 - **title / company / url**: required, taken verbatim from the posting
 - **url**: the canonical posting URL with tracking parameters stripped
+- **description**: the posting's actual job description text, copied as-is (up
+  to 20,000 characters). Do **not** send a summary or paraphrase — when this is
+  a job my scraper had not already found, this text is what my cold DM, HR
+  email and demo agents read to write about the role, and a summary makes all
+  of them worse. Leave it empty rather than inventing one.
 - **source**: exactly one of `LinkedIn`, `Indeed`, `Naukri`, `Instahyre`,
   `Cutshort`, `Wellfound`
 - **status**: `applied` when the application was actually submitted and you saw
