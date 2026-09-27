@@ -187,13 +187,18 @@ def update_company_exclusions(body: CompanyExclusionsSettings):
     ))
 
 
-def _render_application_prompt(template, settings, jobs, resume, page_url, resume_url):
-    """Render one immutable browser-agent batch without browser-local state."""
-    answer_lines = [
+def _application_answers(settings):
+    """The Settings form answers, as prompt lines shared by every apply prompt."""
+    lines = [
         f"- {_APPLICATION_ANSWER_LABELS[key]}: {settings.get(key)}"
         for key in _APPLICATION_ANSWER_LABELS
         if settings.get(key)
     ]
+    return "\n".join(lines) or "- No application-form answers are saved."
+
+
+def _render_application_prompt(template, settings, jobs, resume, page_url, resume_url):
+    """Render one immutable browser-agent batch without browser-local state."""
     batch = [{
         "job_id": job.get("id"),
         "title": job.get("title") or "",
@@ -203,7 +208,7 @@ def _render_application_prompt(template, settings, jobs, resume, page_url, resum
         "url": job.get("url") or "",
     } for job in jobs]
     values = {
-        "application_answers": "\n".join(answer_lines) or "- No application-form answers are saved.",
+        "application_answers": _application_answers(settings),
         "page_url": page_url,
         "resume_filename": (resume or {}).get("filename") or "Resume.pdf",
         "resume_url": resume_url,
@@ -603,7 +608,8 @@ def read_desktop_prompt(request: Request):
     """
     from profile import default_desktop_prompt
 
-    saved = get_application_prompt_settings(_DEFAULT_USERNAME).get("desktop_prompt_template")
+    settings = get_application_prompt_settings(_DEFAULT_USERNAME)
+    saved = settings.get("desktop_prompt_template")
     if saved:
         template = saved
     else:
@@ -621,6 +627,7 @@ def read_desktop_prompt(request: Request):
         "resume_url": str(request.url_for("download_application_resume")),
         "resume_filename": (resume or {}).get("filename") or "Resume.pdf",
         "resume_sha256": (resume or {}).get("sha256") or "unavailable",
+        "application_answers": _application_answers(settings),
     }
     content = _PROMPT_PLACEHOLDER.sub(
         lambda match: values.get(match.group(1), match.group(0)), template,
@@ -631,6 +638,8 @@ def read_desktop_prompt(request: Request):
         issues.append("The saved prompt contains unresolved placeholders.")
     if not resume:
         issues.append("No Settings PDF is available, so the resume link will not work.")
+    if not settings.get("submission_authorization"):
+        issues.append("Submission authorization is blank in Settings.")
     return {
         "content": content,
         "template": template,

@@ -24,6 +24,12 @@ def function(path, name, env):
     exec(compile(ast.Module(body=[node], type_ignores=[]), str(path), "exec"), env)
     return env[name]
 
+
+def answers_for(labels):
+    """The router's own answer formatter, bound to this test's label subset."""
+    return function(ROOT / "app/routers/profile.py", "_application_answers",
+                    {"_APPLICATION_ANSWER_LABELS": labels})
+
 class SettingsProfileTests(unittest.TestCase):
     def test_response_uses_same_context_as_backend(self):
         public = function(ROOT / "app/routers/profile.py", "_public_snapshot", {"profile_text": profile_text})
@@ -157,10 +163,10 @@ class SettingsProfileTests(unittest.TestCase):
             "_render_application_prompt",
             {
                 "json": json,
-                "_APPLICATION_ANSWER_LABELS": {
+                "_application_answers": answers_for({
                     "submission_authorization": "Submission authorization",
                     "notice_period": "Notice period",
-                },
+                }),
                 "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
                 "DEFAULT_AUTOMATION_RULES": profile_data.DEFAULT_AUTOMATION_RULES,
             },
@@ -228,7 +234,8 @@ class SettingsProfileTests(unittest.TestCase):
 
     def test_application_endpoint_excludes_nonpassing_jobs_before_omitting_results(self):
         renderer = function(ROOT / "app/routers/profile.py", "_render_application_prompt", {
-            "json": json, "_APPLICATION_ANSWER_LABELS": {"submission_authorization": "Submission authorization"},
+            "json": json,
+            "_application_answers": answers_for({"submission_authorization": "Submission authorization"}),
             "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
             "DEFAULT_AUTOMATION_RULES": profile_data.DEFAULT_AUTOMATION_RULES,
         })
@@ -280,7 +287,7 @@ class SettingsProfileTests(unittest.TestCase):
             "_render_application_prompt",
             {
                 "json": json,
-                "_APPLICATION_ANSWER_LABELS": {},
+                "_application_answers": answers_for({}),
                 "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
                 "DEFAULT_AUTOMATION_RULES": profile_data.DEFAULT_AUTOMATION_RULES,
             },
@@ -308,11 +315,11 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertEqual(captured["scoring_weights"]["skill"], 33)
         self.assertEqual(saved["automation_rules"], stored["scoring_weights"]["application_prompt"]["automation_rules"])
         render = function(ROOT / "app/routers/profile.py", "_render_application_prompt", {
-            "json": json, "_APPLICATION_ANSWER_LABELS": {
+            "json": json, "_application_answers": answers_for({
                 "total_work_experience": "Total work experience (years, user-provided)",
                 "skill_experience": "Python, MLOps, LLM, RAG or another supplied/resume-supported skill (years)",
                 "onsite_any_location": "Comfortable working onsite at any location (not work authorization)",
-            },
+            }),
             "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
             "DEFAULT_AUTOMATION_RULES": profile_data.DEFAULT_AUTOMATION_RULES,
         })

@@ -82,7 +82,7 @@ export function DesktopPrompt() {
           onChange={(e) => { setText(e.target.value); setDirty(true); }} />
       </div>
       <p className="text-xs text-muted-foreground">
-        Log into all six portals in your browser before starting. Generate resolves the live tracker API and resume links; the agent applies to at most 10 jobs per portal and has no overall time limit. Placeholders: {"{{seen_urls_url}}"}, {"{{record_url}}"}, {"{{resume_url}}"}, {"{{resume_filename}}"}, {"{{resume_sha256}}"}.
+        Log into all six portals in your browser before starting. Generate resolves the live tracker API and resume links, and embeds the application answers saved above so the agent never guesses a notice period or salary. At most 10 jobs per portal, no overall time limit. Placeholders: {"{{seen_urls_url}}"}, {"{{record_url}}"}, {"{{resume_url}}"}, {"{{resume_filename}}"}, {"{{resume_sha256}}"}, {"{{application_answers}}"}.
       </p>
       {loadError && <p role="alert" className="text-sm text-destructive">Could not load the desktop prompt. Check that the backend is running.</p>}
       {dirty && <p role="status" className="text-sm text-amber-600">Unsaved changes — save before copying.</p>}
