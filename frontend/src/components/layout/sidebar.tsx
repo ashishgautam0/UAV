@@ -12,9 +12,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   LayoutDashboard,
-  Moon,
   ClipboardList,
-  GraduationCap,
   Settings,
   Menu,
   X,
@@ -24,11 +22,14 @@ import {
 import { useState } from "react";
 import { NotificationBell } from "./notification-bell";
 
+// Hidden, not removed: /tonight (Today Todo) and /prep28 (Interview Prep) still
+// work for anyone with the URL, and their data keeps flowing. Re-add the entry
+// here to show either one again:
+//   { href: "/tonight", label: "Today Todo", icon: Moon },
+//   { href: "/prep28", label: "Interview Prep", icon: GraduationCap },
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/tonight", label: "Today Todo", icon: Moon },
   { href: "/tracker", label: "Tracker", icon: ClipboardList },
-  { href: "/prep28", label: "Interview Prep", icon: GraduationCap },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
