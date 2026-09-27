@@ -30,6 +30,7 @@ const EMPTY_APPLICATION_SETTINGS: ApplicationPromptSettings = {
   cold_dm_template: "",
   prompt_template: "",
   automation_rules: "",
+  desktop_prompt_template: "",
   submission_authorization: "",
   total_work_experience: "1 year",
   skill_experience: "1 year",

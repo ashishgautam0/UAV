@@ -39,6 +39,18 @@ def _get_client():
 # ===================== PROFILE CRUD =====================
 
 _APPLICATION_PROMPT_KEY = "application_prompt"
+_DESKTOP_PROMPT_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "prompts", "job-agent-desktop.md",
+)
+
+
+def default_desktop_prompt():
+    """Read the shipped Claude Desktop prompt used when nothing is saved yet."""
+    with open(_DESKTOP_PROMPT_PATH, encoding="utf-8") as handle:
+        return handle.read()
+
+
 DEFAULT_APPLICATION_PROMPT_TEMPLATE = """Use your browser to apply to every eligible job in the fixed Best Matches batch below.
 
 {{application_answers}}
@@ -140,6 +152,7 @@ def normalize_application_screening_text(text):
 _APPLICATION_PROMPT_FIELDS = (
     "prompt_template",
     "automation_rules",
+    "desktop_prompt_template",
     *OUTREACH_DEFAULTS,
     "submission_authorization",
     "total_work_experience",

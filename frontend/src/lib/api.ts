@@ -27,6 +27,7 @@ import type {
   ApplicationResumeStatus,
   ApplicationPromptSettings,
   RenderedApplicationPrompt,
+  DesktopPromptResponse,
 } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -283,8 +284,8 @@ export async function getRenderedOutreachPrompt(pageUrl: string, kind: "hr_email
   );
 }
 
-export async function getDesktopPrompt(): Promise<{ content: string }> {
-  return apiFetch<{ content: string }>("/api/profile/desktop-prompt");
+export async function getDesktopPrompt(): Promise<DesktopPromptResponse> {
+  return apiFetch<DesktopPromptResponse>("/api/profile/desktop-prompt");
 }
 
 export async function uploadResumePdf(file: File): Promise<ResumeProfile> {

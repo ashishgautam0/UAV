@@ -414,6 +414,14 @@ def snooze_follow_up(app_id, new_date):
 
 # ===================== SCRAPED JOBS FUNCTIONS =====================
 
+def dedup_window_days():
+    """Days of scrape history that count as "already seen". Tunable via env."""
+    try:
+        return int(os.environ.get("DEDUP_WINDOW_DAYS", "14"))
+    except ValueError:
+        return 14
+
+
 def get_existing_job_urls(since_days=None):
     """URLs already in scraped_jobs, for deduplication.
 

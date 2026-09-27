@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional
+from typing import Literal, Optional
 from datetime import date
 
 
@@ -52,6 +52,7 @@ class ApplicationPromptSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     prompt_template: str = Field(default="", max_length=12_000)
     automation_rules: str = Field(default="", max_length=12_000)
+    desktop_prompt_template: str = Field(default="", max_length=40_000)
     hr_email_template: str = Field(default="", max_length=12_000)
     followup_template: str = Field(default="", max_length=12_000)
     cold_dm_template: str = Field(default="", max_length=12_000)
@@ -144,6 +145,20 @@ class AddApplicationRequest(BaseModel):
     conversion: str = "N/A"
     salary: str = ""
     notes: str = ""
+
+
+class DesktopAgentJobRequest(BaseModel):
+    """One posting the Claude Desktop agent handled during a run."""
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(min_length=1, max_length=300)
+    company: str = Field(min_length=1, max_length=200)
+    url: str = Field(min_length=1, max_length=2_000)
+    source: str = Field(min_length=1, max_length=60)
+    location: str = Field(default="", max_length=200)
+    description: str = Field(default="", max_length=20_000)
+    status: Literal["applied", "skipped"] = "applied"
+    job_type: str = Field(default="Job", max_length=60)
+    notes: str = Field(default="", max_length=2_000)
 
 
 class UpdateStatusRequest(BaseModel):
