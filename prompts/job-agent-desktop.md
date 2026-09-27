@@ -34,39 +34,112 @@ Search each portal for these queries (adapt to each site's search UI):
 3. "GenAI Engineer" or "Generative AI Engineer"
 4. "NLP Engineer"
 5. "LLM Engineer"
-6. "Python Developer" (only if AI/ML is in the description)
+6. "Deep Learning Engineer"
+7. "MLOps Engineer"
+8. "AWS AI Engineer" or "Cloud AI Engineer"
+9. "Data Engineer" (only if AI/ML is in the description)
+10. "Applied Scientist" or "Research Engineer"
 
 Filter by: India location, 0-2 years experience (where the filter exists),
 posted in the last 7 days (where available).
 
 ## TITLE RULES — WHAT TO KEEP vs SKIP
 
-**SKIP these titles** (do not apply):
+These rules match the automated scraper exactly. Apply them in order.
+
+### ALWAYS SKIP (do not apply)
+
+**Seniority — reject if title contains any of these words:**
 - Senior, Sr, Staff, Principal, Lead, Distinguished, PhD-required
-- Java Developer, Software Engineer (without AI/ML qualifier)
-- Data Scientist, Data Analyst (without AI/ML qualifier)
 - Manager, Director, VP, Head of
 - Mid-level (explicitly stated)
+
+**Wrong domain — reject if title contains any of these:**
+- Java, Frontend, React, Angular, UI/UX
+- Content, Marketing, Sales, HR, Finance
+- Blockchain, Security, Cyber, Infosec, Penetration Test, SOC Analyst
+- Specialist
+
+**Reject these generic titles (no AI/ML qualifier):**
+- Software Engineer, Backend Engineer
+- Data Scientist, Data Science, Data Analyst
+- Python Developer, Python Automation Engineer
+- Computer Vision (standalone, without AI/ML qualifier)
+
+**Reject internships:**
 - Intern, Internship, Trainee, Apprentice
 
-**KEEP these titles** (apply if JD also fits):
-- Any title containing: AI, ML, Machine Learning, Deep Learning, NLP,
-  LLM, GenAI, Generative AI, RAG, LangChain, Computer Vision, MLOps
-- Python Engineer/Developer IF the JD mentions AI/ML work
-- Cloud Engineer IF the JD focuses on ML infrastructure
-- Research Engineer/Scientist IF entry-level and AI/ML focused
+**Reject bare one-word titles:**
+- "Engineer", "Developer", "Scientist", "Analyst" with no qualifier
+
+### KEEP (apply if JD also fits)
+
+**AI/ML core titles — any title containing:**
+- AI, Artificial Intelligence, ML, Machine Learning, Deep Learning
+- NLP, Natural Language, LLM, Large Language Model
+- GenAI, Generative AI, Agentic AI, RAG, LangChain
+- Prompt Engineer, Conversational AI, Chatbot
+- OCR, Document AI, Speech Recognition
+- Predictive Modeling, Multimodal, Optimization Algorithm
+
+**Cloud & infrastructure titles (keep if JD involves AI/ML):**
+- AWS Engineer, Cloud Engineer, Cloud AI/ML Engineer
+- SageMaker Engineer, AWS Solutions Architect
+- MLOps Engineer, AIOps, Platform Engineer
+- DevOps Engineer (if JD focuses on ML infrastructure)
+- Data Engineer, Cloud Data Engineer
+- Machine Learning Infrastructure Engineer
+
+**Research titles (keep if entry-level and AI/ML focused):**
+- Research Engineer, Research Scientist, Applied Scientist
+- AI/ML Researcher, AI Research and Development Engineer
+- Graduate Technical Engineer
+
+### DOMAIN KEYWORD GATE
+
+A title must reference at least one AI/ML domain to qualify. These are
+valid domain signals in the title or JD: ai, ml, artificial intelligence,
+machine learning, deep learning, data science, nlp, natural language,
+computer vision, llm, genai, generative ai, agentic, rag, langchain,
+python, fastapi, mlops, prompt engineer, chatbot, conversational ai,
+iot, robotics, uav, digital twin, edge computing, simulation, ocr,
+document ai, speech recognition, predictive modeling, multimodal, aws,
+cloud, sagemaker, bedrock, solutions architect, kubernetes, terraform,
+infrastructure, devops, platform engineer, data engineer.
 
 ## EXPERIENCE RULES
 
 Before applying, read the full job description. **SKIP if**:
-- JD says "3+ years required" or "minimum 3 years" or similar mandatory
-  requirement above 2 years
-- JD says "5-7 years", "senior level required", etc.
+- JD says "3+ years required" or "minimum 3 years" or any mandatory
+  requirement above 2 years (24 months)
+- JD says "5-7 years", "senior level required", "more than 2 years", etc.
+- JD says "5+ years", "6+ years", "7+ years", "8+ years", "10+ years"
 
 **KEEP if**:
 - JD says 0-2 years, 1+ years, "fresher welcome", or no years mentioned
-- JD says "2+ years" (borderline — apply)
-- Experience requirement is listed as "preferred" not "required"
+- JD says "2+ years" or "2 years" (borderline — apply)
+- Experience requirement is listed as "preferred" or "nice to have",
+  not "required" — even if the number exceeds 2 years
+- Upper-bound phrases: "up to 3 years", "at most 3 years" (keep)
+
+## RED FLAGS — CHECK EVERY JD
+
+Before applying, scan the JD for these red flags:
+
+**SKIP immediately if any of these appear:**
+- **Unpaid**: "unpaid", "voluntary", "volunteer", "no stipend"
+- **Region-locked**: "US only", "USA only", "EU only", "US citizen",
+  "clearance required", "must be authorized to work in the United States"
+- **Non-English JD**: JD is primarily in German, French, Spanish, or other
+  non-English language (keywords: deutsch, francais, wir suchen, requisitos)
+
+**Flag but still apply (note in the record):**
+- **Bond risk**: "bond", "service agreement", "minimum commitment",
+  "2 year bond", "3 year bond"
+- **Contract risk**: "contract", "freelance", "gig", "project-based",
+  "temporary"
+- **Generic trainee**: "management trainee", "graduate trainee",
+  "fresher trainee"
 
 ## PORTAL-BY-PORTAL INSTRUCTIONS
 
