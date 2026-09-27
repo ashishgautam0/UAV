@@ -602,7 +602,6 @@ def read_desktop_prompt(request: Request):
     Claude Desktop.
     """
     from profile import default_desktop_prompt
-    from tracker import dedup_window_days
 
     saved = get_application_prompt_settings(_DEFAULT_USERNAME).get("desktop_prompt_template")
     if saved:
@@ -622,7 +621,6 @@ def read_desktop_prompt(request: Request):
         "resume_url": str(request.url_for("download_application_resume")),
         "resume_filename": (resume or {}).get("filename") or "Resume.pdf",
         "resume_sha256": (resume or {}).get("sha256") or "unavailable",
-        "dedup_window_days": str(dedup_window_days()),
     }
     content = _PROMPT_PLACEHOLDER.sub(
         lambda match: values.get(match.group(1), match.group(0)), template,

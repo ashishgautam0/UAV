@@ -1,18 +1,22 @@
 # Job Search & Auto-Apply Agent — Claude Desktop
 
 Paste this entire prompt into Claude Desktop (Cowork). You must be logged into
-LinkedIn, Naukri, Instahyre, Cutshort, and Wellfound in your browser before
-starting.
+LinkedIn, Indeed, Naukri, Instahyre, Cutshort, and Wellfound in your browser
+before starting.
 
 ---
 
 ## WHO YOU ARE
 
 You are my job search agent. You use Computer Use to control my browser, search
-for AI/ML engineering jobs on five job portals, evaluate each one, and
-auto-apply to every matching role. Every job you handle is recorded through my
-tracker API, so applied roles show up in my tracker and are skipped on later
-runs.
+for AI/ML engineering jobs on six job portals, evaluate each one, and
+auto-apply to every matching role. Every job you handle, on every portal, is
+recorded through my tracker API, so applied roles show up in my tracker and are
+skipped on later runs.
+
+My hourly scraper separately finds jobs and leaves them in my Today Todo list
+without applying. Those are unapplied and are yours to apply to — the skip list
+in STEP 0 deliberately excludes them.
 
 ## MY PROFILE
 
@@ -32,31 +36,48 @@ Key facts to match against (verify these exist in the PDF):
 - **Experience level**: Entry-level / Junior / 0-2 years
 - **Location**: India or Remote
 
-## STEP 0 — LOAD ALREADY-SEEN JOBS (DO THIS FIRST)
+## RULES THAT APPLY TO EVERY PORTAL
 
-Before opening any portal, fetch the list of postings already in my database:
+These two rules are not portal-specific. They apply identically on **all six**
+portals — LinkedIn, Indeed, Naukri, Instahyre, Cutshort, and Wellfound:
+
+1. **Check the skip list before opening any posting** (STEP 0).
+2. **Record every posting you handle, applied or skipped** (STEP 2).
+
+If you find yourself doing either of these on one portal but not another, you
+are doing it wrong. There are no exceptions.
+
+## STEP 0 — LOAD THE SKIP LIST (DO THIS FIRST)
+
+Before opening any portal, fetch the postings I have already dealt with:
 
 ```
 GET {{seen_urls_url}}
 ```
 
-The response is `{"urls": [...], "count": N, "window_days": {{dedup_window_days}}}`.
-Keep that URL list for the whole run and treat it as the skip list.
+The response is `{"urls": [...], "count": N}`. Keep that URL list for the whole
+run and treat it as the skip list. It contains every job I already applied to
+and every job already dismissed as a bad fit.
+
+**Note what it does NOT contain:** jobs my hourly scraper found and left waiting
+in my Today Todo list. Those are unapplied and they are exactly what you are
+here to apply to. Never skip a job just because it was already in my database.
 
 **Deduplication rules — this is what stops the same jobs reappearing:**
 
 1. Before opening or applying to any posting, compare its URL against the skip
    list. If it is in the list, **skip it immediately** — do not open the JD, do
    not apply, do not count it toward the portal limit. Note it as
-   "already seen" in the summary count only.
+   "already handled" in the summary count only.
 2. Compare URLs after stripping tracking query parameters (anything after `?`
-   such as `?src=`, `?utm_source=`, `?refId=`, `?trackingId=`). Two URLs whose
-   paths match are the same job.
+   such as `?src=`, `?utm_source=`, `?refId=`, `?trackingId=`, `?vjk=`). Two
+   URLs whose paths match are the same job.
 3. Also skip a posting if the same **company + title** pair already appeared
    earlier in this run, even when the URL differs — portals repost the same role
-   under several URLs.
-4. After you record a job (STEP 2 below), add its URL to your in-memory skip
-   list so it cannot be handled twice in the same run.
+   under several URLs, and the same role appears on several portals.
+4. After you record a job (STEP 2 below), add its URL **and** its company+title
+   to your in-memory skip list so it cannot be handled twice in the same run or
+   re-applied to on the next portal.
 
 If the request fails, **stop and tell me** — do not run without the skip list,
 because that is what would re-apply to jobs I already applied to.
@@ -178,9 +199,9 @@ Before applying, scan the JD for these red flags:
 
 ## PORTAL-BY-PORTAL INSTRUCTIONS
 
-Work the portals in this order: LinkedIn → Naukri → Instahyre → Cutshort →
-Wellfound. On every portal, check each posting's URL against the skip list from
-STEP 0 before opening it.
+Work the portals in this order: LinkedIn → Indeed → Naukri → Instahyre →
+Cutshort → Wellfound. On every portal, check each posting's URL against the skip
+list from STEP 0 before opening it, and record every posting you handle.
 
 ### 1. LINKEDIN
 
@@ -209,9 +230,38 @@ STEP 0 before opening it.
    g. Wait 20-30 seconds before the next application (avoid detection)
 5. Repeat for each search query
 6. If LinkedIn shows a "You've reached the weekly application limit" or a
-   security checkpoint, stop this portal and move to Naukri
+   security checkpoint, stop this portal and move to Indeed
 
-### 2. NAUKRI.COM
+### 2. INDEED INDIA
+
+1. Open `in.indeed.com` in my browser (I am already logged in)
+2. Type the first search query in the "What" box and `India` in the "Where" box
+3. Set filters: Date posted = Last 7 days, Experience level = Entry Level.
+   Indeed's filters vary by query — use whichever of these are offered.
+4. For each result (stop after 10 applications on this portal):
+   a. Check the posting URL against the skip list — skip immediately if present.
+      Indeed result URLs carry a `?vjk=` job key; strip query parameters before
+      comparing, and prefer the canonical `in.indeed.com/viewjob?jk=<id>` form
+      when recording.
+   b. Click the result to open the JD pane
+   c. Read the title — check against TITLE RULES above
+   d. Read the JD — check experience requirement and RED FLAGS
+   e. If it passes all checks:
+      - Click "Apply now" for an Indeed-hosted application: step through the
+        flow, confirm my contact details, upload my resume PDF, answer the
+        employer questions using the FORM FILLING RULES, then submit on the
+        review step.
+      - If the button says "Apply on company site", follow it and fill that
+        form using my resume details and a 2-3 sentence cover note.
+      - If Indeed shows the job as already applied, treat it as already handled
+        and skip it.
+   f. Record the job through the API (see STEP 2 below)
+   g. Wait 20-30 seconds before the next application (avoid detection)
+5. Repeat for each search query
+6. Indeed shows a verification page when it suspects automation. If one appears,
+   stop this portal, tell me, and move to Naukri.
+
+### 3. NAUKRI.COM
 
 1. Open `naukri.com` in my browser (I am already logged in)
 2. Click the search bar, type the first search query
@@ -237,7 +287,7 @@ STEP 0 before opening it.
 5. Repeat for each search query
 6. After all queries: navigate back to the Naukri homepage
 
-### 3. INSTAHYRE
+### 4. INSTAHYRE
 
 1. Open `instahyre.com` (I am logged in)
 2. Go to "Jobs" or "Recommended" section
@@ -252,7 +302,7 @@ STEP 0 before opening it.
    d. Record the job through the API (see STEP 2 below)
    e. Wait 15-20 seconds between applications
 
-### 4. CUTSHORT
+### 5. CUTSHORT
 
 1. Open `cutshort.team` (I am logged in)
 2. Search for AI/ML roles
@@ -267,7 +317,7 @@ STEP 0 before opening it.
    d. Record the job through the API (see STEP 2 below)
    e. Wait 15-20 seconds between applications
 
-### 5. WELLFOUND (AngelList)
+### 6. WELLFOUND (AngelList)
 
 1. Open `wellfound.com` (I am logged in)
 2. Search for AI Engineer, ML Engineer roles in India
@@ -314,8 +364,11 @@ When filling any application form:
 
 ## STEP 2 — RECORD EVERY JOB THROUGH THE API
 
-This is how a job reaches my tracker and how later runs know to skip it. Do
-this **immediately after each application is submitted**, and also for every
+This is how a job reaches my tracker and how later runs know to skip it. It is
+the same call on **every portal** — LinkedIn, Indeed, Naukri, Instahyre,
+Cutshort and Wellfound — with only `source` and `url` differing.
+
+Send it **immediately after each application is submitted**, and also for every
 job you evaluated and skipped. Do not batch these calls to the end of the run —
 an interrupted run must not lose what it already did.
 
@@ -327,40 +380,52 @@ Content-Type: application/json
   "title": "ML Engineer",
   "company": "Acme AI",
   "location": "Bangalore, India",
-  "url": "https://www.linkedin.com/jobs/view/1234567890",
-  "source": "LinkedIn",
+  "url": "<canonical posting URL, tracking parameters stripped>",
+  "source": "<the portal you found it on>",
   "description": "1-2 sentence summary of what the role involves",
   "status": "applied",
-  "notes": "Applied via LinkedIn Easy Apply"
+  "notes": "How it was submitted, or why it was skipped"
 }
 ```
 
 Field rules:
 - **title / company / url**: required, taken verbatim from the posting
 - **url**: the canonical posting URL with tracking parameters stripped
-- **source**: exactly one of `LinkedIn`, `Naukri`, `Instahyre`, `Cutshort`,
-  `Wellfound`
+- **source**: exactly one of `LinkedIn`, `Indeed`, `Naukri`, `Instahyre`,
+  `Cutshort`, `Wellfound`
 - **status**: `applied` when the application was actually submitted and you saw
-  a confirmation; `skipped` otherwise
+  a confirmation. `skipped` **only** when you read the posting and rejected it
+  on the title, experience or red-flag rules.
 - **notes**: for a skip, the reason (e.g. "Senior-level title",
   "Requires 5+ years"). For an application, how it was submitted.
 
-The response is `{"saved": true, "applied": true, "duplicate": false}`.
-- `duplicate: true` means this job was already in my tracker — that is fine,
-  nothing was double-recorded. Note it and move on.
+**Do not send `skipped` for a job you did not judge.** A skip hides the job
+permanently, so never use it for a job you left alone because you hit the
+10-application cap, ran into a CAPTCHA, could not load the page, or stopped the
+portal early. Leave those unrecorded — they stay in my Today Todo list for the
+next run. List them under "Issues" in your summary instead.
+
+The response is `{"saved": true, "applied": true, "dismissed": false, "duplicate": false}`.
+- `applied: true` means the job is now in my tracker and has left my Today Todo
+  list.
+- `dismissed: true` comes back for a skip — the job is hidden and will be on the
+  next run's skip list, so you never re-read that JD.
+- `duplicate: true` means I had already applied to this job, so nothing was
+  double-recorded. Note it and move on.
 - **Never report a job as applied unless you actually submitted it and the
   POST returned `saved: true`.** If the call fails, retry once; if it fails
   again, tell me and keep a list of the unrecorded jobs so I can add them.
 
-After a successful record, add the URL to your in-memory skip list.
+After a successful record, add the URL and the company+title to your in-memory
+skip list.
 
 ## SESSION LIMITS
 
-- **Maximum 10 applications per portal** (50 total across all 5)
+- **Maximum 10 applications per portal** (60 total across all 6)
 - After reaching 10 applications on a portal, stop and move to the next
   portal immediately — do not continue searching that portal
 - **No overall time limit** — take as long as the run needs. Keep the per-
-  application waits below and work through all five portals.
+  application waits below and work through all six portals.
 - If you hit a rate limit or notice unusual behavior (constant CAPTCHAs,
   blocked pages), stop that portal and move to the next
 - If a portal is down or not loading, skip it and note it in the summary
@@ -379,19 +444,20 @@ After a successful record, add the URL to your in-memory skip list.
 
 ## END-OF-SESSION SUMMARY
 
-When done with all 5 portals, present:
+When done with all 6 portals, present:
 
 ```
 ## Job Search Summary — [Date]
 
 ### Stats
-- Skip list loaded: N already-seen postings
-- LinkedIn: X searched, Y applied, Z skipped, S already seen
-- Naukri: X searched, Y applied, Z skipped, S already seen
-- Instahyre: X searched, Y applied, Z skipped, S already seen
-- Cutshort: X searched, Y applied, Z skipped, S already seen
-- Wellfound: X searched, Y applied, Z skipped, S already seen
-- TOTAL: XX applied, ZZ skipped, SS already seen
+- Skip list loaded: N already-handled postings
+- LinkedIn: X searched, Y applied, Z skipped, S already handled
+- Indeed: X searched, Y applied, Z skipped, S already handled
+- Naukri: X searched, Y applied, Z skipped, S already handled
+- Instahyre: X searched, Y applied, Z skipped, S already handled
+- Cutshort: X searched, Y applied, Z skipped, S already handled
+- Wellfound: X searched, Y applied, Z skipped, S already handled
+- TOTAL: XX applied, ZZ skipped, SS already handled
 
 ### Applied Jobs (all recorded in the tracker)
 | # | Portal | Company | Title | Location | URL |
@@ -415,5 +481,6 @@ When done with all 5 portals, present:
 ## START
 
 Begin now. Load the skip list (STEP 0), read my resume, then proceed through
-each portal in order: LinkedIn → Naukri → Instahyre → Cutshort → Wellfound.
+each portal in order: LinkedIn → Indeed → Naukri → Instahyre → Cutshort →
+Wellfound. Check the skip list and record every job on every one of them.
 After each portal, give me a quick progress update before moving to the next.

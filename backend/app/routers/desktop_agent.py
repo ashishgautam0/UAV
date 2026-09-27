@@ -2,18 +2,19 @@
 
 The agent runs in the user's own browser, so it reaches these over HTTPS rather
 than importing the modules directly. Two things it needs from the backend: the
-set of postings already seen (so repeat runs skip them) and a way to record a
-job it just handled into both the job list and the Tracker.
+set of postings already dealt with (so repeat runs skip them) and a way to
+record a job it just handled into both the job list and the Tracker.
 """
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 
 from ..models.schemas import DesktopAgentJobRequest
 from tracker import (
     add_application,
-    dedup_window_days,
     find_application_by_url,
-    get_existing_job_urls,
+    find_scraped_job_by_url,
+    get_handled_job_urls,
+    mark_scraped_job,
     save_scraped_job,
 )
 
@@ -21,20 +22,23 @@ router = APIRouter()
 
 
 @router.get("/seen-urls", name="desktop_agent_seen_urls")
-def seen_urls(days: int | None = Query(None, ge=1, le=365)):
-    """Posting URLs already recorded, using the scraper's dedup window.
+def seen_urls():
+    """Posting URLs already applied to or dismissed, for the agent's skip list.
 
-    The agent fetches this once per run and skips any posting whose URL is in
-    the list, which is what keeps the same jobs from resurfacing every run.
+    Deliberately excludes postings the hourly scraper merely discovered: those
+    are still waiting in Today Todo, and applying to them is the agent's job.
     """
-    window = days or dedup_window_days()
-    urls = get_existing_job_urls(since_days=window)
-    return {"urls": sorted(urls), "count": len(urls), "window_days": window}
+    urls = get_handled_job_urls()
+    return {"urls": sorted(urls), "count": len(urls)}
 
 
 @router.post("/jobs", name="desktop_agent_record_job")
 def record_job(body: DesktopAgentJobRequest):
-    """Save a handled posting to the job list, and to the Tracker if applied."""
+    """Record a handled posting, whichever portal it came from.
+
+    Applied postings reach the Tracker and leave Today Todo. Skipped ones are
+    dismissed, which both hides them and puts them on the next run's skip list.
+    """
     save_scraped_job(
         title=body.title,
         company=body.company,
@@ -43,14 +47,17 @@ def record_job(body: DesktopAgentJobRequest):
         url=body.url,
         description=body.description,
     )
+    scraped = find_scraped_job_by_url(body.url)
 
-    if body.status != "applied":
-        return {"saved": True, "applied": False, "duplicate": False}
+    if body.status == "skipped":
+        if scraped:
+            mark_scraped_job(scraped["id"], "dismissed")
+        return {"saved": True, "applied": False, "dismissed": bool(scraped), "duplicate": False}
 
     # A posting the user already applied to must not produce a second Tracker
     # row; the agent can re-send the same job after an interrupted run.
     if find_application_by_url(body.url):
-        return {"saved": True, "applied": False, "duplicate": True}
+        return {"saved": True, "applied": False, "dismissed": False, "duplicate": True}
 
     add_application(
         company=body.company,
@@ -60,4 +67,6 @@ def record_job(body: DesktopAgentJobRequest):
         url=body.url,
         notes=body.notes,
     )
-    return {"saved": True, "applied": True, "duplicate": False}
+    if scraped:
+        mark_scraped_job(scraped["id"], "applied")
+    return {"saved": True, "applied": True, "dismissed": False, "duplicate": False}

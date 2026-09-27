@@ -8,15 +8,16 @@ from test_settings_profile import ROOT, function
 import profile as profile_data
 
 
-def stub_tracker(existing_urls=(), applied_urls=()):
+def stub_tracker(handled_urls=(), applied_urls=(), scraped_id=7):
     """Replace the data layer so router logic is tested without Supabase."""
-    calls = {"scraped": [], "applied": [], "window": []}
+    calls = {"scraped": [], "applied": [], "marked": []}
     module = ModuleType("tracker")
     module.add_application = lambda **kw: calls["applied"].append(kw)
     module.save_scraped_job = lambda **kw: calls["scraped"].append(kw)
     module.find_application_by_url = lambda url: {"id": 1} if url in applied_urls else None
-    module.get_existing_job_urls = lambda since_days=None: (
-        calls["window"].append(since_days), set(existing_urls))[1]
+    module.find_scraped_job_by_url = lambda url: {"id": scraped_id} if scraped_id else None
+    module.mark_scraped_job = lambda job_id, action: calls["marked"].append((job_id, action))
+    module.get_handled_job_urls = lambda: set(handled_urls)
     module.dedup_window_days = lambda: 14
     return module, calls
 
@@ -24,23 +25,20 @@ def stub_tracker(existing_urls=(), applied_urls=()):
 class SeenUrlsTests(unittest.TestCase):
     def endpoint(self, module):
         return function(ROOT / "app/routers/desktop_agent.py", "seen_urls", {
-            "get_existing_job_urls": module.get_existing_job_urls,
-            "dedup_window_days": module.dedup_window_days,
-            "Query": lambda default, **kw: default,
+            "get_handled_job_urls": module.get_handled_job_urls,
         })
 
-    def test_default_window_matches_the_scraper(self):
-        module, calls = stub_tracker({"https://a/1", "https://b/2"})
-        result = self.endpoint(module)(days=None)
-        self.assertEqual(calls["window"], [14])
-        self.assertEqual(result["window_days"], 14)
+    def test_returns_only_jobs_already_acted_on(self):
+        module, _ = stub_tracker({"https://a/1", "https://b/2"})
+        result = self.endpoint(module)()
         self.assertEqual(result["count"], 2)
         self.assertEqual(result["urls"], ["https://a/1", "https://b/2"])
 
-    def test_caller_may_widen_the_window(self):
-        module, calls = stub_tracker()
-        self.assertEqual(self.endpoint(module)(days=30)["window_days"], 30)
-        self.assertEqual(calls["window"], [30])
+    def test_pending_today_todo_jobs_stay_appliable(self):
+        # The scraper leaves discovered jobs unapplied and undismissed; those
+        # must not reach the skip list or the agent would apply to nothing.
+        module, _ = stub_tracker()
+        self.assertEqual(self.endpoint(module)()["urls"], [])
 
 
 class RecordJobTests(unittest.TestCase):
@@ -49,6 +47,8 @@ class RecordJobTests(unittest.TestCase):
             "add_application": module.add_application,
             "save_scraped_job": module.save_scraped_job,
             "find_application_by_url": module.find_application_by_url,
+            "find_scraped_job_by_url": module.find_scraped_job_by_url,
+            "mark_scraped_job": module.mark_scraped_job,
             "DesktopAgentJobRequest": SimpleNamespace,
         })
 
@@ -62,28 +62,52 @@ class RecordJobTests(unittest.TestCase):
     def test_applied_job_reaches_both_the_job_list_and_the_tracker(self):
         module, calls = stub_tracker()
         result = self.endpoint(module)(self.job())
-        self.assertEqual(result, {"saved": True, "applied": True, "duplicate": False})
+        self.assertEqual(result, {"saved": True, "applied": True,
+                                  "dismissed": False, "duplicate": False})
         self.assertEqual(len(calls["scraped"]), 1)
         self.assertEqual(calls["scraped"][0]["source"], "LinkedIn")
         self.assertEqual(len(calls["applied"]), 1)
         self.assertEqual(calls["applied"][0]["role"], "ML Engineer")
         self.assertEqual(calls["applied"][0]["platform"], "LinkedIn")
         self.assertEqual(calls["applied"][0]["url"], "https://portal/job/1")
+        # The applied flag is what removes it from Today Todo.
+        self.assertEqual(calls["marked"], [(7, "applied")])
+
+    def test_every_portal_records_the_same_way(self):
+        for portal in ("LinkedIn", "Indeed", "Naukri", "Instahyre", "Cutshort", "Wellfound"):
+            with self.subTest(portal=portal):
+                module, calls = stub_tracker()
+                result = self.endpoint(module)(self.job(source=portal))
+                self.assertTrue(result["applied"])
+                self.assertEqual(calls["scraped"][0]["source"], portal)
+                self.assertEqual(calls["applied"][0]["platform"], portal)
+                self.assertEqual(calls["marked"], [(7, "applied")])
 
     def test_repeat_of_an_applied_job_adds_no_second_tracker_row(self):
         module, calls = stub_tracker(applied_urls={"https://portal/job/1"})
         result = self.endpoint(module)(self.job())
-        self.assertEqual(result, {"saved": True, "applied": False, "duplicate": True})
+        self.assertEqual(result, {"saved": True, "applied": False,
+                                  "dismissed": False, "duplicate": True})
         self.assertEqual(calls["applied"], [])
-        # The posting is still refreshed so its JD and dedup entry stay current.
+        self.assertEqual(calls["marked"], [])
+        # The posting is still refreshed so its JD stays current.
         self.assertEqual(len(calls["scraped"]), 1)
 
-    def test_skipped_job_feeds_dedup_without_claiming_an_application(self):
+    def test_skipped_job_is_dismissed_so_its_jd_is_never_reread(self):
         module, calls = stub_tracker()
         result = self.endpoint(module)(self.job(status="skipped", notes="Senior-level title"))
-        self.assertEqual(result, {"saved": True, "applied": False, "duplicate": False})
+        self.assertEqual(result, {"saved": True, "applied": False,
+                                  "dismissed": True, "duplicate": False})
         self.assertEqual(len(calls["scraped"]), 1)
         self.assertEqual(calls["applied"], [])
+        self.assertEqual(calls["marked"], [(7, "dismissed")])
+
+    def test_a_posting_that_intake_policy_rejected_is_not_marked(self):
+        # save_scraped_job drops excluded employers, so there is no row to flag.
+        module, calls = stub_tracker(scraped_id=None)
+        result = self.endpoint(module)(self.job(status="skipped"))
+        self.assertEqual(result["dismissed"], False)
+        self.assertEqual(calls["marked"], [])
 
 
 class DesktopPromptTests(unittest.TestCase):
@@ -126,7 +150,6 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertIn("https://api.test/desktop_agent_seen_urls", result["content"])
         self.assertIn("https://api.test/desktop_agent_record_job", result["content"])
         self.assertIn("résumé.pdf", result["content"])
-        self.assertIn("14", result["content"])
         self.assertFalse(result["customized"])
         self.assertEqual(result["issues"], [])
 
@@ -142,14 +165,43 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertTrue(any("PDF" in issue for issue in result["issues"]))
         self.assertIn("Resume.pdf", result["content"])
 
-    def test_prompt_covers_linkedin_dedup_tracker_and_no_time_cap(self):
-        for portal in ("LINKEDIN", "NAUKRI", "INSTAHYRE", "CUTSHORT", "WELLFOUND"):
+    PORTALS = ("LINKEDIN", "INDEED", "NAUKRI", "INSTAHYRE", "CUTSHORT", "WELLFOUND")
+
+    def test_prompt_covers_every_portal_dedup_tracker_and_no_time_cap(self):
+        for portal in self.PORTALS:
             self.assertIn(portal, self.prompt)
-        for required in ("STEP 0 — LOAD ALREADY-SEEN JOBS", "skip list",
+        for required in ("STEP 0 — LOAD THE SKIP LIST", "skip list",
                          "STEP 2 — RECORD EVERY JOB THROUGH THE API",
+                         "RULES THAT APPLY TO EVERY PORTAL",
                          "Maximum 10 applications per portal", "No overall time limit"):
             self.assertIn(required, self.prompt)
         self.assertNotIn("Maximum 2 hours", self.prompt)
+
+    def test_dedup_and_recording_are_required_on_each_portal(self):
+        """Every portal section must carry both the skip check and the record step."""
+        sections = re.split(r"^### \d+\. ", self.prompt, flags=re.MULTILINE)[1:]
+        self.assertEqual(len(sections), len(self.PORTALS))
+        for section in sections:
+            name = section.split("\n", 1)[0]
+            with self.subTest(portal=name):
+                self.assertIn("skip list", section)
+                self.assertIn("STEP 2", section)
+
+    def test_recording_is_portal_agnostic_and_lists_every_source(self):
+        step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## SESSION", 1)[0]
+        for portal in ("LinkedIn", "Indeed", "Naukri", "Instahyre", "Cutshort", "Wellfound"):
+            self.assertIn(portal, step2)
+        self.assertIn("every portal", step2)
+
+    def test_prompt_guards_against_dismissing_unjudged_jobs(self):
+        step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## SESSION", 1)[0]
+        self.assertIn("Do not send `skipped` for a job you did not judge", step2)
+        self.assertIn("10-application cap", step2)
+
+    def test_prompt_states_scraper_jobs_are_still_appliable(self):
+        step0 = self.prompt.split("STEP 0 — LOAD THE SKIP LIST", 1)[1].split("## WHAT TO SEARCH", 1)[0]
+        self.assertIn("Today Todo", step0)
+        self.assertIn("Never skip a job just because it was already in my database", step0)
 
     def test_prompt_fits_the_saved_field_limit(self):
         limit = function(ROOT / "app/routers/profile.py", "_settings_field_limit", {})

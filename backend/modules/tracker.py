@@ -422,6 +422,47 @@ def dedup_window_days():
         return 14
 
 
+def _paginate(query_fn):
+    """Collect every url a query matches; Supabase caps one select at 1000 rows."""
+    urls = set()
+    page_size = 1000
+    offset = 0
+    while True:
+        resp = query_fn(offset, offset + page_size - 1).execute()
+        batch = resp.data or []
+        urls.update(row["url"] for row in batch if row.get("url"))
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return urls
+
+
+def get_handled_job_urls():
+    """URLs already acted on: applied to, or dismissed as not a fit.
+
+    This is a different question from get_existing_job_urls. That one asks "has
+    the scraper saved this yet", so it covers every discovered posting. This one
+    asks "have we finished with this", so a posting the scraper found and left
+    pending in Today Todo is absent — the desktop agent is meant to apply to
+    exactly those. All-time on purpose: a job applied to a year ago must never
+    come back around.
+    """
+    try:
+        db = _get_client()
+
+        def scraped(flag):
+            return lambda lo, hi: (db.table("scraped_jobs").select("url")
+                                   .eq(flag, True).range(lo, hi))
+
+        def applications(lo, hi):
+            return db.table("applications").select("url").range(lo, hi)
+
+        return (_paginate(scraped("applied")) | _paginate(scraped("dismissed"))
+                | _paginate(applications))
+    except Exception:
+        return set()
+
+
 def get_existing_job_urls(since_days=None):
     """URLs already in scraped_jobs, for deduplication.
 
@@ -436,19 +477,6 @@ def get_existing_job_urls(since_days=None):
     permanent and a re-scrape of a dismissed posting must never recount it as
     "new" or reset its dismissed state.
     """
-    def _paginate(query_fn):
-        urls = set()
-        page_size = 1000
-        offset = 0
-        while True:
-            resp = query_fn(offset, offset + page_size - 1).execute()
-            batch = resp.data or []
-            urls.update(row["url"] for row in batch if row.get("url"))
-            if len(batch) < page_size:
-                break
-            offset += page_size
-        return urls
-
     try:
         db = _get_client()
         cutoff = None
