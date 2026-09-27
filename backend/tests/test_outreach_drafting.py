@@ -7,7 +7,89 @@ from unittest.mock import MagicMock, patch
 
 from test_settings_profile import ROOT, function
 from message_generator import build_cold_dm_prompt, build_hr_email_prompt
-from outreach_quality import validate_outreach_draft
+from outreach_quality import validate_outreach_draft, wrong_demo_links
+
+
+class DemoLinkValidationTests(unittest.TestCase):
+    """A draft reused across two jobs carries the first job's demo link, which
+    would point the second employer at a demo built for someone else's role."""
+
+    DEMO = "https://uav-6qe7.vercel.app/api/demo/"
+
+    def test_the_job_s_own_demo_link_passes(self):
+        note = f"Built a demo for the role: {self.DEMO}54144 — open to connecting."
+        self.assertEqual(wrong_demo_links(note, 54144), [])
+        self.assertIsNone(validate_outreach_draft("cold_dm", note, 54144))
+
+    def test_another_job_s_demo_link_is_rejected(self):
+        # The real slip: Lear Labs (54144) received Viraaj's draft and link.
+        note = f"Built a demo for the role: {self.DEMO}54075 — open to connecting."
+        self.assertEqual(wrong_demo_links(note, 54144), ["54075"])
+        problem = validate_outreach_draft("cold_dm", note, 54144)
+        self.assertIsNotNone(problem)
+        self.assertIn("54075", problem)
+
+    def test_hr_emails_are_checked_too(self):
+        body = f"Here is a demo for the role: {self.DEMO}999"
+        self.assertIsNotNone(validate_outreach_draft("hr_email", body, 54144))
+        self.assertIsNone(validate_outreach_draft("hr_email", body, 999))
+
+    def test_a_draft_with_no_demo_link_is_unaffected(self):
+        self.assertEqual(wrong_demo_links("No link here.", 54144), [])
+        self.assertIsNone(validate_outreach_draft("cold_dm", "No link here.", 54144))
+
+    def test_string_and_int_job_ids_compare_the_same(self):
+        note = f"{self.DEMO}54144"
+        self.assertEqual(wrong_demo_links(note, "54144"), [])
+        self.assertEqual(wrong_demo_links(note, 54144), [])
+
+    def test_missing_job_id_skips_the_check_rather_than_failing(self):
+        self.assertEqual(wrong_demo_links(f"{self.DEMO}1", None), [])
+        self.assertIsNone(validate_outreach_draft("cold_dm", f"{self.DEMO}1"))
+
+    def test_every_foreign_id_is_reported_once(self):
+        note = f"{self.DEMO}1 and {self.DEMO}2 and {self.DEMO}1"
+        self.assertEqual(wrong_demo_links(note, 3), ["1", "2"])
+
+
+class SaveJobMessageDemoGuardTests(unittest.TestCase):
+    """The check has to sit at the save choke point, not only in the CLI, or a
+    subagent writing through another path can still store a mismatched link."""
+
+    def saver(self, writes):
+        db = MagicMock()
+        db.table.return_value.upsert.return_value.execute.side_effect = (
+            lambda: writes.append(True))
+        return function(ROOT / "modules/tracker.py", "save_job_message", {
+            "JOB_MESSAGE_TYPES": ("screen", "cold_dm", "hr_email", "resume_points", "demo_html"),
+            "DEFAULT_MESSAGE_TYPE": "cold_dm",
+            "_get_client": lambda: db,
+            "datetime": __import__("datetime").datetime,
+        })
+
+    def test_a_foreign_demo_link_is_refused_before_any_write(self):
+        writes = []
+        saved = self.saver(writes)(
+            54144, "demo: https://x/api/demo/54075", message_type="cold_dm",
+            profile_version=3)
+        self.assertFalse(saved)
+        self.assertEqual(writes, [], "nothing may reach the database")
+
+    def test_the_job_s_own_link_still_saves(self):
+        writes = []
+        saved = self.saver(writes)(
+            54144, "demo: https://x/api/demo/54144", message_type="cold_dm",
+            profile_version=3)
+        self.assertTrue(saved)
+        self.assertEqual(len(writes), 1)
+
+    def test_a_long_cold_dm_still_saves_here(self):
+        """Only the demo check moved to this layer; widening it would start
+        rejecting drafts that save fine today."""
+        writes = []
+        saved = self.saver(writes)(54144, "x" * 400, message_type="cold_dm",
+                                   profile_version=3)
+        self.assertTrue(saved)
 
 
 class OutreachDraftingTests(unittest.TestCase):

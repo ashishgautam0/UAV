@@ -11,6 +11,10 @@ from unittest.mock import MagicMock, patch
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+# cmd_save imports outreach_quality at call time. This lane installs nothing,
+# and that module only needs `re`, so making it importable keeps the test on
+# the real validator instead of a stub.
+sys.path.insert(0, str(ROOT / "modules"))
 
 
 def function(path, name, env):
