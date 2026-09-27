@@ -188,9 +188,9 @@ def cmd_list(args):
 
 def cmd_save(args):
     content = (args.content if args.content is not None else sys.stdin.read()).strip()
-    if args.type == "cold_dm":
+    if args.type in {"cold_dm", "hr_email"}:
         from outreach_quality import validate_outreach_draft
-        problem = validate_outreach_draft(args.type, content)
+        problem = validate_outreach_draft(args.type, content, args.job_id)
         if problem:
             print(problem, file=sys.stderr)
             return 1

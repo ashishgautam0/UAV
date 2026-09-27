@@ -676,6 +676,16 @@ def save_job_message(scraped_job_id, content, message_type=DEFAULT_MESSAGE_TYPE,
     if message_type not in JOB_MESSAGE_TYPES:
         print(f"Unsupported job message type: {message_type}")
         return False
+    # Last line of defence against a draft reused across jobs: it carries the
+    # other job's demo link, which would send this employer someone else's demo.
+    # Only this check here — the rest of the outreach rules stay in cmd_save,
+    # so this cannot start rejecting drafts that save fine today.
+    from outreach_quality import wrong_demo_links
+    foreign = wrong_demo_links(content, scraped_job_id)
+    if foreign:
+        print(f"Rejected {message_type} for job {scraped_job_id}: "
+              f"it links demo(s) {', '.join(foreign)} belonging to another job.")
+        return False
     db = _get_client()
     try:
         profile_dependent = message_type in {
