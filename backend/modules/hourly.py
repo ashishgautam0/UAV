@@ -10,7 +10,7 @@ from datetime import datetime
 from rapidfuzz import fuzz
 from tracker import (
     init_db, save_scraped_job, save_email_log, get_existing_job_urls,
-    save_notification, init_notifications_table,
+    save_notification, init_notifications_table, dedup_window_days,
 )
 from scraper import run_all_scrapers
 from digest import build_email_content, get_alert_number
@@ -320,11 +320,7 @@ def main():
     # to a recent window so the all-time table (thousands of old/dismissed rows)
     # doesn't block genuinely re-listed roles. Tunable via DEDUP_WINDOW_DAYS.
     print("\nChecking for duplicates...")
-    try:
-        dedup_days = int(os.environ.get("DEDUP_WINDOW_DAYS", "14"))
-    except ValueError:
-        dedup_days = 14
-    existing_urls = get_existing_job_urls(since_days=dedup_days)
+    existing_urls = get_existing_job_urls(since_days=dedup_window_days())
     new_jobs = [j for j in jobs if j.get("url", "") not in existing_urls]
     print(f"New jobs: {len(new_jobs)} (filtered out {len(jobs) - len(new_jobs)} duplicates)")
 

@@ -1,5 +1,4 @@
 import hashlib
-import os
 from io import BytesIO
 from typing import Literal
 import json
@@ -148,6 +147,14 @@ def update_profile(body: UserProfileRequest):
     return UserProfileResponse(username=_DEFAULT_USERNAME)
 
 
+def _settings_field_limit(key):
+    if key == "desktop_prompt_template":
+        return 40_000
+    if key.endswith("template") or key == "automation_rules":
+        return 12_000
+    return 500
+
+
 @router.get("/application-settings", response_model=ApplicationPromptSettings)
 def read_application_settings():
     """Load application answers from backend state for any browser/device."""
@@ -157,7 +164,7 @@ def read_application_settings():
 @router.put("/application-settings", response_model=ApplicationPromptSettings)
 def update_application_settings(body: ApplicationPromptSettings):
     payload = {
-        key: _clean_text(value, 12_000 if key.endswith("template") or key == "automation_rules" else 500)
+        key: _clean_text(value, _settings_field_limit(key))
         for key, value in body.model_dump(exclude_unset=True).items()
     }
     saved = save_application_prompt_settings(_DEFAULT_USERNAME, payload)
@@ -586,16 +593,48 @@ def read_outreach_prompt(request: Request, page_url: str,
                                      issues=issues, unresolved_placeholders=unresolved)
 
 
-_PROMPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "prompts")
-
-
 @router.get("/desktop-prompt")
-def read_desktop_prompt():
-    """Return the Claude Desktop Computer Use job search prompt."""
-    path = os.path.join(_PROMPTS_DIR, "job-agent-desktop.md")
-    try:
-        with open(path) as f:
-            content = f.read()
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Desktop prompt file not found.")
-    return {"content": content}
+def read_desktop_prompt(request: Request):
+    """Return the editable Claude Desktop prompt plus its rendered copy.
+
+    `template` is what Settings edits and saves; `content` is the same text with
+    the live API and resume links resolved, which is what gets pasted into
+    Claude Desktop.
+    """
+    from profile import default_desktop_prompt
+
+    saved = get_application_prompt_settings(_DEFAULT_USERNAME).get("desktop_prompt_template")
+    if saved:
+        template = saved
+    else:
+        try:
+            template = default_desktop_prompt()
+        except OSError as exc:
+            raise HTTPException(
+                status_code=404, detail="Desktop prompt default is unavailable.",
+            ) from exc
+
+    resume = _application_pdf_metadata()
+    values = {
+        "seen_urls_url": str(request.url_for("desktop_agent_seen_urls")),
+        "record_url": str(request.url_for("desktop_agent_record_job")),
+        "resume_url": str(request.url_for("download_application_resume")),
+        "resume_filename": (resume or {}).get("filename") or "Resume.pdf",
+        "resume_sha256": (resume or {}).get("sha256") or "unavailable",
+    }
+    content = _PROMPT_PLACEHOLDER.sub(
+        lambda match: values.get(match.group(1), match.group(0)), template,
+    )
+    unresolved = sorted(set(_PROMPT_PLACEHOLDER.findall(content)))
+    issues = []
+    if unresolved:
+        issues.append("The saved prompt contains unresolved placeholders.")
+    if not resume:
+        issues.append("No Settings PDF is available, so the resume link will not work.")
+    return {
+        "content": content,
+        "template": template,
+        "customized": bool(saved),
+        "issues": issues,
+        "unresolved_placeholders": unresolved,
+    }

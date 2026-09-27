@@ -1,34 +1,56 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getDesktopPrompt } from "@/lib/api";
+import { getDesktopPrompt, updateApplicationPromptSettings } from "@/lib/api";
+import type { DesktopPromptResponse } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Copy, Loader2 } from "lucide-react";
 
 export function DesktopPrompt() {
-  const [content, setContent] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [text, setText] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [generated, setGenerated] = useState<DesktopPromptResponse | null>(null);
 
   useEffect(() => {
     getDesktopPrompt()
-      .then(({ content }) => setContent(content))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .then((data) => { setText(data.template); setGenerated(data); })
+      .catch(() => setLoadError(true))
+      .finally(() => setBusy(false));
   }, []);
 
+  async function run(save: boolean) {
+    setBusy(true);
+    try {
+      if (save) {
+        if (!text.trim()) throw new Error("Enter a prompt before saving.");
+        await updateApplicationPromptSettings({ desktop_prompt_template: text });
+        setDirty(false);
+        toast.success("Desktop prompt saved for every device.");
+      }
+      const data = await getDesktopPrompt();
+      setText(data.template);
+      setGenerated(data);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Desktop prompt could not be generated");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function copy() {
-    if (!content) return;
+    const prompt = generated?.content;
+    if (!prompt) return;
     try {
       if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
-      await navigator.clipboard.writeText(content);
+      await navigator.clipboard.writeText(prompt);
       toast.success("Desktop prompt copied — paste it into Claude Desktop");
     } catch {
       const fallback = document.createElement("textarea");
-      fallback.value = content;
+      fallback.value = prompt;
       fallback.style.position = "fixed";
       fallback.style.opacity = "0";
       document.body.appendChild(fallback);
@@ -45,26 +67,32 @@ export function DesktopPrompt() {
     <CardHeader>
       <CardTitle>Claude Desktop job search prompt</CardTitle>
       <p className="text-sm text-muted-foreground">
-        Copy and paste into Claude Desktop (Cowork) to browse Naukri, Instahyre, Cutshort, and Wellfound using Computer Use. Finds AI/ML entry-level roles and auto-applies.
+        Paste into Claude Desktop (Cowork) to browse LinkedIn, Indeed, Naukri, Instahyre, Cutshort, and Wellfound using Computer Use. On every portal it skips jobs you already applied to or dismissed, applies to matching entry-level AI/ML roles, and records each one in your tracker. Jobs the hourly scraper left in Today Todo stay appliable.
       </p>
     </CardHeader>
     <CardContent className="space-y-3">
       <div className="rounded-lg border p-3">
         <div role="toolbar" aria-label="Desktop prompt actions" className="mb-3 flex flex-wrap gap-2">
-          <Button disabled={!content || loading} onClick={copy}>
-            <Copy className="mr-2 h-4 w-4" />Copy prompt for Claude Desktop
-          </Button>
+          <Button disabled={busy || loadError} onClick={() => run(true)}>{busy ? "Working…" : "Save prompt"}</Button>
+          <Button variant="outline" disabled={busy || dirty || loadError} onClick={() => run(false)}>Generate prompt</Button>
+          <Button variant="outline" disabled={busy || dirty || !generated?.content} onClick={copy}>Copy prompt</Button>
         </div>
-        {loading && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading prompt…</div>}
-        {error && <p role="alert" className="text-sm text-destructive">Could not load the desktop prompt. Check that the backend is running.</p>}
-        {content && <details>
-          <summary className="cursor-pointer text-sm">View prompt</summary>
-          <Textarea readOnly value={content} rows={18} aria-label="Claude Desktop job search prompt" />
-        </details>}
+        <label htmlFor="prompt-desktop" className="text-sm font-medium">Editable desktop prompt</label>
+        <Textarea id="prompt-desktop" value={text} rows={16} maxLength={40000} disabled={busy || loadError}
+          onChange={(e) => { setText(e.target.value); setDirty(true); }} />
       </div>
       <p className="text-xs text-muted-foreground">
-        Log into Naukri, Instahyre, Cutshort, and Wellfound in your browser before starting. The agent reads your resume from ~/Documents/resume.pdf and applies to up to 10 jobs per portal.
+        Log into all six portals in your browser before starting. Generate resolves the live tracker API and resume links; the agent applies to at most 10 jobs per portal and has no overall time limit. Placeholders: {"{{seen_urls_url}}"}, {"{{record_url}}"}, {"{{resume_url}}"}, {"{{resume_filename}}"}, {"{{resume_sha256}}"}.
       </p>
+      {loadError && <p role="alert" className="text-sm text-destructive">Could not load the desktop prompt. Check that the backend is running.</p>}
+      {dirty && <p role="status" className="text-sm text-amber-600">Unsaved changes — save before copying.</p>}
+      {generated && <>
+        {generated.issues.length > 0 && <ul role="alert" className="list-disc pl-5 text-sm">{generated.issues.map(issue => <li key={issue}>{issue}</li>)}</ul>}
+        {!generated.customized && <p className="text-xs text-muted-foreground">Showing the shipped default. Saving stores your own copy.</p>}
+        <details><summary className="cursor-pointer text-sm">Generated prompt preview{dirty ? " (previous version)" : ""}</summary>
+          <Textarea readOnly value={generated.content} rows={16} aria-label="Generated desktop prompt" />
+        </details>
+      </>}
     </CardContent>
   </Card>;
 }
