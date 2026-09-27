@@ -95,9 +95,9 @@ job_search_tool/
 │   └── src/app/
 │       ├── (app)/
 │       │   ├── dashboard/       # Analytics dashboard
-│       │   ├── tonight/         # Tonight's Plan view
+│       │   ├── tonight/         # Today Todo view (hidden from nav)
 │       │   ├── tracker/         # Application tracker
-│       │   ├── prep28/          # Interview prep plan
+│       │   ├── prep28/          # Interview prep plan (hidden from nav)
 │       │   └── settings/        # Settings
 │       └── page.tsx             # Landing page
 └── supabase/
@@ -350,6 +350,7 @@ GET      /api/scraped-jobs/{id}/message  # Routine-written outreach message
 GET      /api/tonight         # Tonight's Plan jobs
 POST     /api/company-research # Company research
 GET/PUT  /api/prep28          # 28-day prep progress
+GET/POST /api/desktop-agent   # Skip list + job recording for the Desktop agent
 GET/POST /api/demos           # Mini demo projects
 GET/PUT  /api/profile         # User profile
 POST     /api/notifications   # Push notifications
