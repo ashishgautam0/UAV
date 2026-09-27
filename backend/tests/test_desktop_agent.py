@@ -8,6 +8,12 @@ from test_settings_profile import ROOT, function
 import profile as profile_data
 
 
+# The `source` values the prompt tells the agent to send, spelled as the stats
+# pages group them. Keep in step with the portal sections in the prompt.
+PORTAL_SOURCES = ("LinkedIn", "Indeed", "Naukri", "Instahyre", "Cutshort",
+                  "Wellfound", "Shine", "Glassdoor", "FirstNaukri", "Unstop", "Apna")
+
+
 def stub_tracker(handled_urls=(), applied_urls=(), scraped_id=None, insert_id=7):
     """Replace the data layer so router logic is tested without Supabase.
 
@@ -109,7 +115,7 @@ class RecordJobTests(unittest.TestCase):
         self.assertEqual(calls["marked"], [(7, "applied")])
 
     def test_every_portal_records_the_same_way(self):
-        for portal in ("LinkedIn", "Indeed", "Naukri", "Instahyre", "Cutshort", "Wellfound"):
+        for portal in PORTAL_SOURCES:
             with self.subTest(portal=portal):
                 module, calls = stub_tracker(scraped_id=None, insert_id=7)
                 result = self.endpoint(module)(self.job(source=portal))
@@ -204,7 +210,8 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertTrue(any("PDF" in issue for issue in result["issues"]))
         self.assertIn("Resume.pdf", result["content"])
 
-    PORTALS = ("LINKEDIN", "INDEED", "NAUKRI", "INSTAHYRE", "CUTSHORT", "WELLFOUND")
+    PORTALS = ("LINKEDIN", "INDEED", "NAUKRI", "INSTAHYRE", "CUTSHORT", "WELLFOUND",
+               "SHINE", "GLASSDOOR", "FIRSTNAUKRI", "UNSTOP", "APNA")
 
     def test_prompt_covers_every_portal_dedup_tracker_and_no_time_cap(self):
         for portal in self.PORTALS:
@@ -228,9 +235,32 @@ class DesktopPromptTests(unittest.TestCase):
 
     def test_recording_is_portal_agnostic_and_lists_every_source(self):
         step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## SESSION", 1)[0]
-        for portal in ("LinkedIn", "Indeed", "Naukri", "Instahyre", "Cutshort", "Wellfound"):
-            self.assertIn(portal, step2)
+        for portal in PORTAL_SOURCES:
+            with self.subTest(portal=portal):
+                self.assertIn(portal, step2)
         self.assertIn("every portal", step2)
+
+    def test_no_portal_section_overrides_the_shared_title_rules(self):
+        """A per-portal note must not re-admit titles the global rules reject —
+        the fresher-focused sites are the tempting place to get this wrong."""
+        sections = re.split(r"^### \d+\. ", self.prompt, flags=re.MULTILINE)[1:]
+        for section in sections:
+            name = section.split("\n", 1)[0]
+            with self.subTest(portal=name):
+                lowered = section.lower()
+                for exempting in ("not a reason to skip.", "is not a reason to skip",
+                                  "trainee engineer"):
+                    if exempting in lowered:
+                        self.assertIn("title rules", lowered,
+                                      f"{name} relaxes a rule without deferring to TITLE RULES")
+
+    def test_summary_and_run_order_cover_every_portal(self):
+        summary = self.prompt.split("END-OF-SESSION SUMMARY", 1)[1]
+        order = self.prompt.split("Work the portals in this order:", 1)[1].split("###", 1)[0]
+        for portal in PORTAL_SOURCES:
+            with self.subTest(portal=portal):
+                self.assertIn(portal, summary)
+                self.assertIn(portal, order)
 
     def test_saved_settings_answers_are_rendered_into_the_prompt(self):
         """The agent must use the answers the user saved, not invent a notice
