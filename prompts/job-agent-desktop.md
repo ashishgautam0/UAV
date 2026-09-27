@@ -148,7 +148,7 @@ Before applying, scan the JD for these red flags:
 1. Open `naukri.com` in my browser (I am already logged in)
 2. Click the search bar, type the first search query
 3. Set filters: Location = India, Experience = 0-2 years, Date = Last 7 days
-4. For each job in the results (up to 30 per query):
+4. For each job in the results (stop after 10 applications on this portal):
    a. Click the job title to open the full JD
    b. Read the title — check against TITLE RULES above
    c. Read the JD — check experience requirement
@@ -257,7 +257,9 @@ For each job, track:
 
 ## SESSION LIMITS
 
-- **Maximum 20 applications per portal** (80 total across all 4)
+- **Maximum 10 applications per portal** (40 total across all 4)
+- After reaching 10 applications on a portal, stop and move to the next
+  portal immediately — do not continue searching that portal
 - **Maximum 2 hours total session time**
 - If you hit a rate limit or notice unusual behavior (constant CAPTCHAs,
   blocked pages), stop that portal and move to the next

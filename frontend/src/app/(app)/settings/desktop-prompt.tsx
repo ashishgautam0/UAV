@@ -63,7 +63,7 @@ export function DesktopPrompt() {
         </details>}
       </div>
       <p className="text-xs text-muted-foreground">
-        Log into Naukri, Instahyre, Cutshort, and Wellfound in your browser before starting. The agent reads your resume from ~/Documents/resume.pdf and applies to up to 20 jobs per portal.
+        Log into Naukri, Instahyre, Cutshort, and Wellfound in your browser before starting. The agent reads your resume from ~/Documents/resume.pdf and applies to up to 10 jobs per portal.
       </p>
     </CardContent>
   </Card>;
