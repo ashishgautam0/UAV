@@ -21,6 +21,7 @@ import { CheckCircle2, Copy, Loader2, Plus, RefreshCw, Trash2, Upload } from "lu
 import styles from "./settings.module.css";
 import { toPromptEditor, fromPromptEditor } from "@/lib/application-prompt-editor";
 import { OutreachPrompt } from "./outreach-prompt";
+import { DesktopPrompt } from "./desktop-prompt";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const EMPTY_APPLICATION_SETTINGS: ApplicationPromptSettings = {
@@ -254,6 +255,7 @@ export default function SettingsPage() {
       <OutreachPrompt kind="followup" title="HR follow-up email prompt" description="Use your Gmail and Dashboard’s Follow-ups Due queue. Check recipient evidence, dates, Sent history and bounces before sending." initialValue={applicationSettings.followup_template} />
       <OutreachPrompt kind="cold_dm" title="Cold DM prompt" description="Generate a fixed batch of eligible due jobs with their saved Cold DM text. Verify each job is still due before sending a LinkedIn connection note; record a confirmed send to advance its existing follow-up schedule." initialValue={applicationSettings.cold_dm_template} />
     </>}
+    <DesktopPrompt />
     <Card>
       <CardHeader><CardTitle>Exclude companies from scraped jobs</CardTitle><p className="text-sm text-muted-foreground">Enter one employer per line. The Claude hourly scraper skips new jobs from these companies before saving or including them in digests. Existing Tracker jobs and history stay intact.</p></CardHeader>
       <CardContent className="space-y-3">

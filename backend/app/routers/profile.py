@@ -1,4 +1,5 @@
 import hashlib
+import os
 from io import BytesIO
 from typing import Literal
 import json
@@ -583,3 +584,18 @@ def read_outreach_prompt(request: Request, page_url: str,
     return RenderedApplicationPrompt(prompt=prompt, job_count=len(jobs or []), resume_available=bool(resume),
                                      ready=bool(resume) and not unresolved and (kind != "cold_dm" or bool(jobs)),
                                      issues=issues, unresolved_placeholders=unresolved)
+
+
+_PROMPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "prompts")
+
+
+@router.get("/desktop-prompt")
+def read_desktop_prompt():
+    """Return the Claude Desktop Computer Use job search prompt."""
+    path = os.path.join(_PROMPTS_DIR, "job-agent-desktop.md")
+    try:
+        with open(path) as f:
+            content = f.read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Desktop prompt file not found.")
+    return {"content": content}

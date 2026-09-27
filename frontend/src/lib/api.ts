@@ -283,6 +283,10 @@ export async function getRenderedOutreachPrompt(pageUrl: string, kind: "hr_email
   );
 }
 
+export async function getDesktopPrompt(): Promise<{ content: string }> {
+  return apiFetch<{ content: string }>("/api/profile/desktop-prompt");
+}
+
 export async function uploadResumePdf(file: File): Promise<ResumeProfile> {
   const form = new FormData();
   form.append("file", file);
