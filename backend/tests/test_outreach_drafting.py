@@ -148,6 +148,21 @@ class OutreachDraftingTests(unittest.TestCase):
         self.assertEqual(extract_published_emails("(hr@a.com). Also HR@A.COM"), ["hr@a.com"])
         self.assertEqual(extract_published_emails(None), [])
 
+    def test_harvesting_imports_without_any_third_party_package(self):
+        """This lane installs nothing. A module-level `import requests` in
+        email_finder broke the whole file's collection in CI while passing
+        locally, so the harvester must need only the standard library."""
+        source = (ROOT / "modules/email_finder.py").read_text()
+        top_level = [
+            line for line in source.splitlines()
+            if line.startswith(("import ", "from ")) and "__future__" not in line
+        ]
+        self.assertNotIn("import requests", top_level)
+        for stdlib in ("import re", "import json"):
+            self.assertIn(stdlib, top_level)
+        # requests is still reachable where it is actually needed.
+        self.assertIn("    import requests", source)
+
     def test_the_pattern_guesser_is_documented_as_unusable_here(self):
         """Port 25 is blocked on Vercel and in the routine container, so every
         candidate returns as an unverified guess. Nothing may read it as a

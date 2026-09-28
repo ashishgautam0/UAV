@@ -34,7 +34,9 @@ import string
 import sys
 import unicodedata
 
-import requests
+# `requests` is imported inside mx_lookup, not here: extract_published_emails
+# needs only `re`, and the dependency-light CI lanes that exercise it install
+# no third-party packages.
 
 DOH_ENDPOINTS = [
     "https://dns.google/resolve",
@@ -132,6 +134,8 @@ def candidates_for(name, domain):
 
 def mx_lookup(domain, timeout=6):
     """MX hosts sorted by priority, via DNS-over-HTTPS (proxy-friendly)."""
+    import requests
+
     for endpoint in DOH_ENDPOINTS:
         try:
             resp = requests.get(
