@@ -58,6 +58,97 @@ class SeenUrlsTests(unittest.TestCase):
         self.assertEqual(self.endpoint(module)()["urls"], [])
 
 
+class StrictColumn:
+    """A column that rejects what Postgres rejects.
+
+    applied and dismissed are integer columns. A previous version filtered them
+    with Python booleans, so PostgREST sent eq.true, Postgres raised
+    'invalid input syntax for type integer', a blanket except swallowed it and
+    the skip list came back empty — telling the agent to re-apply to
+    everything. A permissive fake accepted the boolean and the tests passed.
+    """
+
+    INTEGER_COLUMNS = {"applied", "dismissed"}
+
+    def __init__(self, rows, seen):
+        self.rows, self.seen, self.filters = rows, seen, {}
+
+    def select(self, *_a):
+        return self
+
+    def eq(self, column, value):
+        if column in self.INTEGER_COLUMNS and isinstance(value, bool):
+            raise RuntimeError(
+                f'invalid input syntax for type integer: "{value}"')
+        self.filters[column] = value
+        self.seen.append((column, value))
+        return self
+
+    def gte(self, _column, _value):
+        return self
+
+    def range(self, low, _high):
+        self.low = low
+        return self
+
+    def execute(self):
+        if getattr(self, "low", 0):
+            return SimpleNamespace(data=[])
+        matched = [r for r in self.rows
+                   if all(r.get(k) == v for k, v in self.filters.items())]
+        return SimpleNamespace(data=matched)
+
+
+class DedupQueryTests(unittest.TestCase):
+    """Exercises the real queries against a fake that enforces column types."""
+
+    ROWS = [
+        {"url": "https://applied/1", "applied": 1, "dismissed": 0},
+        {"url": "https://dismissed/2", "applied": 0, "dismissed": 1},
+        {"url": "https://pending/3", "applied": 0, "dismissed": 0},
+    ]
+
+    def dedup_fn(self, name, seen):
+        rows = {"scraped_jobs": self.ROWS,
+                "applications": [{"url": "https://tracked/4"}]}
+        env = {"_get_client": lambda: SimpleNamespace(
+            table=lambda t: StrictColumn(rows[t], seen))}
+        env["_paginate"] = function(ROOT / "modules/tracker.py", "_paginate", {})
+        return function(ROOT / "modules/tracker.py", name, env)
+
+    def test_skip_list_uses_integer_filters_and_finds_handled_jobs(self):
+        seen = []
+        urls = self.dedup_fn("get_handled_job_urls", seen)()
+        self.assertEqual(urls, {"https://applied/1", "https://dismissed/2",
+                                "https://tracked/4"})
+        self.assertNotIn("https://pending/3", urls)
+        self.assertEqual(sorted(seen), [("applied", 1), ("dismissed", 1)])
+
+    def test_scraper_dedup_uses_integer_filters(self):
+        seen = []
+        urls = self.dedup_fn("get_existing_job_urls", seen)(since_days=14)
+        # Every saved posting, unlike the skip list: an applied job is
+        # non-dismissed and so still counts as "the scraper has seen this".
+        self.assertEqual(urls, {"https://applied/1", "https://pending/3",
+                                "https://dismissed/2"})
+        self.assertEqual(sorted(seen), [("dismissed", 0), ("dismissed", 1)])
+
+    def test_a_query_error_is_raised_not_silently_returned_as_empty(self):
+        """An empty skip list from a failure is the dangerous default: it reads
+        as 'nothing handled yet' and the agent re-applies to everything."""
+        def exploding(_table):
+            raise RuntimeError("PostgREST is down")
+        for name, args in (("get_handled_job_urls", ()),
+                           ("get_existing_job_urls", (14,))):
+            with self.subTest(fn=name):
+                fn = function(ROOT / "modules/tracker.py", name, {
+                    "_get_client": lambda: SimpleNamespace(table=exploding),
+                    "_paginate": function(ROOT / "modules/tracker.py", "_paginate", {}),
+                })
+                with self.assertRaises(RuntimeError):
+                    fn(*args)
+
+
 class RecordJobTests(unittest.TestCase):
     def endpoint(self, module):
         return function(ROOT / "app/routers/desktop_agent.py", "record_job", {

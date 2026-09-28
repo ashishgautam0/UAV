@@ -446,21 +446,24 @@ def get_handled_job_urls():
     pending in Today Todo is absent — the desktop agent is meant to apply to
     exactly those. All-time on purpose: a job applied to a year ago must never
     come back around.
+
+    Errors propagate on purpose. An empty skip list is indistinguishable from a
+    working one with nothing in it, and it is the worst possible default here:
+    it tells the agent to apply to everything again.
     """
-    try:
-        db = _get_client()
+    db = _get_client()
 
-        def scraped(flag):
-            return lambda lo, hi: (db.table("scraped_jobs").select("url")
-                                   .eq(flag, True).range(lo, hi))
+    def scraped(flag):
+        # applied/dismissed are integer columns — a boolean here makes
+        # PostgREST send eq.true, which Postgres cannot cast to integer.
+        return lambda lo, hi: (db.table("scraped_jobs").select("url")
+                               .eq(flag, 1).range(lo, hi))
 
-        def applications(lo, hi):
-            return db.table("applications").select("url").range(lo, hi)
+    def applications(lo, hi):
+        return db.table("applications").select("url").range(lo, hi)
 
-        return (_paginate(scraped("applied")) | _paginate(scraped("dismissed"))
-                | _paginate(applications))
-    except Exception:
-        return set()
+    return (_paginate(scraped("applied")) | _paginate(scraped("dismissed"))
+            | _paginate(applications))
 
 
 def get_existing_job_urls(since_days=None):
@@ -476,28 +479,31 @@ def get_existing_job_urls(since_days=None):
     Dismissed URLs are always excluded regardless of age — a dismissal is
     permanent and a re-scrape of a dismissed posting must never recount it as
     "new" or reset its dismissed state.
+
+    Errors propagate on purpose: an empty set silently makes every job look new
+    and the whole run re-processes what it already handled.
     """
-    try:
-        db = _get_client()
-        cutoff = None
-        if since_days:
-            from datetime import datetime, timedelta, timezone
-            cutoff = (datetime.now(timezone.utc) - timedelta(days=since_days)).isoformat()
+    db = _get_client()
+    cutoff = None
+    if since_days:
+        from datetime import datetime, timedelta, timezone
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=since_days)).isoformat()
 
-        # Windowed set: recent non-dismissed rows (prevents re-listing noise)
-        def recent_query(lo, hi):
-            q = db.table("scraped_jobs").select("url").eq("dismissed", False)
-            if cutoff:
-                q = q.gte("scraped_at", cutoff)
-            return q.range(lo, hi)
+    # dismissed is an integer column, so these filters must be 0/1 — a boolean
+    # makes PostgREST send eq.true, which Postgres cannot cast to integer.
 
-        # All-time set: every dismissed URL regardless of age
-        def dismissed_query(lo, hi):
-            return db.table("scraped_jobs").select("url").eq("dismissed", True).range(lo, hi)
+    # Windowed set: recent non-dismissed rows (prevents re-listing noise)
+    def recent_query(lo, hi):
+        q = db.table("scraped_jobs").select("url").eq("dismissed", 0)
+        if cutoff:
+            q = q.gte("scraped_at", cutoff)
+        return q.range(lo, hi)
 
-        return _paginate(recent_query) | _paginate(dismissed_query)
-    except Exception:
-        return set()
+    # All-time set: every dismissed URL regardless of age
+    def dismissed_query(lo, hi):
+        return db.table("scraped_jobs").select("url").eq("dismissed", 1).range(lo, hi)
+
+    return _paginate(recent_query) | _paginate(dismissed_query)
 
 
 def save_scraped_job(title, company, location, source, url, description="",
