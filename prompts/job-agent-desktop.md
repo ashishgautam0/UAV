@@ -46,12 +46,16 @@ Key facts to match against (verify these exist in the PDF):
 
 ## RULES THAT APPLY TO EVERY PORTAL
 
-These two rules are not portal-specific. They apply identically on **all eleven**
-portals — LinkedIn, Indeed, Naukri, Instahyre, Cutshort, Wellfound, Shine,
-Glassdoor India, FirstNaukri, Unstop and Apna:
+These three rules are not portal-specific. They apply identically on **all
+eleven** portals — LinkedIn, Indeed, Naukri, Instahyre, Cutshort, Wellfound,
+Shine, Glassdoor India, FirstNaukri, Unstop and Apna:
 
 1. **Check the skip list before opening any posting** (STEP 0).
 2. **Record every posting you handle, applied or skipped** (STEP 2).
+3. **Where the application lives is never a reason to skip a job.** A posting
+   that hands you off to the employer's own site or an ATS gets applied to
+   exactly like one you can finish on the portal — see APPLYING ON THE
+   EMPLOYER'S OWN SITE.
 
 If you find yourself doing either of these on one portal but not another, you
 are doing it wrong. There are no exceptions.
@@ -226,6 +230,45 @@ Before applying, scan the JD for these red flags:
 - **Generic trainee**: "management trainee", "graduate trainee",
   "fresher trainee"
 
+## APPLYING ON THE EMPLOYER'S OWN SITE
+
+Most good jobs do not apply from inside the job board. The button says "Apply
+on company site", or the portal's apply opens Greenhouse, Lever, Workday,
+SmartRecruiters, Taleo, Zoho Recruit, Keka, Darwinbox or the company's own
+careers page in a new tab.
+
+**Follow it and finish the application there.** These are not "portal jobs" and
+they are not optional extras — they are the majority of the real openings, and
+leaving them is how a run ends with far fewer applications than jobs it found.
+This applies on **every one of the eleven portals**, not just LinkedIn.
+
+The procedure is the same wherever the hand-off comes from:
+
+1. **Follow the link** to the employer's site or ATS and let the page load
+   fully, even when it is slow or opens in a new tab.
+2. **If the site requires an account first, create one** — my real name, the
+   email from my resume, and a fresh strong password. Let the browser's
+   password manager save it, and list the site under "Accounts created" in the
+   summary so I know the account exists.
+   Never reuse a password from another site, and never type an existing
+   password of mine into a site you did not just create that account on.
+3. **Complete any CAPTCHA yourself** with ordinary clicking and typing, then
+   check the application continues. See CAPTCHA, OTP & BLOCKERS if it will not.
+4. **Fill the form** from my resume and saved answers per the FORM FILLING
+   RULES, upload the resume PDF, and write a 2-3 sentence cover note specific
+   to this role.
+5. **Submit and wait for the confirmation screen.** Only then is it applied.
+6. **Record it through the API** (STEP 2) with the portal you found it on as
+   `source` and the portal's posting URL as `url` — not the ATS URL — so the
+   skip list matches it next time.
+
+A longer form, a multi-step wizard, a required account, or a CAPTCHA are all
+normal parts of this and none of them is a reason to abandon the job. The only
+things that end an off-site application are the ones already listed elsewhere:
+a fee, a statement that would not be true, a timed test, a page that will not
+load, or a CAPTCHA you genuinely cannot clear — and each of those ends that one
+application, not the run.
+
 ## PORTAL-BY-PORTAL INSTRUCTIONS
 
 Work the portals in this order: LinkedIn → Indeed → Naukri → Instahyre →
@@ -256,20 +299,11 @@ early, it should stop having worked those rather than having spread thin.
         RULES, then click Submit on the review step. Never leave a partially
         filled Easy Apply modal open — either submit it or discard it.
       - **"Apply" that opens the company's own site or an ATS** (Greenhouse,
-        Lever, Workday, SmartRecruiters, Taleo) — go there and complete the
-        application properly rather than skipping it:
-          * If the site requires an account before applying, create one using
-            my real name and the email from my resume, with a fresh strong
-            password. Let the browser's password manager save it, and list the
-            site under "Accounts created" in your summary so I know it exists.
-            Never reuse a password from another site, and never type a password
-            of mine into a site you did not just create that account on.
-          * Complete any CAPTCHA on the page yourself with ordinary clicking
-            and typing, then check the application continues — see CAPTCHA,
-            OTP & BLOCKERS below if it will not complete.
-          * Fill the form from my resume and saved answers, and write a 2-3
-            sentence cover note specific to the role.
-          * Submit, and wait for the confirmation screen.
+        Lever, Workday, SmartRecruiters, Taleo) — follow it and complete the
+        application there, per APPLYING ON THE EMPLOYER'S OWN SITE above.
+        Creating an account and clearing a CAPTCHA are part of that, not
+        reasons to skip. These are the jobs the Easy Apply filter would have
+        hidden, so expect plenty of them.
       - **After an external application succeeds, go back to that job on
         LinkedIn and click "Yes" on the "Did you apply?" prompt**, so LinkedIn
         marks it applied and stops resurfacing it. Do this only once you have
@@ -303,9 +337,9 @@ early, it should stop having worked those rather than having spread thin.
         employer questions using the FORM FILLING RULES, then submit on the
         review step.
       - If the button says "Apply on company site", follow it and complete the
-        application there — creating an account and completing a CAPTCHA if the
-        site requires it, exactly as described for LinkedIn above. Fill the form
-        from my resume and saved answers with a 2-3 sentence cover note.
+        application there, per APPLYING ON THE EMPLOYER'S OWN SITE — account
+        creation and CAPTCHA included. On Indeed these are most of the good
+        listings; never leave one because it is not an Indeed-hosted apply.
       - If Indeed shows the job as already applied, treat it as already handled
         and skip it.
    f. Record the job through the API (see STEP 2 below)
@@ -328,9 +362,10 @@ early, it should stop having worked those rather than having spread thin.
       - Click "Apply" or "Apply on company site"
       - If Naukri's Quick Apply popup appears: verify pre-filled details are
         correct, upload my resume if not already attached, click Submit
-      - If it redirects to an external site: fill the application form using
-        my resume details (name, email, phone, upload resume PDF, write a
-        2-3 sentence cover note specific to this role)
+      - If it redirects to an external site, complete it there per APPLYING
+        ON THE EMPLOYER'S OWN SITE — account creation and CAPTCHA included.
+        Naukri hands a lot of listings off this way and every one of them
+        still gets applied to.
       - If screening questions appear: answer them from my saved answers and
         resume per the FORM FILLING RULES below — do not improvise a salary,
         notice period or relocation answer here.
@@ -350,6 +385,8 @@ early, it should stop having worked those rather than having spread thin.
    c. If it passes title + experience checks:
       - Click "Apply" or "I'm Interested"
       - Fill any required fields
+      - If it hands off to the employer's site or an ATS, complete it there
+        per APPLYING ON THE EMPLOYER'S OWN SITE
       - Submit
    d. Record the job through the API (see STEP 2 below)
    e. Wait 15-20 seconds between applications
@@ -365,6 +402,8 @@ early, it should stop having worked those rather than having spread thin.
       - Click "Apply" or "I'm interested"
       - Fill any required response or cover message (2-3 sentences, specific
         to the role, using only verified resume facts)
+      - If it hands off to the employer's site or an ATS, complete it there
+        per APPLYING ON THE EMPLOYER'S OWN SITE
       - Submit
    d. Record the job through the API (see STEP 2 below)
    e. Wait 15-20 seconds between applications
@@ -380,6 +419,8 @@ early, it should stop having worked those rather than having spread thin.
       - Click "Apply"
       - Fill application fields (most should be pre-filled from profile)
       - Add a short note specific to this startup (reference their product)
+      - Many Wellfound startups apply on their own site or ATS — follow it and
+        complete it there per APPLYING ON THE EMPLOYER'S OWN SITE
       - Submit
    d. Record the job through the API (see STEP 2 below)
    e. Wait 15-20 seconds between applications
@@ -396,7 +437,8 @@ early, it should stop having worked those rather than having spread thin.
    d. If it passes:
       - Click "Apply" — Shine usually applies straight from the saved profile
       - If it opens a questionnaire, answer it from my saved answers
-      - If it redirects to the company site, fill that form instead
+      - If it redirects to the company site, complete it there per APPLYING
+        ON THE EMPLOYER'S OWN SITE
    e. Record the job through the API (see STEP 2 below)
    f. Wait 15-20 seconds between applications
 
@@ -414,7 +456,9 @@ early, it should stop having worked those rather than having spread thin.
    d. If it passes:
       - "Easy Apply" — complete it in place with my resume and saved answers
       - Otherwise the button goes to the employer's own site or an ATS
-        (Greenhouse, Lever, Workday); follow it and fill that form
+        (Greenhouse, Lever, Workday); follow it and complete it there per
+        APPLYING ON THE EMPLOYER'S OWN SITE. On Glassdoor this is the common
+        case, not the exception.
    e. Record the job through the API (see STEP 2 below)
    f. Wait 20-30 seconds before the next application
 4. Glassdoor often interrupts with a sign-up or "continue reading" wall. If one
@@ -435,7 +479,9 @@ experience band. That is a fit, not a reason to skip.
       here. What is different is only that a JD asking for "0 years" or
       "fresher" is a normal match on this site, not a red flag.
    d. If it passes:
-      - Click "Apply" and complete any assessment-free application
+      - Click "Apply" and complete any assessment-free application,
+        following a hand-off to the employer's own site per APPLYING ON THE
+        EMPLOYER'S OWN SITE
       - **Skip** any posting that requires sitting a timed test or coding
         assessment to apply — note it as skipped with that reason
    e. Record the job through the API (see STEP 2 below)
@@ -457,7 +503,8 @@ Unstop mixes competitions, hackathons and hiring challenges with real jobs.
       - anything with an entry fee, and anything requiring a timed round to
         apply
    d. If it is a real job posting and it passes:
-      - Click "Apply Now" and complete the application
+      - Click "Apply Now" and complete the application, following a hand-off
+        to the employer's own site per APPLYING ON THE EMPLOYER'S OWN SITE
       - Add a short role-specific note if a message field is offered
    e. Record the job through the API (see STEP 2 below)
    f. Wait 15-20 seconds between applications
@@ -478,7 +525,8 @@ gate matters more here than anywhere else.
    d. Also skip any listing that asks for a placement fee, deposit or
       registration payment, and any listing without a named employer
    e. If it passes:
-      - Click "Apply" and complete the application
+      - Click "Apply" and complete the application, following a hand-off to
+        the employer's own site per APPLYING ON THE EMPLOYER'S OWN SITE
       - Apna may want to start a WhatsApp or in-app chat with the employer.
         Submitting the application is enough — **do not** send chat messages
         or share my phone number beyond the application form.
@@ -618,7 +666,8 @@ Field rules:
   `Apna` — spelled exactly like that, since my stats group by this field
 - **status**: `applied` when the application was actually submitted and you saw
   a confirmation. `skipped` **only** when you read the posting and rejected it
-  on the title, experience or red-flag rules.
+  on the title, experience or red-flag rules. Applying on the employer's own
+  site is never one of those reasons — that job gets `applied` like any other.
 - **notes**: for a skip, the reason (e.g. "Senior-level title",
   "Requires 5+ years"). For an application, how it was submitted.
 

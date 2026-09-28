@@ -341,6 +341,41 @@ class DesktopPromptTests(unittest.TestCase):
         blockers = self.prompt.split("## CAPTCHA, OTP & BLOCKERS", 1)[1].split("## STEP 2", 1)[0]
         self.assertNotIn("Wait for confirmation", blockers)
 
+    def test_every_portal_applies_on_the_employer_site_instead_of_skipping(self):
+        """The agent was skipping every job that applied on the company's own
+        site, which is most of the real openings. The shared procedure has to
+        exist and every portal section has to route into it."""
+        section = self.prompt.split("## APPLYING ON THE EMPLOYER'S OWN SITE", 1)[1] \
+                             .split("## PORTAL-BY-PORTAL", 1)[0]
+        for required in (
+            "Follow it and finish the application there",
+            "every one of the eleven portals",
+            # what the off-site flow has to survive
+            "If the site requires an account first, create one",
+            "Complete any CAPTCHA yourself",
+            "Submit and wait for the confirmation screen",
+            # the record must key on the portal URL or dedup breaks next run
+            "not the ATS URL",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, section)
+
+        # Each portal points at the shared procedure rather than restating a
+        # partial version of it — a portal that omits it is one that skips.
+        sections = re.split(r"^### \d+\. ", self.prompt, flags=re.MULTILINE)[1:]
+        self.assertEqual(len(sections), len(self.PORTALS))
+        for body in sections:
+            name = body.split("\n", 1)[0]
+            with self.subTest(portal=name):
+                self.assertIn("EMPLOYER'S OWN SITE", body)
+
+        # An off-site apply route is never a valid `skipped` reason.
+        rules = self.prompt.split("## RULES THAT APPLY TO EVERY PORTAL", 1)[1] \
+                           .split("## STEP 0", 1)[0]
+        self.assertIn("never a reason to skip a job", rules)
+        step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## KEEP GOING", 1)[0]
+        self.assertIn("Applying on the employer's own\n  site is never one of those reasons", step2)
+
     def test_dedup_and_recording_are_required_on_each_portal(self):
         """Every portal section must carry both the skip check and the record step."""
         sections = re.split(r"^### \d+\. ", self.prompt, flags=re.MULTILINE)[1:]
@@ -484,11 +519,21 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertIn("Today Todo", step0)
         self.assertIn("Never skip a job just because it was already in my database", step0)
 
-    def test_prompt_fits_the_saved_field_limit(self):
+    def test_prompt_fits_the_saved_field_limit_with_real_answers(self):
+        """The stub answers above are a few bytes; the real ones are every
+        Settings field at its own 500-char ceiling. Size the prompt against
+        that worst case, or a user with long answers gets a 422 on save."""
         limit = function(ROOT / "app/routers/profile.py", "_settings_field_limit", {})
-        self.assertLess(len(self.prompt), limit("desktop_prompt_template"))
         self.assertEqual(limit("hr_email_template"), 12_000)
         self.assertEqual(limit("notice_period"), 500)
+
+        ceiling = limit("desktop_prompt_template")
+        self.assertLess(len(self.prompt), ceiling)
+        # Every answer field filled to its own limit, plus the resolved URLs.
+        worst_case = len(self.prompt) + 10 * (limit("notice_period") + 80)
+        self.assertLess(worst_case, ceiling,
+                        "the prompt has outgrown its saved-field limit once the "
+                        "Settings answers are rendered into it")
 
 
 if __name__ == "__main__":
