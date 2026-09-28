@@ -127,8 +127,8 @@ to jobs I have already applied to, which is worse for me than a run that did
 not start.
 
 **Once the run is going, nothing stops it except an account lockout.** Every
-other problem — a missing answer, an unclear question, a CAPTCHA you cannot
-clear, an OTP prompt, a dead page, a required account you cannot create — costs
+other problem — a missing answer, an unclear question, a CAPTCHA of any
+kind, an OTP prompt, a dead page, a required account you cannot create — costs
 that one job and nothing more. Skip it, note it, keep going.
 
 ## WHAT TO SEARCH
@@ -282,8 +282,8 @@ The procedure is the same wherever the hand-off comes from:
    summary so I know the account exists.
    Never reuse a password from another site, and never type an existing
    password of mine into a site you did not just create that account on.
-3. **Complete any CAPTCHA yourself** with ordinary clicking and typing, then
-   check the application continues. See CAPTCHA, OTP & BLOCKERS if it will not.
+3. **If a CAPTCHA appears, abandon this job immediately** and move to the next
+   one — do not attempt it. See CAPTCHA, OTP & BLOCKERS below.
 4. **Fill the form** from my resume and saved answers per the FORM FILLING
    RULES, upload the resume PDF, and write a 2-3 sentence cover note specific
    to this role.
@@ -292,12 +292,11 @@ The procedure is the same wherever the hand-off comes from:
    `source` and the portal's posting URL as `url` — not the ATS URL — so the
    skip list matches it next time.
 
-A longer form, a multi-step wizard, a required account, or a CAPTCHA are all
-normal parts of this and none of them is a reason to abandon the job. The only
-things that end an off-site application are the ones already listed elsewhere:
-a fee, a statement that would not be true, a timed test, a page that will not
-load, or a CAPTCHA you genuinely cannot clear — and each of those ends that one
-application, not the run.
+A longer form, a multi-step wizard and a required account are all normal parts
+of this and none of them is a reason to abandon the job. What does end an
+off-site application: a CAPTCHA, a fee, a statement that would not be true, a
+timed test, an OTP prompt, or a page that will not load. Each of those ends
+that one application, not the run.
 
 ## PORTAL-BY-PORTAL INSTRUCTIONS
 
@@ -331,9 +330,9 @@ early, it should stop having worked those rather than having spread thin.
       - **"Apply" that opens the company's own site or an ATS** (Greenhouse,
         Lever, Workday, SmartRecruiters, Taleo) — follow it and complete the
         application there, per APPLYING ON THE EMPLOYER'S OWN SITE above.
-        Creating an account and clearing a CAPTCHA are part of that, not
-        reasons to skip. These are the jobs the Easy Apply filter would have
-        hidden, so expect plenty of them.
+        Creating an account is part of that and is not a reason to skip; a
+        CAPTCHA is — abandon that job. These are the jobs the Easy Apply filter
+        would have hidden, so expect plenty of them.
       - **After an external application succeeds, go back to that job on
         LinkedIn and click "Yes" on the "Did you apply?" prompt**, so LinkedIn
         marks it applied and stops resurfacing it. Do this only once you have
@@ -367,8 +366,8 @@ early, it should stop having worked those rather than having spread thin.
         employer questions using the FORM FILLING RULES, then submit on the
         review step.
       - If the button says "Apply on company site", follow it and complete the
-        application there, per APPLYING ON THE EMPLOYER'S OWN SITE — account
-        creation and CAPTCHA included. On Indeed these are most of the good
+        application there, per APPLYING ON THE EMPLOYER'S OWN SITE, creating
+        an account where one is required. On Indeed these are most of the good
         listings; never leave one because it is not an Indeed-hosted apply.
       - If Indeed shows the job as already applied, treat it as already handled
         and skip it.
@@ -393,7 +392,7 @@ early, it should stop having worked those rather than having spread thin.
       - If Naukri's Quick Apply popup appears: verify pre-filled details are
         correct, upload my resume if not already attached, click Submit
       - If it redirects to an external site, complete it there per APPLYING
-        ON THE EMPLOYER'S OWN SITE — account creation and CAPTCHA included.
+        ON THE EMPLOYER'S OWN SITE, creating an account where one is required.
         Naukri hands a lot of listings off this way and every one of them
         still gets applied to.
       - If screening questions appear: answer them from my saved answers and
@@ -655,10 +654,11 @@ Never bypass a challenge and never use a third-party solving service.
 **A blocker ends that one job, not the run.** Leave it, note it under Issues,
 and go straight to the next posting — never sit waiting for me to answer.
 
-- **CAPTCHA**: attempt the normal on-page challenge with ordinary browser
-  interactions and check that the application continues. If you cannot complete
-  it, leave that job and move to the next one. Mention it under Issues at the
-  end; do not stop and wait for help mid-run.
+- **CAPTCHA**: **do not attempt it at all.** The moment a CAPTCHA, "verify you
+  are human", "I'm not a robot" or image/puzzle challenge appears, abandon that
+  application and go to the next job. Do not click through it, do not retry the
+  page hoping for a different challenge, and do not wait for me. My time is
+  better spent on the jobs that do not ask. Note it under Issues at the end.
 - **OTP / 2FA**: do not wait for a code. Leave that job unrecorded, note it
   under Issues, and continue. Tell me at the end which jobs needed a code so I
   can do those myself.
