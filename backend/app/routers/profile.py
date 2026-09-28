@@ -149,7 +149,11 @@ def update_profile(body: UserProfileRequest):
 
 def _settings_field_limit(key):
     if key == "desktop_prompt_template":
-        return 40_000
+        # The desktop prompt carries eleven portal playbooks and the shared
+        # apply rules, and it grows every time a portal changes. The store is
+        # a text column, so this ceiling only exists to reject a runaway paste
+        # — keep enough headroom that a normal edit never trips it.
+        return 60_000
     if key.endswith("template") or key == "automation_rules":
         return 12_000
     return 500
