@@ -47,18 +47,6 @@ _DEFAULT_USERNAME = "subidh"
 _MAX_RESUME_BYTES = 10 * 1024 * 1024
 _MAX_RESUME_PAGES = 30
 _APPLICATION_PREFIX = "application-resumes"
-_APPLICATION_ANSWER_LABELS = {
-    "submission_authorization": "Submission authorization",
-    "total_work_experience": "Total work experience (years, user-provided)",
-    "skill_experience": "Python, MLOps, LLM, RAG or another supplied/resume-supported skill (years)",
-    "onsite_any_location": "Comfortable working onsite at any location (not work authorization)",
-    "notice_period": "Notice period",
-    "current_ctc": "Current compensation",
-    "expected_ctc": "Expected compensation",
-    "expected_start_date": "Expected start date",
-    "current_location": "Current location",
-    "relocation_preference": "Relocation preference",
-}
 _PROMPT_PLACEHOLDER = re.compile(r"{{([a-z_][a-z0-9_]*)}}")
 
 
@@ -161,7 +149,7 @@ def _settings_field_limit(key):
 
 @router.get("/application-settings", response_model=ApplicationPromptSettings)
 def read_application_settings():
-    """Load application answers from backend state for any browser/device."""
+    """Load the prompt settings from backend state for any browser/device."""
     return ApplicationPromptSettings(**get_application_prompt_settings(_DEFAULT_USERNAME))
 
 
@@ -191,16 +179,6 @@ def update_company_exclusions(body: CompanyExclusionsSettings):
     ))
 
 
-def _application_answers(settings):
-    """The Settings form answers, as prompt lines shared by every apply prompt."""
-    lines = [
-        f"- {_APPLICATION_ANSWER_LABELS[key]}: {settings.get(key)}"
-        for key in _APPLICATION_ANSWER_LABELS
-        if settings.get(key)
-    ]
-    return "\n".join(lines) or "- No application-form answers are saved."
-
-
 def _render_application_prompt(template, settings, jobs, resume, page_url, resume_url):
     """Render one immutable browser-agent batch without browser-local state."""
     batch = [{
@@ -212,7 +190,6 @@ def _render_application_prompt(template, settings, jobs, resume, page_url, resum
         "url": job.get("url") or "",
     } for job in jobs]
     values = {
-        "application_answers": _application_answers(settings),
         "page_url": page_url,
         "resume_filename": (resume or {}).get("filename") or "Resume.pdf",
         "resume_url": resume_url,
@@ -224,8 +201,6 @@ def _render_application_prompt(template, settings, jobs, resume, page_url, resum
              "from job JSON; older saved wording that expects those fields is fulfilled "
              "by this server check. Recheck each listing for new mandatory requirements.\n\n" +
              (settings.get("automation_rules") or DEFAULT_AUTOMATION_RULES).rstrip())
-    if "{{application_answers}}" not in rules + template:
-        template = template.rstrip() + "\n\nUser-provided application answers:\n{{application_answers}}"
     rendered = rules + "\n\n" + template
     for key, value in values.items():
         rendered = rendered.replace("{{" + key + "}}", value)
@@ -259,8 +234,6 @@ def read_rendered_application_prompt(request: Request, page_url: str):
         issues.append("No current Today Todo jobs have a passing screen and posting URL.")
     if not resume:
         issues.append("No latest Settings PDF is available.")
-    if not settings.get("submission_authorization"):
-        issues.append("Submission authorization is blank in Settings.")
     if unresolved:
         issues.append("The saved prompt or automation rules contain unresolved placeholders.")
     return RenderedApplicationPrompt(
@@ -602,6 +575,19 @@ def read_outreach_prompt(request: Request, page_url: str,
                                      issues=issues, unresolved_placeholders=unresolved)
 
 
+def _excluded_company_lines():
+    """The Settings exclusion list as prompt bullets.
+
+    The hourly scraper filters these out of its own intake; the desktop agent
+    searches the portals itself, so it only honours them if they are written
+    into its prompt.
+    """
+    companies = get_company_exclusions(_DEFAULT_USERNAME)
+    if not companies:
+        return "- (No companies are excluded.)"
+    return "\n".join(f"- {name}" for name in companies)
+
+
 @router.get("/desktop-prompt")
 def read_desktop_prompt(request: Request):
     """Return the shipped Claude Desktop prompt plus its rendered copy.
@@ -613,7 +599,6 @@ def read_desktop_prompt(request: Request):
     """
     from profile import default_desktop_prompt
 
-    settings = get_application_prompt_settings(_DEFAULT_USERNAME)
     try:
         template = default_desktop_prompt()
     except OSError as exc:
@@ -628,7 +613,7 @@ def read_desktop_prompt(request: Request):
         "resume_url": str(request.url_for("download_application_resume")),
         "resume_filename": (resume or {}).get("filename") or "Resume.pdf",
         "resume_sha256": (resume or {}).get("sha256") or "unavailable",
-        "application_answers": _application_answers(settings),
+        "excluded_companies": _excluded_company_lines(),
     }
     content = _PROMPT_PLACEHOLDER.sub(
         lambda match: values.get(match.group(1), match.group(0)), template,
@@ -639,8 +624,6 @@ def read_desktop_prompt(request: Request):
         issues.append("The prompt contains unresolved placeholders.")
     if not resume:
         issues.append("No Settings PDF is available, so the resume link will not work.")
-    if not settings.get("submission_authorization"):
-        issues.append("Submission authorization is blank in Settings.")
     return {
         "content": content,
         "template": template,

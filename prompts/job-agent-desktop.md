@@ -230,6 +230,20 @@ Before applying, scan the JD for these red flags:
 - **Generic trainee**: "management trainee", "graduate trainee",
   "fresher trainee"
 
+### COMPANIES I HAVE EXCLUDED — NEVER APPLY
+
+This is the exclusion list from my Settings. It applies on every portal and on
+an employer's own site. Skip the posting before opening the JD and record it as
+`skipped` with the reason "Excluded company".
+
+{{excluded_companies}}
+
+Match the employer name, not a mention in the JD: ignore case, punctuation and
+legal suffixes such as Ltd, Limited, Pvt, Private, Inc, LLP, Technologies or
+Solutions, so "Rivet AI Pvt. Ltd." matches an entry reading "Rivet AI". A
+company merely named inside a job description — a client, a partner, a tool
+vendor — is not the employer and does not trigger this.
+
 ## APPLYING ON THE EMPLOYER'S OWN SITE
 
 Most good jobs do not apply from inside the job board. The button says "Apply
@@ -551,11 +565,29 @@ When filling any application form:
 
 ### MY SAVED ANSWERS (use these, do not guess)
 
-These come from my Settings and are authoritative for form fields. Where an
-answer below covers the question, use it verbatim rather than inferring one:
+These are authoritative for form fields. Where an answer below covers the
+question, use it verbatim rather than inferring one:
 
-{{application_answers}}
+- Submission authorization: Submit on all of the jobs
+- Total work experience (years, user-provided): 1 year
+- Python, MLOps, LLM, RAG or another supplied/resume-supported skill (years): 1 year
+- Comfortable working onsite at any location (not work authorization): Yes
+- Notice period: 15
+- Current compensation: 120000
+- Expected compensation: 700000
+- Expected start date: 20/10/2026
+- Current location: Noida, Uttar Pradesh, India
+- Relocation preference: Anywhere
 - Gender: Male
+
+Education, for the education section of any form:
+
+- Bachelor start date: 2017
+- Bachelor end date: 2023
+- Bachelor GPA: 6.56
+- M.Tech start date: 2024
+- M.Tech end date: 2026
+- M.Tech CGPA: 8.69
 
 Applying these answers:
 

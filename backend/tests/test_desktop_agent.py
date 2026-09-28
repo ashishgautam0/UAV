@@ -250,7 +250,7 @@ class DesktopPromptTests(unittest.TestCase):
         """A saved copy froze the prompt: later improvements to the shipped file
         never reached the agent. Settings no longer offers Save, and a write from
         an older client must not resurrect the override."""
-        stored = {"scoring_weights": {"application_prompt": {"notice_period": "Two weeks"}}}
+        stored = {"scoring_weights": {"application_prompt": {"automation_rules": "Mine."}}}
         with patch.object(profile_data, "get_profile", return_value=stored), patch.object(
             profile_data, "upsert_profile", side_effect=lambda username, data: data
         ) as save:
@@ -259,23 +259,22 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertEqual(saved["desktop_prompt_template"], "")
         written = save.call_args.args[1]["scoring_weights"]["application_prompt"]
         self.assertEqual(written["desktop_prompt_template"], "")
-        # The answers the prompt renders from stay editable.
-        self.assertEqual(saved["notice_period"], "Two weeks")
+        # Unrelated settings are still persisted.
+        self.assertIn("Mine.", saved["automation_rules"])
 
-    def render(self, saved_template="", resume=None, answers=None):
+    def render(self, resume=None, excluded=()):
         """Call the endpoint with the data layer stubbed, as the CI lane has no DB."""
         module, _ = stub_tracker()
-        settings = {"desktop_prompt_template": saved_template,
-                    "submission_authorization": "Yes", **(answers or {})}
+        lines = function(ROOT / "app/routers/profile.py", "_excluded_company_lines", {
+            "get_company_exclusions": lambda _username: list(excluded),
+            "_DEFAULT_USERNAME": "subidh",
+        })
         with patch.dict(sys.modules, {"tracker": module}):
             endpoint = function(ROOT / "app/routers/profile.py", "read_desktop_prompt", {
                 "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_][a-z0-9_]*)}}"),
                 "_DEFAULT_USERNAME": "subidh",
-                "get_application_prompt_settings": lambda username: settings,
                 "_application_pdf_metadata": lambda: resume,
-                "_application_answers": lambda s: "\n".join(
-                    f"- {k}: {v}" for k, v in sorted(s.items())
-                    if k not in {"desktop_prompt_template"}),
+                "_excluded_company_lines": lines,
                 "HTTPException": RuntimeError,
                 "Request": SimpleNamespace,
             })
@@ -294,10 +293,12 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertFalse(result["customized"])
         self.assertEqual(result["issues"], [])
 
-    def test_a_saved_copy_is_ignored_in_favour_of_the_shipped_file(self):
-        result = self.render(saved_template="Mine {{nonsense}}", resume={"filename": "r.pdf"})
+    def test_the_endpoint_serves_the_shipped_file_and_reads_no_settings(self):
+        """render() supplies no get_application_prompt_settings at all, so this
+        passing proves the endpoint cannot serve a stored copy or a stored
+        answer — the shipped file is the only source."""
+        result = self.render(resume={"filename": "r.pdf"})
         self.assertFalse(result["customized"])
-        self.assertNotIn("Mine {{nonsense}}", result["template"])
         self.assertEqual(result["template"], profile_data.default_desktop_prompt())
         self.assertEqual(result["unresolved_placeholders"], [])
 
@@ -428,21 +429,56 @@ class DesktopPromptTests(unittest.TestCase):
                 self.assertIn(portal, summary)
                 self.assertIn(portal, order)
 
-    def test_saved_settings_answers_are_rendered_into_the_prompt(self):
-        """The agent must use the answers the user saved, not invent a notice
-        period or salary, so the Settings answers have to reach the prompt."""
-        self.assertIn("{{application_answers}}", self.prompt)
+    def test_excluded_companies_reach_the_agent(self):
+        """The exclusion list only filtered the hourly scraper's intake. The
+        desktop agent searches the portals itself, so it never saw the list
+        until the prompt carried it."""
+        section = self.prompt.split("### COMPANIES I HAVE EXCLUDED", 1)[1] \
+                             .split("## APPLYING ON THE EMPLOYER", 1)[0]
+        self.assertIn("{{excluded_companies}}", section)
+        self.assertIn("Excluded company", section)
+        # Employer name, not a mention inside the JD.
+        self.assertIn("is not the employer and does not trigger this", section)
+
         result = self.render(resume={"filename": "r.pdf"},
-                            answers={"notice_period": "15 days",
-                                     "expected_ctc": "Negotiable"})
-        self.assertIn("notice_period: 15 days", result["content"])
-        self.assertIn("expected_ctc: Negotiable", result["content"])
+                             excluded=["Rivet AI Ltd", "Small Startup"])
+        self.assertIn("- Rivet AI Ltd\n- Small Startup", result["content"])
         self.assertNotIn("{{", result["content"])
 
-    def test_blank_submission_authorization_is_surfaced(self):
-        result = self.render(resume={"filename": "r.pdf"},
-                            answers={"submission_authorization": ""})
-        self.assertTrue(any("authorization" in issue.lower() for issue in result["issues"]))
+        empty = self.render(resume={"filename": "r.pdf"})
+        self.assertIn("(No companies are excluded.)", empty["content"])
+        self.assertNotIn("{{", empty["content"])
+
+    def test_the_form_answers_live_in_the_prompt_not_in_settings(self):
+        """The answers were moved out of Settings into the prompt text, so the
+        agent must find every one of them in the shipped file with no
+        placeholder left to resolve."""
+        self.assertNotIn("{{application_answers}}", self.prompt)
+        answers = self.prompt.split("### MY SAVED ANSWERS", 1)[1].split("Applying these answers", 1)[0]
+        for line in (
+            "- Submission authorization: Submit on all of the jobs",
+            "- Total work experience (years, user-provided): 1 year",
+            "- Comfortable working onsite at any location (not work authorization): Yes",
+            "- Notice period: 15",
+            "- Current compensation: 120000",
+            "- Expected compensation: 700000",
+            "- Expected start date: 20/10/2026",
+            "- Current location: Noida, Uttar Pradesh, India",
+            "- Relocation preference: Anywhere",
+            "- Gender: Male",
+        ):
+            with self.subTest(answer=line):
+                self.assertIn(line, answers)
+        # The degrees were buried in the relocation answer; forms ask for them
+        # separately, so they get their own lines.
+        for line in ("- Bachelor GPA: 6.56", "- M.Tech CGPA: 8.69",
+                     "- Bachelor start date: 2017", "- M.Tech end date: 2026"):
+            with self.subTest(answer=line):
+                self.assertIn(line, answers)
+        self.assertNotIn("AnywhereBachelor", self.prompt)
+        result = self.render(resume={"filename": "r.pdf"})
+        self.assertIn("- Notice period: 15", result["content"])
+        self.assertNotIn("{{", result["content"])
 
     def test_linkedin_and_indeed_search_the_last_24_hours(self):
         linkedin = self.prompt.split("### 1. LINKEDIN", 1)[1].split("### 2.", 1)[0]
@@ -532,21 +568,12 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertIn("Today Todo", step0)
         self.assertIn("Never skip a job just because it was already in my database", step0)
 
-    def test_prompt_fits_the_saved_field_limit_with_real_answers(self):
-        """The stub answers above are a few bytes; the real ones are every
-        Settings field at its own 500-char ceiling. Size the prompt against
-        that worst case, or a user with long answers gets a 422 on save."""
+    def test_prompt_fits_the_saved_field_limit(self):
+        """Nothing expands into the prompt now that the answers are inline, so
+        its own length is the whole measurement."""
         limit = function(ROOT / "app/routers/profile.py", "_settings_field_limit", {})
         self.assertEqual(limit("hr_email_template"), 12_000)
-        self.assertEqual(limit("notice_period"), 500)
-
-        ceiling = limit("desktop_prompt_template")
-        self.assertLess(len(self.prompt), ceiling)
-        # Every answer field filled to its own limit, plus the resolved URLs.
-        worst_case = len(self.prompt) + 10 * (limit("notice_period") + 80)
-        self.assertLess(worst_case, ceiling,
-                        "the prompt has outgrown its saved-field limit once the "
-                        "Settings answers are rendered into it")
+        self.assertLess(len(self.prompt), limit("desktop_prompt_template"))
 
 
 if __name__ == "__main__":

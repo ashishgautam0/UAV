@@ -53,8 +53,6 @@ def default_desktop_prompt():
 
 DEFAULT_APPLICATION_PROMPT_TEMPLATE = """Use your browser to apply to every eligible job in the fixed Best Matches batch below.
 
-{{application_answers}}
-
 Return to this Today Todo page after each submission: {{page_url}}
 
 Download my default application PDF, {{resume_filename}}, from this link: {{resume_url}}
@@ -154,22 +152,7 @@ _APPLICATION_PROMPT_FIELDS = (
     "automation_rules",
     "desktop_prompt_template",
     *OUTREACH_DEFAULTS,
-    "submission_authorization",
-    "total_work_experience",
-    "skill_experience",
-    "onsite_any_location",
-    "notice_period",
-    "current_ctc",
-    "expected_ctc",
-    "expected_start_date",
-    "current_location",
-    "relocation_preference",
 )
-_DEFAULT_APPLICATION_ANSWERS = {
-    "total_work_experience": "1 year",
-    "skill_experience": "1 year",
-    "onsite_any_location": "Yes",
-}
 
 def get_profile(username="subidh"):
     """Get full profile dict from Supabase. Returns None if not found."""
@@ -206,9 +189,6 @@ def get_application_prompt_settings(username="subidh"):
     if not isinstance(stored, dict):
         stored = {}
     result = {field: str(stored.get(field) or "") for field in _APPLICATION_PROMPT_FIELDS}
-    for key, default in _DEFAULT_APPLICATION_ANSWERS.items():
-        if key not in stored:
-            result[key] = default
     result["prompt_template"] = result["prompt_template"] or DEFAULT_APPLICATION_PROMPT_TEMPLATE
     result["automation_rules"] = result["automation_rules"] or DEFAULT_AUTOMATION_RULES
     for key in ("prompt_template", "automation_rules"):
@@ -224,7 +204,7 @@ def get_application_prompt_settings(username="subidh"):
 
 
 def save_application_prompt_settings(username="subidh", data=None):
-    """Persist application answers without overwriting unrelated scoring settings."""
+    """Persist prompt settings without overwriting unrelated scoring settings."""
     profile = get_profile(username) or {}
     weights = profile.get("scoring_weights") or {}
     if not isinstance(weights, dict):
@@ -237,9 +217,6 @@ def save_application_prompt_settings(username="subidh", data=None):
         field: str(merged.get(field) or "")
         for field in _APPLICATION_PROMPT_FIELDS
     }
-    for key, default in _DEFAULT_APPLICATION_ANSWERS.items():
-        if key not in merged:
-            cleaned[key] = default
     cleaned["prompt_template"] = (
         cleaned["prompt_template"] or DEFAULT_APPLICATION_PROMPT_TEMPLATE
     )

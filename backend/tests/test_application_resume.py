@@ -148,10 +148,9 @@ class ResumeTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(("/application-resume", ("POST",)), routes_by_path)
         self.assertIn(("/resume", ("POST",)), routes_by_path)
 
-    def test_today_todo_prompt_is_gone_but_its_answers_stay_editable(self):
-        """The Today Todo prompt was removed from Settings. Its answer fields
-        were not: the Claude Desktop prompt renders them into every form, so
-        losing the only editor for them would break applying."""
+    def test_today_todo_prompt_and_its_answer_fields_are_gone_from_settings(self):
+        """The Today Todo prompt went first; the answers it carried have since
+        moved into the Claude Desktop prompt text, so Settings holds neither."""
         page = (ROOT.parent / "frontend/src/app/(app)/tonight/page.tsx").read_text()
         self.assertNotIn("ApplyWithCodex", page)
         self.assertNotIn("Codex application prompt", page)
@@ -167,11 +166,14 @@ class ResumeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(
             (ROOT.parent / "frontend/src/lib/application-prompt-editor.ts").exists()
         )
-        self.assertIn("Save application answers", settings)
+        # The answers moved out of Settings entirely and into the prompt text.
         for answer in ("submission_authorization", "notice_period", "expected_ctc",
-                       "relocation_preference"):
+                       "relocation_preference", "Save application answers"):
             with self.subTest(answer=answer):
-                self.assertIn(answer, settings)
+                self.assertNotIn(answer, settings)
+        prompt = (ROOT.parent / "prompts/job-agent-desktop.md").read_text()
+        self.assertIn("- Notice period: 15", prompt)
+        self.assertIn("- Expected compensation: 700000", prompt)
 
     def test_profile_cleanup_preserves_rows_referenced_by_audited_drafts(self):
         class Result:
