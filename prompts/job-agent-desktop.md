@@ -225,24 +225,42 @@ early, it should stop having worked those rather than having spread thin.
 1. Open `linkedin.com/jobs` in my browser (I am already logged in)
 2. Type the first search query in the job search bar
 3. Set filters: Location = India, Experience level = Entry level +
-   Associate, Date posted = Past week. Turn on "Easy Apply" first, then repeat
-   the query without it for postings that apply on the company site.
+   Associate, **Date posted = Past 24 hours**.
+   **Do NOT turn on the "Easy Apply" filter.** It hides the jobs that apply on
+   the company's own site, and those are worth applying to — take the results
+   as they come and handle whichever apply route each job offers.
 4. For each job card in the results (stop after 10 applications on this portal):
    a. Check the posting URL against the skip list — skip immediately if present
    b. Click the card to open the JD panel
    c. Read the title — check against TITLE RULES above
    d. Read the JD — check experience requirement and RED FLAGS
-   e. If it passes all checks:
-      - Click "Easy Apply" when present: step through the modal, confirm my
-        contact details, upload my resume PDF, answer screening questions using
-        the FORM FILLING RULES, then click Submit on the review step. Never
-        leave a partially filled Easy Apply modal open — either submit it or
-        discard it.
-      - If the job says "Apply" and redirects to the company site: fill that
-        form using my resume details and a 2-3 sentence cover note specific to
-        the role.
-      - If LinkedIn shows the job as already applied, treat it as already seen
-        and skip it.
+   e. If it passes all checks, apply by whichever route the button offers:
+      - **"Easy Apply"** — step through the modal, confirm my contact details,
+        upload my resume PDF, answer screening questions using the FORM FILLING
+        RULES, then click Submit on the review step. Never leave a partially
+        filled Easy Apply modal open — either submit it or discard it.
+      - **"Apply" that opens the company's own site or an ATS** (Greenhouse,
+        Lever, Workday, SmartRecruiters, Taleo) — go there and complete the
+        application properly rather than skipping it:
+          * If the site requires an account before applying, create one using
+            my real name and the email from my resume, with a fresh strong
+            password. Let the browser's password manager save it, and list the
+            site under "Accounts created" in your summary so I know it exists.
+            Never reuse a password from another site, and never type a password
+            of mine into a site you did not just create that account on.
+          * Complete any CAPTCHA on the page yourself with ordinary clicking
+            and typing, then check the application continues — see CAPTCHA,
+            OTP & BLOCKERS below if it will not complete.
+          * Fill the form from my resume and saved answers, and write a 2-3
+            sentence cover note specific to the role.
+          * Submit, and wait for the confirmation screen.
+      - **After an external application succeeds, go back to that job on
+        LinkedIn and click "Yes" on the "Did you apply?" prompt**, so LinkedIn
+        marks it applied and stops resurfacing it. Do this only once you have
+        actually seen the employer's confirmation — never click Yes for an
+        application you did not complete.
+      - If LinkedIn already shows the job as applied, treat it as already
+        handled and skip it.
    f. Record the job through the API (see STEP 2 below)
    g. Wait 20-30 seconds before the next application (avoid detection)
 5. Repeat for each search query
@@ -253,7 +271,7 @@ early, it should stop having worked those rather than having spread thin.
 
 1. Open `in.indeed.com` in my browser (I am already logged in)
 2. Type the first search query in the "What" box and `India` in the "Where" box
-3. Set filters: Date posted = Last 7 days, Experience level = Entry Level.
+3. Set filters: **Date posted = Last 24 hours**, Experience level = Entry Level.
    Indeed's filters vary by query — use whichever of these are offered.
 4. For each result (stop after 10 applications on this portal):
    a. Check the posting URL against the skip list — skip immediately if present.
@@ -268,8 +286,10 @@ early, it should stop having worked those rather than having spread thin.
         flow, confirm my contact details, upload my resume PDF, answer the
         employer questions using the FORM FILLING RULES, then submit on the
         review step.
-      - If the button says "Apply on company site", follow it and fill that
-        form using my resume details and a 2-3 sentence cover note.
+      - If the button says "Apply on company site", follow it and complete the
+        application there — creating an account and completing a CAPTCHA if the
+        site requires it, exactly as described for LinkedIn above. Fill the form
+        from my resume and saved answers with a 2-3 sentence cover note.
       - If Indeed shows the job as already applied, treat it as already handled
         and skip it.
    f. Record the job through the API (see STEP 2 below)
@@ -471,6 +491,7 @@ These come from my Settings and are authoritative for form fields. Where an
 answer below covers the question, use it verbatim rather than inferring one:
 
 {{application_answers}}
+- Gender: Male
 
 Applying these answers:
 
@@ -482,8 +503,13 @@ Applying these answers:
 - **Onsite**: if asked whether I am comfortable working onsite, answer Yes for
   any location. That does not answer separate questions about relocation, visa
   eligibility, or start date — use my saved answers for those.
+- **Gender**: answer Male when a form asks. For any **other** demographic or
+  EEO question — race or ethnicity, disability status, veteran status, caste,
+  religion, sexual orientation — choose "Prefer not to say" or "Decline to
+  self-identify" when that option exists, and otherwise leave it blank. Never
+  invent one of these about me.
 - Never change what my resume says to make it agree with a form answer, and
-  never invent a salary, notice period, eligibility or demographic answer.
+  never invent a salary, notice period or eligibility answer.
 
 ### THE THREE STANDARD COMPANY QUESTIONS
 
@@ -661,6 +687,10 @@ When done with all 11 portals, present:
 |---|--------|---------|-------|--------|
 | 1 | Naukri | BigCorp | Senior AI Lead | Senior-level title |
 | ... |
+
+### Accounts created
+- [Any company site or ATS where you had to register to apply, so I know the
+  account exists and can find the saved password]
 
 ### Not Recorded
 - [Any job whose POST failed, so I can add it manually]
