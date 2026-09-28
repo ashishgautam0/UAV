@@ -224,26 +224,3 @@ class PushSubscriptionRequest(BaseModel):
     endpoint: str
     keys: dict
 
-
-# ---- 28-Day Prep ----
-
-class Prep28Request(BaseModel):
-    """The mutable prep28 state. Freeform to match the frontend blob."""
-    start: Optional[str] = None
-    dayOverride: Optional[int] = None
-    sess: Optional[str] = None
-    done: dict = {}
-    # Missed coding problems on the spaced-repetition ladder, keyed by task id.
-    review: dict = {}
-    # Plan version the progress was recorded against; the frontend resets
-    # progress when it no longer matches the plan it is rendering.
-    v: Optional[int] = None
-
-
-class Prep28Response(BaseModel):
-    start: Optional[str] = None
-    dayOverride: Optional[int] = None
-    sess: Optional[str] = None
-    done: dict = {}
-    review: dict = {}
-    v: Optional[int] = None

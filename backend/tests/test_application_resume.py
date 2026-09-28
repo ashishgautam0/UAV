@@ -148,7 +148,10 @@ class ResumeTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(("/application-resume", ("POST",)), routes_by_path)
         self.assertIn(("/resume", ("POST",)), routes_by_path)
 
-    def test_today_todo_no_longer_renders_the_settings_prompt(self):
+    def test_today_todo_prompt_is_gone_but_its_answers_stay_editable(self):
+        """The Today Todo prompt was removed from Settings. Its answer fields
+        were not: the Claude Desktop prompt renders them into every form, so
+        losing the only editor for them would break applying."""
         page = (ROOT.parent / "frontend/src/app/(app)/tonight/page.tsx").read_text()
         self.assertNotIn("ApplyWithCodex", page)
         self.assertNotIn("Codex application prompt", page)
@@ -156,8 +159,19 @@ class ResumeTests(unittest.IsolatedAsyncioTestCase):
             (ROOT.parent / "frontend/src/components/apply-with-codex.tsx").exists()
         )
         settings = (ROOT.parent / "frontend/src/app/(app)/settings/page.tsx").read_text()
-        self.assertIn("application-prompt-template", settings)
-        self.assertIn("Save Today Todo prompt", settings)
+        for gone in ("Today Todo application prompt", "Save Today Todo prompt",
+                     "application-prompt-template", "application-prompt-editor",
+                     "getRenderedApplicationPrompt"):
+            with self.subTest(gone=gone):
+                self.assertNotIn(gone, settings)
+        self.assertFalse(
+            (ROOT.parent / "frontend/src/lib/application-prompt-editor.ts").exists()
+        )
+        self.assertIn("Save application answers", settings)
+        for answer in ("submission_authorization", "notice_period", "expected_ctc",
+                       "relocation_preference"):
+            with self.subTest(answer=answer):
+                self.assertIn(answer, settings)
 
     def test_profile_cleanup_preserves_rows_referenced_by_audited_drafts(self):
         class Result:

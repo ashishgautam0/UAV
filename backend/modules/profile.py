@@ -213,8 +213,12 @@ def get_application_prompt_settings(username="subidh"):
     result["automation_rules"] = result["automation_rules"] or DEFAULT_AUTOMATION_RULES
     for key in ("prompt_template", "automation_rules"):
         result[key] = normalize_application_screening_text(result[key])
+    # Outreach prompts are no longer editable in Settings, so a copy saved by an
+    # older build must not keep overriding the shipped text — those copies had
+    # gone stale (one had lost the cold-DM job batch entirely). The stored value
+    # is left in place rather than deleted, so it can be read back if needed.
     for key, default in OUTREACH_DEFAULTS.items():
-        result[key] = result[key] or default
+        result[key] = default
     result["cold_dm_template"] = remove_legacy_cold_dm_navigation(result["cold_dm_template"])
     return result
 
@@ -242,15 +246,21 @@ def save_application_prompt_settings(username="subidh", data=None):
     cleaned["automation_rules"] = cleaned["automation_rules"] or DEFAULT_AUTOMATION_RULES
     for key in ("prompt_template", "automation_rules"):
         cleaned[key] = normalize_application_screening_text(cleaned[key])
-    for key, default in OUTREACH_DEFAULTS.items():
-        cleaned[key] = cleaned[key] or default
-    cleaned["cold_dm_template"] = remove_legacy_cold_dm_navigation(cleaned["cold_dm_template"])
+    # Settings no longer edits the outreach or desktop prompts, so a write must
+    # not replace the shipped text. Persist whatever an older build stored,
+    # untouched, and report the shipped default — what every reader now gets.
+    for key in (*OUTREACH_DEFAULTS, "desktop_prompt_template"):
+        cleaned[key] = str(stored.get(key) or "")
     saved = upsert_profile(username, {
         "scoring_weights": {**weights, _APPLICATION_PROMPT_KEY: cleaned},
     })
     if not saved:
         return None
-    return cleaned
+    served = dict(cleaned)
+    for key, default in OUTREACH_DEFAULTS.items():
+        served[key] = default
+    served["cold_dm_template"] = remove_legacy_cold_dm_navigation(served["cold_dm_template"])
+    return served
 
 
 def get_company_exclusions(username="subidh"):

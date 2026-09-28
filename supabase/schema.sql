@@ -407,20 +407,6 @@ create index if not exists idx_message_requests_created on message_requests (cre
 
 
 -- ---------------------------------------------------------------------------
--- prep28_progress — the user's 28-day prep progress (single-user, keyed by
--- username). The plan CONTENT is static in the frontend; this table stores only
--- the mutable state: start date, day override, and which task ids are checked.
--- Kept as one jsonb blob so the frontend shape can evolve without migrations.
--- ---------------------------------------------------------------------------
-create table if not exists prep28_progress (
-    id            bigserial   primary key,
-    username      text        not null unique,
-    state         jsonb       not null default '{}'::jsonb,
-    updated_at    timestamptz not null default now()
-);
-
-
--- ---------------------------------------------------------------------------
 -- Row Level Security
 -- Enabled with no policies: anon and authenticated are denied everything, and
 -- only the service_role key reaches the data. See ACCESS MODEL at the top.
@@ -438,7 +424,6 @@ alter table resume_profiles        enable row level security;
 alter table job_messages           enable row level security;
 alter table cover_letter_drafts    enable row level security;
 alter table message_requests       enable row level security;
-alter table prep28_progress        enable row level security;
 
 revoke all on table resume_profiles, cover_letter_drafts from anon, authenticated;
 grant all on table resume_profiles, cover_letter_drafts to service_role;

@@ -17,7 +17,6 @@ from .routers import (
     follow_ups,
     mini_demos,
     notifications,
-    prep28,
     profile,
     scraper,
     stats,
@@ -81,7 +80,6 @@ app.include_router(mini_demos.router, prefix="/api/demos", tags=["Mini Demos"])
 app.include_router(profile.router, prefix="/api/profile", tags=["Profile"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(follow_ups.router, prefix="/api/follow-ups", tags=["Follow-ups"])
-app.include_router(prep28.router, prefix="/api/prep28", tags=["28-Day Prep"])
 app.include_router(desktop_agent.router, prefix="/api/desktop-agent", tags=["Desktop Agent"])
 
 

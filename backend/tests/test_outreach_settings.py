@@ -20,12 +20,15 @@ class OutreachSettingsTests(unittest.TestCase):
         with patch.object(profile_data, "get_profile", return_value=stored), patch.object(
             profile_data, "upsert_profile", side_effect=lambda username, data: data
         ) as save:
-            result = profile_data.save_application_prompt_settings(data={"cold_dm_template": "Brief DM"})
-        self.assertEqual(result["followup_template"], "My follow-ups")
-        self.assertEqual(result["hr_email_template"], "My initial email")
-        self.assertEqual(result["notice_period"], "Two weeks")
+            result = profile_data.save_application_prompt_settings(data={"notice_period": "One month"})
+        # The outreach prompts are no longer editable, so all three report the
+        # shipped text whatever the row holds.
+        for key, default in profile_data.OUTREACH_DEFAULTS.items():
+            with self.subTest(prompt=key):
+                self.assertEqual(result[key], default)
+        self.assertEqual(result["notice_period"], "One month")
         self.assertIn("My saved rule", result["automation_rules"])
-        self.assertEqual(result["cold_dm_template"], "Brief DM")
+        self.assertEqual(result["prompt_template"], "Applications {{batch_jobs}}")
         self.assertEqual(save.call_args.args[1]["scoring_weights"]["skill"], 12)
 
     def test_older_clients_do_not_clear_new_prompt_fields(self):
@@ -193,31 +196,40 @@ class OutreachSettingsTests(unittest.TestCase):
         self.assertEqual(payload[0]["tracker_url"], "https://app.test/jobs/54222")
         self.assertIn("TrueMeds%20Fixture%20recruiter", payload[0]["recruiters_search_url"])
 
-    def test_saved_legacy_navigation_is_removed_without_erasing_custom_prompt(self):
-        legacy = ("My personal note.\nOpen Dashboard → Cold DMs Due (the existing follow-up schedule) "
-                  "and snapshot the due cards. Click each individual card. Do not use "
-                  "untracked discovery jobs or substitute HR email/follow-up drafts.\n"
-                  "Keep my other instructions.\n")
-        stored = {"scoring_weights": {"application_prompt": {"cold_dm_template": legacy}}}
+    def test_a_saved_copy_no_longer_overrides_the_shipped_prompt(self):
+        """Settings dropped Save, and the copies it had already stored were stale
+        — one had lost the cold-DM job batch entirely, so the prompt ran without
+        any jobs in it. Every reader now gets the shipped text."""
+        stale = ("My personal note. The backend includes only jobs with passing screening "
+                 "and current stored cold_dm text.")
+        stored = {"scoring_weights": {"application_prompt": {
+            "cold_dm_template": stale, "followup_template": "My follow-ups",
+            "hr_email_template": "My initial email",
+        }}}
         with patch.object(profile_data, "get_profile", return_value=stored):
-            cleaned = profile_data.get_application_prompt_settings()["cold_dm_template"]
-        self.assertIn("My personal note", cleaned)
-        self.assertIn("Keep my other instructions", cleaned)
-        self.assertNotIn("Open Dashboard", cleaned)
-        prompt, _ = self.renderer()(legacy, {"filename": "active.pdf"}, "https://app.test/dashboard",
-                                    "https://api.test/pdf", "cold_dm", [], "2026-09-27T09:00:00+05:30")
-        self.assertIn("Keep my other instructions", prompt)
-        self.assertNotIn("Open Dashboard → Cold DMs Due", prompt)
+            served = profile_data.get_application_prompt_settings()
+        for key, default in profile_data.OUTREACH_DEFAULTS.items():
+            with self.subTest(prompt=key):
+                self.assertEqual(served[key], default)
+        self.assertNotIn("My personal note", served["cold_dm_template"])
+        # The batch placeholders the stale copy had dropped are back.
+        self.assertIn("{{cold_dm_jobs}}", served["cold_dm_template"])
+        self.assertIn("{{cold_dm_snapshot_at}}", served["cold_dm_template"])
 
-    def test_saved_old_default_screening_sentence_is_updated(self):
-        older = ('My custom note. The backend includes only jobs with passing screening '
-                 'and current stored cold_dm text. Keep my contact preference.')
-        stored = {"scoring_weights": {"application_prompt": {"cold_dm_template": older}}}
-        with patch.object(profile_data, "get_profile", return_value=stored):
-            updated = profile_data.get_application_prompt_settings()["cold_dm_template"]
-        self.assertNotIn("passing screening", updated)
-        self.assertIn("current PDF-versioned stored cold_dm", updated)
-        self.assertIn("Keep my contact preference", updated)
+    def test_the_stale_copy_is_kept_in_the_row_rather_than_deleted(self):
+        """Ignoring the override must not destroy it — a save rewrites what was
+        already stored, so the old text stays recoverable from the profile."""
+        stored = {"scoring_weights": {"application_prompt": {
+            "cold_dm_template": "My personal note", "notice_period": "Two weeks",
+        }}}
+        with patch.object(profile_data, "get_profile", return_value=stored), patch.object(
+            profile_data, "upsert_profile", side_effect=lambda username, data: data
+        ) as save:
+            served = profile_data.save_application_prompt_settings(data={"notice_period": "One month"})
+        written = save.call_args.args[1]["scoring_weights"]["application_prompt"]
+        self.assertEqual(written["cold_dm_template"], "My personal note")
+        self.assertEqual(served["cold_dm_template"], profile_data.OUTREACH_DEFAULTS["cold_dm_template"])
+        self.assertEqual(written["notice_period"], "One month")
 
     def test_no_eligible_due_job_is_not_a_ready_to_copy_prompt(self):
         blocked = [{"blocked_reason": "No current Cold DM for the latest Settings PDF", "job_id": 8, "tracker_id": 4,
