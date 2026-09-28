@@ -170,8 +170,12 @@ def cmd_list(args):
                 demo_url=_demo_url_for_job(job["id"]),
                 company_intel=_company_intel_text(job["company"]))
         elif args.type == "hr_email":
+            from email_finder import extract_published_emails
+            published = extract_published_emails(job["description"])
+            job["published_emails"] = published
             job["draft_spec"] = build_hr_email_prompt(
-                job["company"], job["title"], job["description"], job["demo_url"], profile)
+                job["company"], job["title"], job["description"], job["demo_url"], profile,
+                published_emails=published)
     json.dump(
         {
             "message_type": args.type,
