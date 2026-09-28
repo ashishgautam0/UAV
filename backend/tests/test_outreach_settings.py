@@ -4,7 +4,7 @@ import sys
 import unittest
 from types import SimpleNamespace
 from typing import Literal
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from test_settings_profile import ROOT, function, profile_data
 from app.models.schemas import ApplicationPromptSettings, CompanyExclusionsSettings, RenderedApplicationPrompt
@@ -231,6 +231,61 @@ class OutreachSettingsTests(unittest.TestCase):
         self.assertEqual(written["cold_dm_template"], "My personal note")
         self.assertEqual(served["cold_dm_template"], profile_data.OUTREACH_DEFAULTS["cold_dm_template"])
         self.assertIn("Mine, revised.", written["automation_rules"])
+
+    def test_company_research_caches_the_hiring_email_for_reuse(self):
+        """The research agent was finding a published address and dropping it in
+        its report. Caching it per company means one search per employer instead
+        of one per posting, and it lands in the draft's To: line."""
+        captured = {}
+        db = MagicMock()
+        db.table.return_value.upsert.side_effect = lambda payload, **_: captured.update(payload) or MagicMock()
+        save = function(ROOT / "modules/tracker.py", "save_research_cache",
+                        {"_get_client": lambda: db})
+        save("Acme", {
+            "product_url": "https://acme.example",
+            "hiring_email": "  Careers@Acme.Example  ",
+            "hiring_email_source": "https://acme.example/careers",
+            "hiring_contact": {"name": "Real Person", "title": "Recruiter"},
+        })
+        # Normalized, and stored with the page that published it.
+        self.assertEqual(captured["hiring_email"], "careers@acme.example")
+        self.assertEqual(captured["hiring_email_source"], "https://acme.example/careers")
+
+        # Absent keys must not break the older callers that omit them.
+        captured.clear()
+        save("Beta", {"product_url": "https://beta.example", "hiring_contact": {}})
+        self.assertEqual(captured["hiring_email"], "")
+        self.assertEqual(captured["hiring_email_source"], "")
+
+    def test_the_cached_email_leads_the_draft_recipients(self):
+        published = function(ROOT / "modules/pending_messages.py", "_cached_hiring_email", {})
+        import types
+        tracker = types.ModuleType("tracker")
+        tracker.get_cached_research = lambda _name: {"hiring_email": "HR@Acme.Example"}
+        with patch.dict(sys.modules, {"tracker": tracker}):
+            self.assertEqual(published("Acme"), "hr@acme.example")
+        # No cache row, and a failing lookup, both degrade to empty rather than
+        # blocking the draft.
+        tracker.get_cached_research = lambda _name: None
+        with patch.dict(sys.modules, {"tracker": tracker}):
+            self.assertEqual(published("Acme"), "")
+        def boom(_name):
+            raise RuntimeError("supabase down")
+        tracker.get_cached_research = boom
+        with patch.dict(sys.modules, {"tracker": tracker}):
+            self.assertEqual(published("Acme"), "")
+
+    def test_the_research_agent_is_told_to_find_the_email_during_research(self):
+        agent = (ROOT.parent / ".claude/agents/job-research.md").read_text()
+        for required in ("Find the hiring email here, during research",
+                         "hiring_email", "hiring_email_source",
+                         "HIRING EMAIL:", "Never construct an address"):
+            with self.subTest(required=required):
+                self.assertIn(required, agent)
+        migration = (ROOT.parent / "supabase/add_hiring_email.sql").read_text()
+        self.assertIn("add column if not exists hiring_email", migration)
+        schema = (ROOT.parent / "supabase/schema.sql").read_text()
+        self.assertIn("hiring_email             text", schema)
 
     def test_no_eligible_due_job_is_not_a_ready_to_copy_prompt(self):
         blocked = [{"blocked_reason": "No current Cold DM for the latest Settings PDF", "job_id": 8, "tracker_id": 4,

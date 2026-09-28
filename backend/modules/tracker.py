@@ -1083,6 +1083,10 @@ def save_research_cache(company_name, research_data):
         "hiring_contact_name": research_data.get("hiring_contact", {}).get("name", ""),
         "hiring_contact_title": research_data.get("hiring_contact", {}).get("title", ""),
         "hiring_contact_linkedin": research_data.get("hiring_contact", {}).get("linkedin_url", ""),
+        # Found during company research so the HR email agent does not repeat
+        # the search per job. Stored only with the page that published it.
+        "hiring_email": (research_data.get("hiring_email") or "").strip().lower(),
+        "hiring_email_source": (research_data.get("hiring_email_source") or "").strip(),
         "product_url": research_data.get("product_url", ""),
     }, on_conflict="company_name").execute()
 

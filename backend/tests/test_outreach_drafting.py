@@ -186,7 +186,8 @@ class OutreachDraftingTests(unittest.TestCase):
                 "_tracked_jobs_missing": lambda *_: ([{"id": 7, "company": "Acme", "title": "ML Engineer",
                     "description": "Exact JD", "demo_url": "https://demo/7"}], 1),
                 "_profile_text": profile, "_demo_url_for_job": lambda _: "",
-                "_company_intel_text": lambda _: "", "json": json, "sys": sys})
+                "_company_intel_text": lambda _: "", "json": json, "sys": sys,
+                "_cached_hiring_email": lambda _: ""})
             with patch("sys.stdout", new_callable=io.StringIO) as out:
                 command(SimpleNamespace(type=kind, limit=10))
                 result = json.loads(out.getvalue())
