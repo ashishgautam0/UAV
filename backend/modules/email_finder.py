@@ -11,7 +11,12 @@ Statuses per candidate:
   catch_all  the server accepts every address, so acceptance proves nothing
   invalid    SMTP rejected the mailbox
   pattern    could not SMTP-verify (port blocked / greylisted); MX exists,
-             so this is an educated pattern guess
+             so this is an educated pattern guess and NOT evidence. Outbound
+             port 25 is blocked on both Vercel and the routine container, so
+             in this deployment every candidate comes back as "pattern" —
+             treat the whole report as a lead to check by hand, never as a
+             verified recipient. `extract_published_emails` is the evidence
+             path; this is not.
   no_mx      the domain has no mail setup at all
 
 CLI:
@@ -49,6 +54,50 @@ PATTERNS = [
 
 HELO_DOMAIN = "uav-6qe7.vercel.app"
 SMTP_TIMEOUT = 8
+
+
+# Addresses an employer published in its own job description are the only
+# recipient evidence that costs nothing to obtain: the employer wrote them on
+# the posting itself. These are harvested, never constructed.
+_EMAIL_IN_TEXT = re.compile(
+    r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"
+)
+# Mailboxes that appear in postings but are not a hiring contact.
+_NON_HIRING_LOCALS = frozenset({
+    "noreply", "no-reply", "donotreply", "do-not-reply", "support", "help",
+    "helpdesk", "info", "sales", "billing", "invoice", "accounts", "legal",
+    "privacy", "security", "abuse", "webmaster", "postmaster", "marketing",
+    "newsletter", "subscribe", "unsubscribe", "feedback",
+})
+# Job boards and mail providers — an address here is not the employer's.
+_NON_EMPLOYER_DOMAINS = frozenset({
+    "gmail.com", "yahoo.com", "yahoo.co.in", "hotmail.com", "outlook.com",
+    "live.com", "rediffmail.com", "protonmail.com", "icloud.com",
+    "naukri.com", "indeed.com", "linkedin.com", "shine.com", "glassdoor.com",
+    "monster.com", "instahyre.com", "cutshort.io", "wellfound.com",
+    "apna.co", "unstop.com", "example.com",
+})
+
+
+def extract_published_emails(text):
+    """Employer addresses the job description itself publishes, in order.
+
+    Drops duplicates, obvious non-hiring mailboxes (noreply@, support@) and
+    free-mail or job-board domains, which belong to the board or an individual
+    rather than the hiring employer. Returns [] when the posting has none —
+    this harvests what is written, it never guesses a pattern.
+    """
+    seen, out = set(), []
+    for raw in _EMAIL_IN_TEXT.findall(str(text or "")):
+        email = raw.strip(".,;:()<>[]'\"").lower()
+        if email in seen:
+            continue
+        seen.add(email)
+        local, _, domain = email.partition("@")
+        if local in _NON_HIRING_LOCALS or domain in _NON_EMPLOYER_DOMAINS:
+            continue
+        out.append(email)
+    return out
 
 
 def _ascii(s):

@@ -11,16 +11,41 @@ identity. If profile facts or demo are unavailable, report blocked.
 
 ## Recipient evidence
 Verify the exact employer, hiring entity and role/location using the official
-job/careers source. Inspect up to five relevant public pages. Accept one
-explicitly published relevant recruiter/HR/applications address; report its
-source URL and hiring-relevance excerpt. An external recruiter requires an
-official employer posting linking them to the job. Recheck cached contacts.
+job/careers source. Accept one explicitly published relevant recruiter, HR or
+applications address; report its source URL and hiring-relevance excerpt. An
+external recruiter requires an official employer posting linking them to the
+job. Recheck cached contacts.
 
-Never construct firstname.lastname@, careers@ or jobs@ from a domain. SMTP
-probes, catch-all results and directory guesses are not evidence. If unresolved,
-write `To: unknown — recipient verification required`. Keep source evidence
-in the handoff report, not the email body. The Gmail sending workflow resolves
-the recipient before sending; this routine only stores drafts.
+**Work these sources in order and stop at the first published address.** Most
+drafts came back with no recipient because the search was open-ended, so this
+list is deliberate — do not stop before you have tried all of it.
+
+1. **`published_emails` in the job's own row.** Already harvested from the
+   posting the employer wrote. The source is the job URL; nothing more to
+   verify. Prefer a hiring mailbox (careers/hr/talent/recruit/jobs) over a
+   generic one, and a generic company address over nothing.
+2. **The posting page itself**, including any "apply by email" line the
+   harvester could have missed because the text was an image or a link label.
+3. **The employer's careers page** — try `/careers`, `/career`, `/jobs`,
+   `/join-us`, `/work-with-us` on the cached domain, and the `careers.`
+   subdomain.
+4. **The employer's contact page** — `/contact`, `/contact-us`, `/about`.
+   An address here counts only if the page ties it to hiring or applications;
+   a general enquiries box does not.
+5. **The ATS the posting hands off to** (Greenhouse, Lever, Workday and the
+   like) — these sometimes publish a recruiting contact on the listing footer.
+
+Never construct an address from a domain — not firstname.lastname@, and not
+careers@ or jobs@ either. SMTP probes, catch-all results and directory guesses
+are not evidence: outbound port 25 is blocked in this environment, so
+`email_finder`'s verification cannot run and every candidate it returns is an
+unverified pattern guess. Do not use its output as a recipient.
+
+If all five sources come up empty, write
+`To: unknown — recipient verification required`. That is a correct outcome, not
+a failure — say in your report which sources you tried. Keep source evidence in
+the handoff report, not the email body. The Gmail sending workflow resolves the
+recipient before sending; this routine only stores drafts.
 
 ## Purpose and format
 Help HR quickly see the role, one relevant qualification and the demo.

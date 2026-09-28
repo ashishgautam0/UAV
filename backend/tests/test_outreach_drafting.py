@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from test_settings_profile import ROOT, function
+from email_finder import extract_published_emails
 from message_generator import build_cold_dm_prompt, build_hr_email_prompt
 from outreach_quality import validate_outreach_draft, wrong_demo_links
 
@@ -110,6 +111,58 @@ class OutreachDraftingTests(unittest.TestCase):
         for text in ("70–110", "https://demo/1", "unknown — recipient verification required",
                      "Coursework: Python", "never turn coursework", "Do not send email"):
             self.assertIn(text, email["prompt"])
+
+    def test_an_address_the_posting_publishes_is_offered_as_evidence(self):
+        """81% of stored drafts had no recipient because the only route was an
+        open-ended web search. An address the employer wrote into its own
+        posting is evidence already — the posting is the official source."""
+        email = build_hr_email_prompt(
+            "Acme", "ML Engineer", "Mail your CV to careers@acme.co.in", "https://demo/1",
+            "Coursework: Python", published_emails=["careers@acme.co.in"])
+        self.assertIn("PUBLISHED IN THIS POSTING (evidence", email["prompt"])
+        self.assertIn("careers@acme.co.in", email["prompt"])
+        # With nothing published the agent is sent to the employer's own pages,
+        # and the unknown marker still has to survive as the honest fallback.
+        blank = build_hr_email_prompt("Acme", "ML Engineer", "No email here", "https://demo/1",
+                                      "Coursework: Python")
+        self.assertIn("none — research the employer's own pages", blank["prompt"])
+        self.assertIn("unknown — recipient verification required", blank["prompt"])
+
+    def test_harvesting_keeps_hiring_mailboxes_and_drops_the_rest(self):
+        # The two real postings in the tracker that carry an address.
+        self.assertEqual(
+            extract_published_emails("Reach us at hello@operinlabs.com for a chat."),
+            ["hello@operinlabs.com"])
+        self.assertEqual(
+            extract_published_emails("Send to TalentAcquisitionIndia@revantage.com"),
+            ["talentacquisitionindia@revantage.com"])
+        for text, reason in (
+            ("noreply@acme.com", "automated mailbox"),
+            ("support@acme.com", "not a hiring mailbox"),
+            ("someone@gmail.com", "free mail, not the employer"),
+            ("jobs@naukri.com", "the job board, not the employer"),
+        ):
+            with self.subTest(reason=reason):
+                self.assertEqual(extract_published_emails(text), [])
+        # Punctuation, casing and duplicates.
+        self.assertEqual(extract_published_emails("(hr@a.com). Also HR@A.COM"), ["hr@a.com"])
+        self.assertEqual(extract_published_emails(None), [])
+
+    def test_the_pattern_guesser_is_documented_as_unusable_here(self):
+        """Port 25 is blocked on Vercel and in the routine container, so every
+        candidate returns as an unverified guess. Nothing may read it as a
+        verified recipient."""
+        finder = (ROOT / "modules/email_finder.py").read_text()
+        self.assertIn("NOT evidence", finder)
+        self.assertIn("port 25 is blocked", finder)
+        agent = (ROOT.parent / ".claude/agents/recruiter-email.md").read_text()
+        self.assertIn("Do not use its output as a recipient", agent)
+        # The ordered source list that replaced the open-ended search.
+        for source in ("published_emails", "/careers", "/contact", "careers.",
+                       "The ATS the posting hands off to"):
+            with self.subTest(source=source):
+                self.assertIn(source, agent)
+        self.assertIn("careers@ or jobs@ either", agent)
 
     def test_list_emits_exact_job_and_single_profile_snapshot(self):
         for kind in ("cold_dm", "hr_email"):
