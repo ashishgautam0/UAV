@@ -304,15 +304,42 @@ class DesktopPromptTests(unittest.TestCase):
     PORTALS = ("LINKEDIN", "INDEED", "NAUKRI", "INSTAHYRE", "CUTSHORT", "WELLFOUND",
                "SHINE", "GLASSDOOR", "FIRSTNAUKRI", "UNSTOP", "APNA")
 
-    def test_prompt_covers_every_portal_dedup_tracker_and_no_time_cap(self):
+    def test_prompt_covers_every_portal_dedup_tracker_and_no_caps(self):
         for portal in self.PORTALS:
             self.assertIn(portal, self.prompt)
         for required in ("STEP 0 — LOAD THE SKIP LIST", "skip list",
                          "STEP 2 — RECORD EVERY JOB THROUGH THE API",
                          "RULES THAT APPLY TO EVERY PORTAL",
-                         "Maximum 10 applications per portal", "No overall time limit"):
+                         "KEEP GOING UNTIL I SAY STOP",
+                         "There is no application cap and no time limit"):
             self.assertIn(required, self.prompt)
-        self.assertNotIn("Maximum 2 hours", self.prompt)
+        # The run is open-ended now: nothing may reintroduce a per-portal or
+        # per-session ceiling that quietly ends it early.
+        for banned in ("Maximum 2 hours", "Maximum 10 applications per portal",
+                       "stop after 10 applications", "SESSION LIMITS",
+                       "10-application cap"):
+            self.assertNotIn(banned, self.prompt)
+
+    def test_prompt_submits_without_asking_but_still_guards_the_account(self):
+        """The agent stalled on every Indeed submit waiting for a go-ahead, so
+        the prompt has to authorize submitting outright — while keeping the one
+        blocker that protects the accounts."""
+        for required in (
+            "DO NOT ASK ME BEFORE SUBMITTING",
+            "standing authorization to submit",
+            "do not ask again on the next job",
+            "Indeed included",
+            # a blocker costs one job, never the run
+            "A blocker ends that one job, not the run",
+            "do not wait for a code",
+            # ...except the one that gets the account banned
+            "**Account lockout or rate-limit warning**: **STOP immediately**",
+            "ends the whole run",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.prompt)
+        blockers = self.prompt.split("## CAPTCHA, OTP & BLOCKERS", 1)[1].split("## STEP 2", 1)[0]
+        self.assertNotIn("Wait for confirmation", blockers)
 
     def test_dedup_and_recording_are_required_on_each_portal(self):
         """Every portal section must carry both the skip check and the record step."""
@@ -325,7 +352,7 @@ class DesktopPromptTests(unittest.TestCase):
                 self.assertIn("STEP 2", section)
 
     def test_recording_is_portal_agnostic_and_lists_every_source(self):
-        step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## SESSION", 1)[0]
+        step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## KEEP GOING", 1)[0]
         for portal in PORTAL_SOURCES:
             with self.subTest(portal=portal):
                 self.assertIn(portal, step2)
@@ -346,7 +373,7 @@ class DesktopPromptTests(unittest.TestCase):
                                       f"{name} relaxes a rule without deferring to TITLE RULES")
 
     def test_summary_and_run_order_cover_every_portal(self):
-        summary = self.prompt.split("END-OF-SESSION SUMMARY", 1)[1]
+        summary = self.prompt.split("## SUMMARY — WHEN I STOP YOU", 1)[1]
         order = self.prompt.split("Work the portals in this order:", 1)[1].split("###", 1)[0]
         for portal in PORTAL_SOURCES:
             with self.subTest(portal=portal):
@@ -419,7 +446,7 @@ class DesktopPromptTests(unittest.TestCase):
             "Do not** opt into optional marketing",
             # captcha posture
             "never use a third-party solving service",
-            "do not halt the whole run",
+            "A blocker ends that one job, not the run",
             # never double-submit
             "never re-submit the application",
             "A form that merely looks filled in is not a",
@@ -442,15 +469,15 @@ class DesktopPromptTests(unittest.TestCase):
     def test_prompt_asks_for_the_real_jd_not_a_summary(self):
         """The outreach agents read this text as the JD, so a paraphrase degrades
         every cold DM, HR email and demo written from it."""
-        step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## SESSION", 1)[0]
+        step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## KEEP GOING", 1)[0]
         self.assertIn("actual job description text", step2)
         self.assertIn("Do **not** send a summary or paraphrase", step2)
         self.assertNotIn("1-2 sentence summary of what the role involves", step2)
 
     def test_prompt_guards_against_dismissing_unjudged_jobs(self):
-        step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## SESSION", 1)[0]
+        step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## KEEP GOING", 1)[0]
         self.assertIn("Do not send `skipped` for a job you did not judge", step2)
-        self.assertIn("10-application cap", step2)
+        self.assertIn("hit an OTP prompt, could not load the page", step2)
 
     def test_prompt_states_scraper_jobs_are_still_appliable(self):
         step0 = self.prompt.split("STEP 0 — LOAD THE SKIP LIST", 1)[1].split("## WHAT TO SEARCH", 1)[0]
