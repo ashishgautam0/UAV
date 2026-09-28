@@ -125,6 +125,11 @@ create table if not exists company_research_cache (
     hiring_contact_name      text        not null default '',
     hiring_contact_title     text        not null default '',
     hiring_contact_linkedin  text        not null default '',
+    -- A hiring address the research agent found explicitly published, with the
+    -- page it came from as evidence. Cached per company so every job at that
+    -- employer reuses one search instead of repeating it per posting.
+    hiring_email             text        not null default '',
+    hiring_email_source      text        not null default '',
     product_url              text        not null default '',
     researched_at            timestamptz not null default now()
 );

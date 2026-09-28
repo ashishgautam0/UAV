@@ -103,6 +103,16 @@ def _tracked_jobs_missing(message_type, limit):
     return need, len(tracked)
 
 
+def _cached_hiring_email(company_name):
+    """The hiring address company research cached for this employer, if any."""
+    try:
+        from tracker import get_cached_research
+        row = get_cached_research(company_name) or {}
+        return (row.get("hiring_email") or "").strip().lower()
+    except Exception:
+        return ""
+
+
 def _company_intel_text(company_name):
     """One-line company context from the research cache, or empty."""
     try:
@@ -117,6 +127,9 @@ def _company_intel_text(company_name):
             title = row.get("hiring_contact_title") or ""
             parts.append(f"Hiring contact: {row['hiring_contact_name']}"
                          + (f" ({title})" if title else ""))
+        if row.get("hiring_email"):
+            source = row.get("hiring_email_source") or "source not recorded"
+            parts.append(f"Published hiring email: {row['hiring_email']} (from {source})")
         return "; ".join(parts)
     except Exception:
         return ""
@@ -171,7 +184,12 @@ def cmd_list(args):
                 company_intel=_company_intel_text(job["company"]))
         elif args.type == "hr_email":
             from email_finder import extract_published_emails
-            published = extract_published_emails(job["description"])
+            # Company research already looked for a published hiring address and
+            # cached it, so that comes first; the posting's own text backs it up.
+            cached = _cached_hiring_email(job["company"])
+            published = ([cached] if cached else []) + [
+                e for e in extract_published_emails(job["description"]) if e != cached
+            ]
             job["published_emails"] = published
             job["draft_spec"] = build_hr_email_prompt(
                 job["company"], job["title"], job["description"], job["demo_url"], profile,

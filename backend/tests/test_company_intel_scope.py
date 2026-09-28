@@ -36,6 +36,8 @@ class CompanyIntelScopeTests(unittest.TestCase):
             "description": "must not survive",
             "recent_news": "must not survive",
             "tech_signals": ["Python"],
+            "hiring_email": "careers@obrien.example",
+            "hiring_email_source": "https://obrien.example/careers",
             "hiring_contact": {
                 "name": "Zoë O'Brien",
                 "title": "Technical Recruiter",
@@ -43,12 +45,16 @@ class CompanyIntelScopeTests(unittest.TestCase):
             },
         })
 
+        # The recipient and the page that published it are in scope; company
+        # descriptions, news and tech signals still are not.
         payload = db.table.return_value.upsert.call_args.args[0]
         self.assertEqual(payload, {
             "company_name": "O'Brien Labs",
             "hiring_contact_name": "Zoë O'Brien",
             "hiring_contact_title": "Technical Recruiter",
             "hiring_contact_linkedin": "https://www.linkedin.com/in/zoe-obrien",
+            "hiring_email": "careers@obrien.example",
+            "hiring_email_source": "https://obrien.example/careers",
             "product_url": "https://obrien.example",
         })
         db.table.return_value.upsert.assert_called_once_with(

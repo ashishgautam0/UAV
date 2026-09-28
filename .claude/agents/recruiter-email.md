@@ -20,10 +20,12 @@ job. Recheck cached contacts.
 drafts came back with no recipient because the search was open-ended, so this
 list is deliberate — do not stop before you have tried all of it.
 
-1. **`published_emails` in the job's own row.** Already harvested from the
-   posting the employer wrote. The source is the job URL; nothing more to
-   verify. Prefer a hiring mailbox (careers/hr/talent/recruit/jobs) over a
-   generic one, and a generic company address over nothing.
+1. **`published_emails` in the job's own row.** The first entry is whatever
+   company research already cached for this employer, followed by anything
+   harvested from the posting text. Both are published addresses with a source
+   on record, so use the first one and stop — there is nothing left to verify.
+   Check `python pending_messages.py intel --name "<Company>"` if you want to
+   see the page it came from.
 2. **The posting page itself**, including any "apply by email" line the
    harvester could have missed because the text was an image or a link label.
 3. **The employer's careers page** — try `/careers`, `/career`, `/jobs`,
@@ -34,6 +36,10 @@ list is deliberate — do not stop before you have tried all of it.
    a general enquiries box does not.
 5. **The ATS the posting hands off to** (Greenhouse, Lever, Workday and the
    like) — these sometimes publish a recruiting contact on the listing footer.
+
+Sources 2–5 are the fallback for a company researched before the cache held an
+email, or one where research found none. When you do find an address this way,
+say so in your report with its source URL so it can be cached for next time.
 
 Never construct an address from a domain — not firstname.lastname@, and not
 careers@ or jobs@ either. SMTP probes, catch-all results and directory guesses
