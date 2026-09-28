@@ -369,6 +369,41 @@ class DesktopPromptTests(unittest.TestCase):
                             answers={"submission_authorization": ""})
         self.assertTrue(any("authorization" in issue.lower() for issue in result["issues"]))
 
+    def test_linkedin_and_indeed_search_the_last_24_hours(self):
+        linkedin = self.prompt.split("### 1. LINKEDIN", 1)[1].split("### 2.", 1)[0]
+        indeed = self.prompt.split("### 2. INDEED", 1)[1].split("### 3.", 1)[0]
+        self.assertIn("Past 24 hours", linkedin)
+        self.assertIn("Last 24 hours", indeed)
+        self.assertNotIn("Past week", linkedin)
+        self.assertNotIn("Last 7 days", indeed)
+
+    def test_linkedin_does_not_filter_to_easy_apply(self):
+        """The Easy Apply filter hides jobs that apply on the company's site,
+        which are exactly the ones this run should still reach."""
+        linkedin = self.prompt.split("### 1. LINKEDIN", 1)[1].split("### 2.", 1)[0]
+        self.assertIn('Do NOT turn on the "Easy Apply" filter', linkedin)
+        for required in ("Lever, Workday, SmartRecruiters",
+                         'click "Yes" on the "Did you apply?" prompt',
+                         "never click Yes for an"):
+            with self.subTest(rule=required):
+                self.assertIn(required, linkedin)
+
+    def test_gender_is_answered_and_other_demographics_are_declined(self):
+        """Supplying gender must not license inventing race, disability or
+        veteran status, which sit on the same EEO forms."""
+        self.assertIn("- Gender: Male", self.prompt)
+        self.assertIn("answer Male when a form asks", self.prompt)
+        self.assertIn("Prefer not to say", self.prompt)
+        for protected in ("race or ethnicity", "disability status",
+                          "veteran status"):
+            with self.subTest(field=protected):
+                self.assertIn(protected, self.prompt)
+
+    def test_account_creation_does_not_print_passwords_in_the_summary(self):
+        self.assertIn("password manager save it", self.prompt)
+        self.assertIn("Accounts created", self.prompt)
+        self.assertIn("Never reuse a password from another site", self.prompt)
+
     def test_prompt_carries_the_shared_apply_rules(self):
         """Rules ported from the Today Todo apply prompt, which the agent needs
         to get through real forms without stalling or inventing answers."""
