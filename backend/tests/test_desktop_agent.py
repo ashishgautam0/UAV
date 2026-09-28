@@ -366,7 +366,7 @@ class DesktopPromptTests(unittest.TestCase):
             "every one of the eleven portals",
             # what the off-site flow has to survive
             "If the site requires an account first, create one",
-            "Complete any CAPTCHA yourself",
+            "If a CAPTCHA appears, abandon this job immediately",
             "Submit and wait for the confirmation screen",
             # the record must key on the portal URL or dedup breaks next run
             "not the ATS URL",
@@ -389,6 +389,25 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertIn("never a reason to skip a job", rules)
         step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## KEEP GOING", 1)[0]
         self.assertIn("Applying on the employer's own\n  site is never one of those reasons", step2)
+
+    def test_a_captcha_is_skipped_rather_than_attempted(self):
+        """Solving them burned the run's time for a low success rate, so a
+        CAPTCHA now costs the job outright — and the prompt must not promise
+        CAPTCHA handling anywhere else."""
+        blockers = self.prompt.split("## CAPTCHA, OTP & BLOCKERS", 1)[1].split("## STEP 2", 1)[0]
+        for required in ("do not attempt it at all",
+                         "abandon that\n  application and go to the next job",
+                         "do not retry the\n  page hoping for a different challenge"):
+            with self.subTest(required=required):
+                self.assertIn(required, blockers)
+        # Nothing may still tell it to work through a challenge.
+        for banned in ("Complete any CAPTCHA", "clearing a CAPTCHA",
+                       "CAPTCHA included", "complete the CAPTCHA",
+                       "a CAPTCHA you cannot clear", "CAPTCHA you genuinely cannot clear"):
+            with self.subTest(banned=banned):
+                self.assertNotIn(banned, self.prompt)
+        # The ban on paid solvers stays — it reinforces the skip.
+        self.assertIn("use a CAPTCHA-solving service", self.prompt)
 
     def test_dedup_and_recording_are_required_on_each_portal(self):
         """Every portal section must carry both the skip check and the record step."""
