@@ -332,16 +332,6 @@ export interface ApplicationPromptSettings {
   prompt_template: string;
   automation_rules: string;
   desktop_prompt_template: string;
-  submission_authorization: string;
-  total_work_experience: string;
-  skill_experience: string;
-  onsite_any_location: string;
-  notice_period: string;
-  current_ctc: string;
-  expected_ctc: string;
-  expected_start_date: string;
-  current_location: string;
-  relocation_preference: string;
 }
 
 export interface DesktopPromptResponse {

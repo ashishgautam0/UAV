@@ -25,11 +25,6 @@ def function(path, name, env):
     return env[name]
 
 
-def answers_for(labels):
-    """The router's own answer formatter, bound to this test's label subset."""
-    return function(ROOT / "app/routers/profile.py", "_application_answers",
-                    {"_APPLICATION_ANSWER_LABELS": labels})
-
 class SettingsProfileTests(unittest.TestCase):
     def test_response_uses_same_context_as_backend(self):
         public = function(ROOT / "app/routers/profile.py", "_public_snapshot", {"profile_text": profile_text})
@@ -73,9 +68,12 @@ class SettingsProfileTests(unittest.TestCase):
         db.rpc.assert_called_once()
 
     def test_application_prompt_settings_are_allowlisted(self):
+        """The form answers moved into the desktop prompt text, so they are no
+        longer settings at all — only the prompt fields remain."""
         stored = {
             "scoring_weights": {
                 "application_prompt": {
+                    "prompt_template": "Mine {{batch_jobs}}",
                     "notice_period": "One month",
                     "unsupported": "must not escape",
                 },
@@ -83,16 +81,16 @@ class SettingsProfileTests(unittest.TestCase):
         }
         with patch.object(profile_data, "get_profile", return_value=stored):
             result = profile_data.get_application_prompt_settings()
-        self.assertEqual(result["notice_period"], "One month")
-        self.assertEqual((result["total_work_experience"], result["skill_experience"], result["onsite_any_location"]),
-                         ("1 year", "1 year", "Yes"))
-        self.assertIn("{{batch_jobs}}", result["prompt_template"])
+        self.assertEqual(result["prompt_template"], "Mine {{batch_jobs}}")
         self.assertTrue(result["automation_rules"].startswith("AUTOMATION RULES (authoritative):"))
-        self.assertNotIn("unsupported", result)
-        self.assertEqual(result["current_location"], "")
+        for gone in ("notice_period", "current_location", "submission_authorization",
+                     "total_work_experience", "unsupported"):
+            with self.subTest(gone=gone):
+                self.assertNotIn(gone, result)
 
     def test_saving_application_prompt_preserves_other_scoring_settings(self):
-        existing = {"scoring_weights": {"skill": 44, "application_prompt": {"notice_period": "old"}}}
+        existing = {"scoring_weights": {"skill": 44, "application_prompt": {
+            "prompt_template": "old {{batch_jobs}}"}}}
         captured = {}
 
         def save(username, data):
@@ -102,17 +100,16 @@ class SettingsProfileTests(unittest.TestCase):
         with patch.object(profile_data, "get_profile", return_value=existing), \
              patch.object(profile_data, "upsert_profile", side_effect=save):
             result = profile_data.save_application_prompt_settings(
-                data={"notice_period": "Two weeks", "unknown": "ignored"}
+                data={"prompt_template": "new {{batch_jobs}}", "unknown": "ignored"}
             )
         self.assertEqual(captured["scoring_weights"]["skill"], 44)
-        self.assertEqual(result["notice_period"], "Two weeks")
+        self.assertEqual(result["prompt_template"], "new {{batch_jobs}}")
         self.assertIn("backend includes only jobs that passed current screening", result["automation_rules"])
-        self.assertEqual(result["total_work_experience"], "1 year")
-        self.assertEqual(result["onsite_any_location"], "Yes")
         self.assertNotIn("unknown", captured["scoring_weights"]["application_prompt"])
+        self.assertNotIn("notice_period", captured["scoring_weights"]["application_prompt"])
 
     def test_company_exclusions_roundtrip_without_erasing_profile_settings(self):
-        rows = [{"scoring_weights": {"skill": 44, "application_prompt": {"notice_period": "old"}}}]
+        rows = [{"scoring_weights": {"skill": 44, "application_prompt": {"prompt_template": "old"}}}]
         db = MagicMock()
         db.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = rows
 
@@ -130,7 +127,7 @@ class SettingsProfileTests(unittest.TestCase):
             self.assertEqual(profile_data.get_company_exclusions(), saved)
         self.assertEqual(saved, ["Rivet AI Ltd", "Small Startup"])
         self.assertEqual(rows[0]["scoring_weights"]["skill"], 44)
-        self.assertEqual(rows[0]["scoring_weights"]["application_prompt"]["notice_period"], "old")
+        self.assertEqual(rows[0]["scoring_weights"]["application_prompt"]["prompt_template"], "old")
 
     def test_company_exclusion_read_errors_stop_intake(self):
         with patch.object(profile_data, "_get_client", side_effect=RuntimeError("service unavailable")):
@@ -142,12 +139,7 @@ class SettingsProfileTests(unittest.TestCase):
             "scoring_weights": {"application_prompt": ["not", "a", "mapping"]},
         }):
             result = profile_data.get_application_prompt_settings()
-        self.assertTrue(all(
-            value == "" for key, value in result.items() if not key.endswith("template")
-            and key not in {"automation_rules", "total_work_experience", "skill_experience", "onsite_any_location"}
-        ))
-        self.assertEqual((result["total_work_experience"], result["skill_experience"], result["onsite_any_location"]),
-                         ("1 year", "1 year", "Yes"))
+        self.assertEqual(sorted(result), sorted(profile_data._APPLICATION_PROMPT_FIELDS))
         self.assertIn("AUTOMATION RULES (authoritative):", result["automation_rules"])
         self.assertIn("{{resume_url}}", result["prompt_template"])
         self.assertIn("No, I have not attended that company's selection process before", result["prompt_template"])
@@ -157,26 +149,19 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertIn("answer Yes for any location", result["prompt_template"])
         self.assertIn("For an unrelated skill with no supplied or resume evidence, ask me", result["prompt_template"])
 
-    def test_ready_prompt_resolves_fixed_batch_resume_and_saved_answers(self):
+    def test_ready_prompt_resolves_fixed_batch_and_resume(self):
         render = function(
             ROOT / "app/routers/profile.py",
             "_render_application_prompt",
             {
                 "json": json,
-                "_application_answers": answers_for({
-                    "submission_authorization": "Submission authorization",
-                    "notice_period": "Notice period",
-                }),
                 "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
                 "DEFAULT_AUTOMATION_RULES": profile_data.DEFAULT_AUTOMATION_RULES,
             },
         )
-        settings = {
-            "submission_authorization": "Submit after required confirmation.",
-            "notice_period": "One month",
-        }
+        settings = {}
         template = (
-            "{{application_answers}}\n{{page_url}}\n{{resume_filename}}\n"
+            "{{page_url}}\n{{resume_filename}}\n"
             "{{resume_url}}\n{{resume_sha256}}\n{{batch_jobs}}"
         )
         jobs = [{
@@ -220,7 +205,6 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertIn("match job ID and URL; swipe left to Remove", prompt)
         self.assertIn("Do not mark it Applied or delete the database record", prompt)
         self.assertIn("For a temporary page error, login, unsolved CAPTCHA, or uncertain availability, leave its card", prompt)
-        self.assertIn("Submission authorization: Submit after required confirmation.", prompt)
         self.assertIn('"job_id": 91', prompt)
         self.assertIn("O'Reilly भारत", prompt)
         self.assertIn("https://api.example/api/profile/resume/pdf", prompt)
@@ -228,20 +212,21 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertNotIn("FOLLOW-UPS —", prompt)
         self.assertNotIn("click 'Mark emailed'", prompt)
         self.assertNotIn("must not bloat", prompt)
-        for placeholder in ("application_answers", "page_url", "resume_filename",
+        for placeholder in ("page_url", "resume_filename",
                             "resume_url", "resume_sha256", "batch_jobs"):
             self.assertNotIn("{{" + placeholder + "}}", prompt)
+        # Nothing appends an answers block any more; the answers live in the
+        # Claude Desktop prompt file instead.
+        self.assertNotIn("application answers", prompt.lower())
 
     def test_application_endpoint_excludes_nonpassing_jobs_before_omitting_results(self):
         renderer = function(ROOT / "app/routers/profile.py", "_render_application_prompt", {
             "json": json,
-            "_application_answers": answers_for({"submission_authorization": "Submission authorization"}),
             "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
             "DEFAULT_AUTOMATION_RULES": profile_data.DEFAULT_AUTOMATION_RULES,
         })
-        settings = {"prompt_template": "{{application_answers}}\nFixed batch:\n{{batch_jobs}}",
-                    "automation_rules": profile_data.DEFAULT_AUTOMATION_RULES,
-                    "submission_authorization": "Approved for eligible jobs"}
+        settings = {"prompt_template": "Fixed batch:\n{{batch_jobs}}",
+                    "automation_rules": profile_data.DEFAULT_AUTOMATION_RULES}
         endpoint = function(ROOT / "app/routers/profile.py", "read_rendered_application_prompt", {
             "Request": object, "RenderedApplicationPrompt": RenderedApplicationPrompt,
             "_clean_text": lambda value, maximum: value, "_DEFAULT_USERNAME": "fixture",
@@ -287,7 +272,6 @@ class SettingsProfileTests(unittest.TestCase):
             "_render_application_prompt",
             {
                 "json": json,
-                "_application_answers": answers_for({}),
                 "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
                 "DEFAULT_AUTOMATION_RULES": profile_data.DEFAULT_AUTOMATION_RULES,
             },
@@ -311,15 +295,12 @@ class SettingsProfileTests(unittest.TestCase):
         with patch.object(profile_data, "get_profile", return_value=stored), patch.object(
             profile_data, "upsert_profile", side_effect=lambda username, data: captured.update(data) or data
         ):
-            saved = profile_data.save_application_prompt_settings(data={"notice_period": "Tomorrow"})
+            saved = profile_data.save_application_prompt_settings(
+                data={"prompt_template": "Apply tomorrow to {{batch_jobs}}"})
         self.assertEqual(captured["scoring_weights"]["skill"], 33)
         self.assertEqual(saved["automation_rules"], stored["scoring_weights"]["application_prompt"]["automation_rules"])
         render = function(ROOT / "app/routers/profile.py", "_render_application_prompt", {
-            "json": json, "_application_answers": answers_for({
-                "total_work_experience": "Total work experience (years, user-provided)",
-                "skill_experience": "Python, MLOps, LLM, RAG or another supplied/resume-supported skill (years)",
-                "onsite_any_location": "Comfortable working onsite at any location (not work authorization)",
-            }),
+            "json": json,
             "_PROMPT_PLACEHOLDER": re.compile(r"{{([a-z_]+)}}"),
             "DEFAULT_AUTOMATION_RULES": profile_data.DEFAULT_AUTOMATION_RULES,
         })
@@ -328,9 +309,6 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertFalse(unresolved)
         self.assertIn("- Visit https://app.example/tonight for this batch.", prompt)
         self.assertIn('"job_id": 42', prompt)
-        self.assertIn("Total work experience (years, user-provided): 1 year", prompt)
-        self.assertIn("Python, MLOps, LLM, RAG or another supplied/resume-supported skill (years): 1 year", prompt)
-        self.assertIn("Comfortable working onsite at any location (not work authorization): Yes", prompt)
         self.assertNotIn("Start working through the fixed batch immediately", prompt)
         custom, unresolved = render("Apply", {"automation_rules": "{{missing_rule_value}}"}, [], None,
                                     "https://app.example/tonight", "https://api.example/resume")
@@ -378,6 +356,21 @@ class SettingsProfileTests(unittest.TestCase):
         # The drop is offered as a migration to run deliberately, not applied.
         self.assertIn("drop table if exists public.prep28_progress",
                       (repo / "supabase/remove_prep28.sql").read_text())
+
+    def test_settings_lists_the_prompts_first_and_the_resume_last(self):
+        page = (ROOT.parent / "frontend/src/app/(app)/settings/page.tsx").read_text()
+        order = [
+            "<DesktopPrompt />",
+            'kind="hr_email"',
+            'kind="cold_dm"',
+            'kind="followup"',
+            "Exclude companies from scraped jobs",
+            '<h1 className="text-2xl font-bold">Resume profile</h1>',
+            "Active backend resume",
+        ]
+        found = [page.index(marker) for marker in order]
+        self.assertEqual(found, sorted(found),
+                         "Settings sections are out of order: " + ", ".join(order))
 
     def test_resume_upload_sits_in_the_page_header(self):
         page = (ROOT.parent / "frontend/src/app/(app)/settings/page.tsx").read_text()

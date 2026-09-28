@@ -70,10 +70,10 @@ export function DesktopPrompt() {
         <Textarea id="prompt-desktop" readOnly value={text} rows={16} />
       </div>
       <p className="text-xs text-muted-foreground">
-        Log into all eleven portals in your browser before starting. Generate resolves the live tracker API and resume links, and embeds the application answers saved above so the agent never guesses a notice period or salary. No application cap and no time limit — it keeps applying until you tell it to stop. Placeholders: {"{{seen_urls_url}}"}, {"{{record_url}}"}, {"{{resume_url}}"}, {"{{resume_filename}}"}, {"{{resume_sha256}}"}, {"{{application_answers}}"}.
+        Log into all eleven portals in your browser before starting. Generate resolves the live tracker API and resume links. No application cap and no time limit — it keeps applying until you tell it to stop. Placeholders: {"{{seen_urls_url}}"}, {"{{record_url}}"}, {"{{resume_url}}"}, {"{{resume_filename}}"}, {"{{resume_sha256}}"}.
       </p>
       <p className="text-xs text-muted-foreground">
-        This prompt ships with the app and is not editable here, so improvements reach the agent on the next Generate. Edit the answers above to change what it fills into forms.
+        This prompt ships with the app and is not editable here, so improvements reach the agent on the next Generate. The answers it fills into forms — notice period, compensation, location, education — live in the prompt text itself.
       </p>
       {loadError && <p role="alert" className="text-sm text-destructive">Could not load the desktop prompt. Check that the backend is running.</p>}
       {generated && <>

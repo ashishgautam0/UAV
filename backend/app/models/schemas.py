@@ -48,7 +48,7 @@ class UserProfileResponse(BaseModel):
 
 
 class ApplicationPromptSettings(BaseModel):
-    """User-supplied application answers stored with the backend profile."""
+    """The prompt templates stored with the backend profile."""
     model_config = ConfigDict(extra="forbid")
     prompt_template: str = Field(default="", max_length=12_000)
     automation_rules: str = Field(default="", max_length=12_000)
@@ -56,16 +56,6 @@ class ApplicationPromptSettings(BaseModel):
     hr_email_template: str = Field(default="", max_length=12_000)
     followup_template: str = Field(default="", max_length=12_000)
     cold_dm_template: str = Field(default="", max_length=12_000)
-    submission_authorization: str = Field(default="", max_length=500)
-    total_work_experience: str = Field(default="", max_length=500)
-    skill_experience: str = Field(default="", max_length=500)
-    onsite_any_location: str = Field(default="", max_length=500)
-    notice_period: str = Field(default="", max_length=500)
-    current_ctc: str = Field(default="", max_length=500)
-    expected_ctc: str = Field(default="", max_length=500)
-    expected_start_date: str = Field(default="", max_length=500)
-    current_location: str = Field(default="", max_length=500)
-    relocation_preference: str = Field(default="", max_length=500)
 
 
 class CompanyExclusionsSettings(BaseModel):

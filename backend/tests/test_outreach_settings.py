@@ -11,24 +11,24 @@ from app.models.schemas import ApplicationPromptSettings, CompanyExclusionsSetti
 
 
 class OutreachSettingsTests(unittest.TestCase):
-    def test_partial_save_keeps_other_prompts_and_answers(self):
+    def test_partial_save_keeps_the_other_prompt_settings(self):
         stored = {"scoring_weights": {"skill": 12, "application_prompt": {
             "prompt_template": "Applications {{batch_jobs}}", "followup_template": "My follow-ups",
-            "hr_email_template": "My initial email", "notice_period": "Two weeks",
+            "hr_email_template": "My initial email",
             "automation_rules": "AUTOMATION RULES (authoritative):\n- My saved rule.",
         }}}
         with patch.object(profile_data, "get_profile", return_value=stored), patch.object(
             profile_data, "upsert_profile", side_effect=lambda username, data: data
         ) as save:
-            result = profile_data.save_application_prompt_settings(data={"notice_period": "One month"})
+            result = profile_data.save_application_prompt_settings(
+                data={"prompt_template": "Applications {{batch_jobs}} now"})
         # The outreach prompts are no longer editable, so all three report the
         # shipped text whatever the row holds.
         for key, default in profile_data.OUTREACH_DEFAULTS.items():
             with self.subTest(prompt=key):
                 self.assertEqual(result[key], default)
-        self.assertEqual(result["notice_period"], "One month")
         self.assertIn("My saved rule", result["automation_rules"])
-        self.assertEqual(result["prompt_template"], "Applications {{batch_jobs}}")
+        self.assertEqual(result["prompt_template"], "Applications {{batch_jobs}} now")
         self.assertEqual(save.call_args.args[1]["scoring_weights"]["skill"], 12)
 
     def test_older_clients_do_not_clear_new_prompt_fields(self):
@@ -158,7 +158,7 @@ class OutreachSettingsTests(unittest.TestCase):
             other, _ = self.renderer()("Email template", {}, "https://app", "https://pdf", kind)
             self.assertNotIn("LINKEDIN COLD DM = CONNECTION REQUEST", other)
 
-    def test_outreach_readiness_is_independent_of_today_todo_and_submission_authorization(self):
+    def test_outreach_readiness_depends_only_on_the_active_resume(self):
         due = [{"blocked_reason": "", "job_id": 42, "tracker_id": 9,
                 "company": "Fixture", "cold_dm": "Hi!"}]
         fake_tracker = SimpleNamespace(get_cold_dm_prompt_jobs=lambda _: due,
@@ -220,16 +220,17 @@ class OutreachSettingsTests(unittest.TestCase):
         """Ignoring the override must not destroy it — a save rewrites what was
         already stored, so the old text stays recoverable from the profile."""
         stored = {"scoring_weights": {"application_prompt": {
-            "cold_dm_template": "My personal note", "notice_period": "Two weeks",
+            "cold_dm_template": "My personal note", "automation_rules": "Mine.",
         }}}
         with patch.object(profile_data, "get_profile", return_value=stored), patch.object(
             profile_data, "upsert_profile", side_effect=lambda username, data: data
         ) as save:
-            served = profile_data.save_application_prompt_settings(data={"notice_period": "One month"})
+            served = profile_data.save_application_prompt_settings(
+                data={"automation_rules": "Mine, revised."})
         written = save.call_args.args[1]["scoring_weights"]["application_prompt"]
         self.assertEqual(written["cold_dm_template"], "My personal note")
         self.assertEqual(served["cold_dm_template"], profile_data.OUTREACH_DEFAULTS["cold_dm_template"])
-        self.assertEqual(written["notice_period"], "One month")
+        self.assertIn("Mine, revised.", written["automation_rules"])
 
     def test_no_eligible_due_job_is_not_a_ready_to_copy_prompt(self):
         blocked = [{"blocked_reason": "No current Cold DM for the latest Settings PDF", "job_id": 8, "tracker_id": 4,

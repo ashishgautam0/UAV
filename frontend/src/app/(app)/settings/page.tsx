@@ -6,7 +6,6 @@ import {
   getApplicationPromptSettings,
   getCompanyExclusions,
   getResumeProfileStatus,
-  updateApplicationPromptSettings,
   updateCompanyExclusions,
   uploadResumePdf,
 } from "@/lib/api";
@@ -29,33 +28,7 @@ const EMPTY_APPLICATION_SETTINGS: ApplicationPromptSettings = {
   prompt_template: "",
   automation_rules: "",
   desktop_prompt_template: "",
-  submission_authorization: "",
-  total_work_experience: "1 year",
-  skill_experience: "1 year",
-  onsite_any_location: "Yes",
-  notice_period: "",
-  current_ctc: "",
-  expected_ctc: "",
-  expected_start_date: "",
-  current_location: "",
-  relocation_preference: "",
 };
-// The answers the Claude Desktop prompt renders into every application form.
-// They used to be edited inside the Today Todo prompt text; that prompt is gone,
-// so they get their own fields.
-const ANSWER_FIELDS = [
-  ["submission_authorization", "Submission authorization"],
-  ["total_work_experience", "Total work experience (years, user-provided)"],
-  ["skill_experience", "Python, MLOps, LLM, RAG or another supplied/resume-supported skill (years)"],
-  ["onsite_any_location", "Comfortable working onsite at any location (not work authorization)"],
-  ["notice_period", "Notice period"],
-  ["current_ctc", "Current compensation"],
-  ["expected_ctc", "Expected compensation"],
-  ["expected_start_date", "Expected start date"],
-  ["current_location", "Current location"],
-  ["relocation_preference", "Relocation preference"],
-] as const satisfies readonly (readonly [keyof ApplicationPromptSettings, string])[];
-
 const evidence = (item: ResumeFact) => item.evidence?.map((e) => e.excerpt).filter(Boolean).join(" · ") || "User review required";
 
 function toReview(profile: ResumeProfile): ResumeProfileReview {
@@ -83,8 +56,6 @@ export default function SettingsPage() {
   const [candidate, setCandidate] = useState<ResumeProfile | null>(null);
   const [review, setReview] = useState<ResumeProfileReview | null>(null);
   const [applicationSettings, setApplicationSettings] = useState<ApplicationPromptSettings>(EMPTY_APPLICATION_SETTINGS);
-  const [savingApplicationSettings, setSavingApplicationSettings] = useState(false);
-  const [answersDirty, setAnswersDirty] = useState(false);
 
   useEffect(() => {
     getCompanyExclusions().then(({ companies }) => {
@@ -132,24 +103,6 @@ export default function SettingsPage() {
     finally { setBusy(false); }
   }
 
-  async function saveApplicationSettings() {
-    const tooLong = ANSWER_FIELDS.find(([key]) => (applicationSettings[key] || "").length > 500);
-    if (tooLong) return toast.error(`${tooLong[1]} must be 500 characters or fewer.`);
-    setSavingApplicationSettings(true);
-    try {
-      const saved = await updateApplicationPromptSettings(Object.fromEntries(
-        ANSWER_FIELDS.map(([key]) => [key, applicationSettings[key]]),
-      ));
-      setApplicationSettings(saved);
-      setAnswersDirty(false);
-      toast.success("Application answers saved for every browser and device.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Application answers could not be saved");
-    } finally {
-      setSavingApplicationSettings(false);
-    }
-  }
-
   async function saveCompanyExclusions() {
     const companies = excludedCompaniesText.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
     if (companies.length > 100 || companies.some((name) => name.length > 120)) {
@@ -171,6 +124,26 @@ export default function SettingsPage() {
 
   if (loading) return <div className="flex h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   return <div className={`${styles.settings} mx-auto w-full min-w-0 max-w-5xl space-y-6`}>
+    <div>
+      <h1 className="text-2xl font-bold">Prompts</h1>
+      <p className="mt-1 text-sm text-muted-foreground">Generate a prompt, copy it, and paste it into Claude. Each one ships with the app and is not editable here.</p>
+    </div>
+    <DesktopPrompt />
+    {!loadError && <>
+      <OutreachPrompt kind="hr_email" title="Initial HR email prompt" description="Send through your Gmail. Use Dashboard’s HR todos; verify recipients and research official hiring contacts if Claude’s address is invalid or unverified." initialValue={applicationSettings.hr_email_template} />
+      <OutreachPrompt kind="cold_dm" title="Cold DM prompt" description="Generate a fixed batch of eligible due jobs with their saved Cold DM text. Verify each job is still due before sending a LinkedIn connection note; record a confirmed send to advance its existing follow-up schedule." initialValue={applicationSettings.cold_dm_template} />
+      <OutreachPrompt kind="followup" title="HR follow-up email prompt" description="Use your Gmail and Dashboard’s Follow-ups Due queue. Check recipient evidence, dates, Sent history and bounces before sending." initialValue={applicationSettings.followup_template} />
+    </>}
+    <Card>
+      <CardHeader><CardTitle>Exclude companies from scraped jobs</CardTitle><p className="text-sm text-muted-foreground">Enter one employer per line. The hourly scraper skips new jobs from these companies, and the list is written into the Claude Desktop prompt above so the agent skips them too. Existing Tracker jobs and history stay intact.</p></CardHeader>
+      <CardContent className="space-y-3">
+        <label htmlFor="excluded-company-names" className="text-sm font-medium">Company names to skip</label>
+        <Textarea id="excluded-company-names" value={excludedCompaniesText} rows={8} disabled={!exclusionsLoaded || savingExclusions} onChange={(event) => { setExcludedCompaniesText(event.target.value); setExclusionsDirty(true); }} placeholder="Example Company\nAnother Company" />
+        <p className="text-xs text-muted-foreground">Matches the employer name after normalizing punctuation and common legal suffixes. It does not match companies merely mentioned in the job description. Existing large-company and experience filters still apply.</p>
+        <Button type="button" disabled={!exclusionsLoaded || !exclusionsDirty || savingExclusions} onClick={saveCompanyExclusions}>{savingExclusions && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save excluded companies</Button>
+        {!exclusionsLoaded && <p role="status" className="text-xs text-amber-600">Company list unavailable. Reload Settings to retry.</p>}
+      </CardContent>
+    </Card>
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h1 className="text-2xl font-bold">Resume profile</h1><p className="mt-1 text-sm text-muted-foreground">Upload a text-based PDF, then verify extracted facts and evidence. DOCX, text, and LaTeX input are not accepted.</p></div>
       <div className="shrink-0">
@@ -200,45 +173,6 @@ export default function SettingsPage() {
       </CardContent>
     </Card> : !loadError && <p className="rounded border p-4 text-sm">No active backend resume. Upload a PDF and confirm its extracted facts to activate it.</p>}
     {pending && pending.id !== active?.id && <div className="flex flex-wrap items-center justify-between gap-3 rounded border p-4 text-sm"><span>Awaiting review: {pending.source_filename} · v{pending.version}. The backend still uses the active profile above.</span><Button variant="outline" disabled={busy} onClick={() => { setCandidate(pending); setReview(toReview(pending)); }}>Review uploaded PDF</Button></div>}
-    <Card>
-      <CardHeader>
-        <CardTitle>Application answers</CardTitle>
-        <p className="text-sm text-muted-foreground">What the Claude Desktop agent fills into application forms. Leave an answer blank rather than guessing — the prompt tells the agent to ask you instead of inventing one.</p>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {ANSWER_FIELDS.map(([key, label]) => <div key={key} className="space-y-1">
-          <label htmlFor={`answer-${key}`} className="text-sm font-medium">{label}</label>
-          <Input
-            id={`answer-${key}`}
-            value={applicationSettings[key]}
-            disabled={savingApplicationSettings || loadError}
-            maxLength={500}
-            onChange={(event) => { setApplicationSettings({ ...applicationSettings, [key]: event.target.value }); setAnswersDirty(true); }}
-          />
-        </div>)}
-        <Button disabled={!answersDirty || savingApplicationSettings || loadError} onClick={saveApplicationSettings}>
-          {savingApplicationSettings && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Save application answers
-        </Button>
-        <p className="text-xs text-muted-foreground">Saved for every browser and device. Generate the Claude Desktop prompt below after changing an answer so the new value is embedded in it.</p>
-      </CardContent>
-    </Card>
-    {!loadError && <>
-      <OutreachPrompt kind="hr_email" title="Initial HR email prompt" description="Send through your Gmail. Use Dashboard’s HR todos; verify recipients and research official hiring contacts if Claude’s address is invalid or unverified." initialValue={applicationSettings.hr_email_template} />
-      <OutreachPrompt kind="followup" title="HR follow-up email prompt" description="Use your Gmail and Dashboard’s Follow-ups Due queue. Check recipient evidence, dates, Sent history and bounces before sending." initialValue={applicationSettings.followup_template} />
-      <OutreachPrompt kind="cold_dm" title="Cold DM prompt" description="Generate a fixed batch of eligible due jobs with their saved Cold DM text. Verify each job is still due before sending a LinkedIn connection note; record a confirmed send to advance its existing follow-up schedule." initialValue={applicationSettings.cold_dm_template} />
-    </>}
-    <DesktopPrompt />
-    <Card>
-      <CardHeader><CardTitle>Exclude companies from scraped jobs</CardTitle><p className="text-sm text-muted-foreground">Enter one employer per line. The Claude hourly scraper skips new jobs from these companies before saving or including them in digests. Existing Tracker jobs and history stay intact.</p></CardHeader>
-      <CardContent className="space-y-3">
-        <label htmlFor="excluded-company-names" className="text-sm font-medium">Company names to skip</label>
-        <Textarea id="excluded-company-names" value={excludedCompaniesText} rows={8} disabled={!exclusionsLoaded || savingExclusions} onChange={(event) => { setExcludedCompaniesText(event.target.value); setExclusionsDirty(true); }} placeholder="Example Company\nAnother Company" />
-        <p className="text-xs text-muted-foreground">Matches the employer name after normalizing punctuation and common legal suffixes. It does not match companies merely mentioned in the job description. Existing large-company and experience filters still apply.</p>
-        <Button type="button" disabled={!exclusionsLoaded || !exclusionsDirty || savingExclusions} onClick={saveCompanyExclusions}>{savingExclusions && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save excluded companies</Button>
-        {!exclusionsLoaded && <p role="status" className="text-xs text-amber-600">Company list unavailable. Reload Settings to retry.</p>}
-      </CardContent>
-    </Card>
     {candidate && review && <Card><CardHeader><CardTitle>{candidate.id === active?.id ? "Edit active profile" : "Review uploaded profile"} · v{candidate.version}</CardTitle><p className="text-sm text-muted-foreground">Corrections remain separate; the extracted PDF text and hash never change.</p></CardHeader><CardContent className="space-y-6">
       <div><label className="text-sm font-medium">Skills (comma separated)</label><Textarea value={review.skills.join(", ")} onChange={(e) => setReview({ ...review, skills: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) })} /><p className="mt-1 text-xs text-muted-foreground">Evidence: {(candidate.facts.skills || []).map(evidence).join(" · ") || "None extracted"}</p></div>
       <div><label className="text-sm font-medium">Certifications (comma separated)</label><Textarea value={review.certifications.join(", ")} onChange={(e) => setReview({ ...review, certifications: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) })} /><p className="mt-1 text-xs text-muted-foreground">Evidence: {(candidate.facts.certifications || []).map(evidence).join(" · ") || "None extracted"}</p></div>
