@@ -34,7 +34,7 @@ from profile import (
     upsert_profile,
 )
 from resume_profile import extract_profile_facts, reviewed_experience_months, profile_text
-from prep28 import (
+from pdf_storage import (
     _encode_url_path,
     _ensure_pdf_bucket,
     _get_client as _storage_client,
@@ -604,25 +604,22 @@ def read_outreach_prompt(request: Request, page_url: str,
 
 @router.get("/desktop-prompt")
 def read_desktop_prompt(request: Request):
-    """Return the editable Claude Desktop prompt plus its rendered copy.
+    """Return the shipped Claude Desktop prompt plus its rendered copy.
 
-    `template` is what Settings edits and saves; `content` is the same text with
-    the live API and resume links resolved, which is what gets pasted into
-    Claude Desktop.
+    `template` is the shipped text; `content` is the same text with the live API
+    and resume links resolved, which is what gets pasted into Claude Desktop.
+    Settings no longer saves its own copy: a saved copy froze the prompt, so
+    later improvements to the shipped file never reached the agent.
     """
     from profile import default_desktop_prompt
 
     settings = get_application_prompt_settings(_DEFAULT_USERNAME)
-    saved = settings.get("desktop_prompt_template")
-    if saved:
-        template = saved
-    else:
-        try:
-            template = default_desktop_prompt()
-        except OSError as exc:
-            raise HTTPException(
-                status_code=404, detail="Desktop prompt default is unavailable.",
-            ) from exc
+    try:
+        template = default_desktop_prompt()
+    except OSError as exc:
+        raise HTTPException(
+            status_code=404, detail="Desktop prompt default is unavailable.",
+        ) from exc
 
     resume = _application_pdf_metadata()
     values = {
@@ -639,7 +636,7 @@ def read_desktop_prompt(request: Request):
     unresolved = sorted(set(_PROMPT_PLACEHOLDER.findall(content)))
     issues = []
     if unresolved:
-        issues.append("The saved prompt contains unresolved placeholders.")
+        issues.append("The prompt contains unresolved placeholders.")
     if not resume:
         issues.append("No Settings PDF is available, so the resume link will not work.")
     if not settings.get("submission_authorization"):
@@ -647,7 +644,7 @@ def read_desktop_prompt(request: Request):
     return {
         "content": content,
         "template": template,
-        "customized": bool(saved),
+        "customized": False,
         "issues": issues,
         "unresolved_placeholders": unresolved,
     }

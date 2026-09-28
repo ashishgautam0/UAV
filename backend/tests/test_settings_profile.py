@@ -354,11 +354,49 @@ class SettingsProfileTests(unittest.TestCase):
         self.assertNotIn("For each eligible job in this fixed batch", prompt)
         self.assertNotIn("pay a fee, send email, or apply", prompt)
 
-    def test_settings_exposes_only_ready_prompt_copy(self):
+    def test_interview_prep_is_removed_but_the_resume_bucket_survives(self):
+        """The 28-day prep feature is gone. Its Supabase bucket name is not: the
+        resume upload writes there, so renaming it would orphan every PDF."""
+        repo = ROOT.parent
+        for path in ("backend/modules/prep28.py", "backend/app/routers/prep28.py",
+                     "frontend/src/lib/prep28.ts", "frontend/src/app/(app)/prep28"):
+            with self.subTest(path=path):
+                self.assertFalse((repo / path).exists())
+        for path, gone in (
+            ("backend/app/main.py", "prep28"),
+            ("backend/app/models/schemas.py", "Prep28"),
+            ("frontend/src/lib/api.ts", "prep28"),
+            ("frontend/src/lib/types.ts", "Prep28State"),
+            ("frontend/src/app/(app)/dashboard/page.tsx", "prep28"),
+            ("supabase/schema.sql", "prep28_progress"),
+        ):
+            with self.subTest(path=path):
+                self.assertNotIn(gone, (repo / path).read_text())
+        storage = (repo / "backend/modules/pdf_storage.py").read_text()
+        self.assertIn('_PDF_BUCKET = "prep28-pdfs"', storage)
+        self.assertIn("orphan every", storage)
+        # The drop is offered as a migration to run deliberately, not applied.
+        self.assertIn("drop table if exists public.prep28_progress",
+                      (repo / "supabase/remove_prep28.sql").read_text())
+
+    def test_resume_upload_sits_in_the_page_header(self):
         page = (ROOT.parent / "frontend/src/app/(app)/settings/page.tsx").read_text()
-        self.assertIn("Ready-to-paste Codex prompt", page)
-        self.assertIn("disabled={!renderedPrompt?.ready || promptDirty", page)
-        self.assertIn("Copy complete prompt for Codex", page)
+        header = page.split("<h1 className=\"text-2xl font-bold\">Resume profile</h1>", 1)[1] \
+                     .split("{loadError &&", 1)[0]
+        self.assertIn("Upload resume", header)
+        self.assertIn('type="file"', header)
+        # One step now: picking the PDF extracts it, so the old two-stage
+        # drop zone and its separate button are gone.
+        self.assertNotIn("Choose or drop a PDF", page)
+        self.assertNotIn("Extract for review", page)
+
+    def test_settings_no_longer_builds_the_codex_batch_prompt(self):
+        """That prompt drove Today Todo, which Settings no longer offers."""
+        page = (ROOT.parent / "frontend/src/app/(app)/settings/page.tsx").read_text()
+        for gone in ("Ready-to-paste Codex prompt", "Copy complete prompt for Codex",
+                     "Generate current batch", "renderedPrompt"):
+            with self.subTest(gone=gone):
+                self.assertNotIn(gone, page)
 
     def test_followups_use_dashboard_and_separate_confirmed_history_logging(self):
         followup = profile_data.OUTREACH_DEFAULTS["followup_template"]

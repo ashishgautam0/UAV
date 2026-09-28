@@ -20,7 +20,6 @@ import type {
   WeeklyTrend,
   AppNotification,
   UnreadCountResponse,
-  Prep28State,
   ResumeProfile,
   ResumeProfileReview,
   ResumeProfileStatus,
@@ -366,66 +365,4 @@ export async function unsubscribePush(subscription: PushSubscriptionJSON) {
       keys: subscription.keys,
     }),
   });
-}
-
-// ---- 28-Day Prep ----
-export async function getPrep28(): Promise<Prep28State> {
-  return apiFetch<Prep28State>("/api/prep28");
-}
-
-export async function savePrep28(state: Prep28State): Promise<Prep28State> {
-  return apiFetch<Prep28State>("/api/prep28", {
-    method: "PUT",
-    body: JSON.stringify(state),
-  });
-}
-
-// ---- Block-B study PDFs ----
-// Open-in-new-tab URL for one named PDF (served inline from our origin).
-export function prepPdfUrl(taskId: string, filename: string): string {
-  return `${API_URL}/api/prep28/pdf/${encodeURIComponent(
-    taskId
-  )}/${encodeURIComponent(filename)}`;
-}
-
-// Returns a map of task id -> [filenames] for every Block-B task with PDFs.
-export async function listPrepPdfs(): Promise<Record<string, string[]>> {
-  const r = await apiFetch<{ pdfs: Record<string, string[]> }>(
-    "/api/prep28/pdfs"
-  );
-  return r.pdfs || {};
-}
-
-export async function uploadPrepPdf(taskId: string, file: File): Promise<void> {
-  // Two steps, on purpose: ask the API for a signed URL, then send the bytes
-  // straight to storage. Routing the file through the API fails — the platform
-  // caps serverless request bodies at ~4.5 MB and rejects any real study PDF
-  // with a 413 before our code ever runs.
-  const { signed_url } = await apiFetch<{ signed_url: string; name: string }>(
-    `/api/prep28/pdf-url/${encodeURIComponent(
-      taskId
-    )}?name=${encodeURIComponent(file.name)}`,
-    { method: "POST" }
-  );
-
-  const res = await fetch(signed_url, {
-    method: "PUT",
-    headers: { "Content-Type": "application/pdf" },
-    body: file,
-  });
-  if (!res.ok) {
-    throw new Error(`Upload failed (${res.status})`);
-  }
-}
-
-export async function deletePrepPdf(
-  taskId: string,
-  filename: string
-): Promise<void> {
-  await apiFetch(
-    `/api/prep28/pdf/${encodeURIComponent(taskId)}/${encodeURIComponent(
-      filename
-    )}`,
-    { method: "DELETE" }
-  );
 }

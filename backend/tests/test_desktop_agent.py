@@ -246,16 +246,21 @@ class DesktopPromptTests(unittest.TestCase):
     def setUp(self):
         self.prompt = profile_data.default_desktop_prompt()
 
-    def test_default_is_editable_through_settings(self):
-        self.assertIn("desktop_prompt_template", profile_data._APPLICATION_PROMPT_FIELDS)
-        stored = {"scoring_weights": {"application_prompt": {"hr_email_template": "mine"}}}
+    def test_settings_can_no_longer_save_its_own_copy_of_the_prompt(self):
+        """A saved copy froze the prompt: later improvements to the shipped file
+        never reached the agent. Settings no longer offers Save, and a write from
+        an older client must not resurrect the override."""
+        stored = {"scoring_weights": {"application_prompt": {"notice_period": "Two weeks"}}}
         with patch.object(profile_data, "get_profile", return_value=stored), patch.object(
             profile_data, "upsert_profile", side_effect=lambda username, data: data
-        ):
+        ) as save:
             saved = profile_data.save_application_prompt_settings(
                 data={"desktop_prompt_template": "My desktop prompt"})
-        self.assertEqual(saved["desktop_prompt_template"], "My desktop prompt")
-        self.assertEqual(saved["hr_email_template"], "mine")
+        self.assertEqual(saved["desktop_prompt_template"], "")
+        written = save.call_args.args[1]["scoring_weights"]["application_prompt"]
+        self.assertEqual(written["desktop_prompt_template"], "")
+        # The answers the prompt renders from stay editable.
+        self.assertEqual(saved["notice_period"], "Two weeks")
 
     def render(self, saved_template="", resume=None, answers=None):
         """Call the endpoint with the data layer stubbed, as the CI lane has no DB."""
@@ -289,10 +294,18 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertFalse(result["customized"])
         self.assertEqual(result["issues"], [])
 
-    def test_saved_prompt_wins_and_bad_placeholders_are_reported(self):
+    def test_a_saved_copy_is_ignored_in_favour_of_the_shipped_file(self):
         result = self.render(saved_template="Mine {{nonsense}}", resume={"filename": "r.pdf"})
-        self.assertTrue(result["customized"])
-        self.assertEqual(result["template"], "Mine {{nonsense}}")
+        self.assertFalse(result["customized"])
+        self.assertNotIn("Mine {{nonsense}}", result["template"])
+        self.assertEqual(result["template"], profile_data.default_desktop_prompt())
+        self.assertEqual(result["unresolved_placeholders"], [])
+
+    def test_bad_placeholders_in_the_shipped_file_are_reported(self):
+        with patch.object(profile_data, "default_desktop_prompt",
+                          return_value="Shipped {{nonsense}}"):
+            result = self.render(resume={"filename": "r.pdf"})
+        self.assertEqual(result["template"], "Shipped {{nonsense}}")
         self.assertEqual(result["unresolved_placeholders"], ["nonsense"])
         self.assertIn("unresolved placeholders", result["issues"][0])
 

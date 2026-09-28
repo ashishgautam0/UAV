@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getDesktopPrompt, updateApplicationPromptSettings } from "@/lib/api";
+import { getDesktopPrompt } from "@/lib/api";
 import type { DesktopPromptResponse } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,36 +10,26 @@ import { toast } from "sonner";
 
 export function DesktopPrompt() {
   const [text, setText] = useState("");
-  const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [generated, setGenerated] = useState<DesktopPromptResponse | null>(null);
 
-  useEffect(() => {
-    getDesktopPrompt()
-      .then((data) => { setText(data.template); setGenerated(data); })
-      .catch(() => setLoadError(true))
-      .finally(() => setBusy(false));
-  }, []);
-
-  async function run(save: boolean) {
+  async function load() {
     setBusy(true);
     try {
-      if (save) {
-        if (!text.trim()) throw new Error("Enter a prompt before saving.");
-        await updateApplicationPromptSettings({ desktop_prompt_template: text });
-        setDirty(false);
-        toast.success("Desktop prompt saved for every device.");
-      }
       const data = await getDesktopPrompt();
       setText(data.template);
       setGenerated(data);
+      setLoadError(false);
     } catch (e) {
+      setLoadError(true);
       toast.error(e instanceof Error ? e.message : "Desktop prompt could not be generated");
     } finally {
       setBusy(false);
     }
   }
+
+  useEffect(() => { void load(); }, []);
 
   async function copy() {
     const prompt = generated?.content;
@@ -73,23 +63,22 @@ export function DesktopPrompt() {
     <CardContent className="space-y-3">
       <div className="rounded-lg border p-3">
         <div role="toolbar" aria-label="Desktop prompt actions" className="mb-3 flex flex-wrap gap-2">
-          <Button disabled={busy || loadError} onClick={() => run(true)}>{busy ? "Working…" : "Save prompt"}</Button>
-          <Button variant="outline" disabled={busy || dirty || loadError} onClick={() => run(false)}>Generate prompt</Button>
-          <Button variant="outline" disabled={busy || dirty || !generated?.content} onClick={copy}>Copy prompt</Button>
+          <Button disabled={busy} onClick={() => void load()}>{busy ? "Working…" : "Generate prompt"}</Button>
+          <Button variant="outline" disabled={busy || !generated?.content} onClick={copy}>Copy prompt</Button>
         </div>
-        <label htmlFor="prompt-desktop" className="text-sm font-medium">Editable desktop prompt</label>
-        <Textarea id="prompt-desktop" value={text} rows={16} maxLength={40000} disabled={busy || loadError}
-          onChange={(e) => { setText(e.target.value); setDirty(true); }} />
+        <label htmlFor="prompt-desktop" className="text-sm font-medium">Desktop prompt</label>
+        <Textarea id="prompt-desktop" readOnly value={text} rows={16} />
       </div>
       <p className="text-xs text-muted-foreground">
-        Log into all eleven portals in your browser before starting. Generate resolves the live tracker API and resume links, and embeds the application answers saved above so the agent never guesses a notice period or salary. At most 10 jobs per portal (110 max), no overall time limit. Placeholders: {"{{seen_urls_url}}"}, {"{{record_url}}"}, {"{{resume_url}}"}, {"{{resume_filename}}"}, {"{{resume_sha256}}"}, {"{{application_answers}}"}.
+        Log into all eleven portals in your browser before starting. Generate resolves the live tracker API and resume links, and embeds the application answers saved above so the agent never guesses a notice period or salary. No application cap and no time limit — it keeps applying until you tell it to stop. Placeholders: {"{{seen_urls_url}}"}, {"{{record_url}}"}, {"{{resume_url}}"}, {"{{resume_filename}}"}, {"{{resume_sha256}}"}, {"{{application_answers}}"}.
+      </p>
+      <p className="text-xs text-muted-foreground">
+        This prompt ships with the app and is not editable here, so improvements reach the agent on the next Generate. Edit the answers above to change what it fills into forms.
       </p>
       {loadError && <p role="alert" className="text-sm text-destructive">Could not load the desktop prompt. Check that the backend is running.</p>}
-      {dirty && <p role="status" className="text-sm text-amber-600">Unsaved changes — save before copying.</p>}
       {generated && <>
         {generated.issues.length > 0 && <ul role="alert" className="list-disc pl-5 text-sm">{generated.issues.map(issue => <li key={issue}>{issue}</li>)}</ul>}
-        {!generated.customized && <p className="text-xs text-muted-foreground">Showing the shipped default. Saving stores your own copy.</p>}
-        <details><summary className="cursor-pointer text-sm">Generated prompt preview{dirty ? " (previous version)" : ""}</summary>
+        <details><summary className="cursor-pointer text-sm">Generated prompt preview</summary>
           <Textarea readOnly value={generated.content} rows={16} aria-label="Generated desktop prompt" />
         </details>
       </>}

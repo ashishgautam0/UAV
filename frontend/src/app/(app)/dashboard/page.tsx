@@ -13,7 +13,6 @@ import {
   getStatusFunnel,
   getRoleAnalysis,
   getFollowUpEffectiveness,
-  getPrep28,
 } from "@/lib/api";
 import type {
   DashboardStats,
@@ -26,9 +25,7 @@ import type {
   PlatformEffectiveness,
   StatusFunnel,
   RoleAnalysis,
-  Prep28State,
 } from "@/lib/types";
-import { PLAN, PLAN_DAYS, PLAN_VERSION } from "@/lib/prep28";
 
 import {
   Card,
@@ -53,7 +50,6 @@ import {
   Briefcase,
   Clock,
   Copy,
-  GraduationCap,
   Loader2,
   MessageSquareText,
   ThumbsUp,
@@ -70,57 +66,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-// Tasks per day on the /prep28 page — used to read its localStorage progress
-// ("prep28") for the widget below.
-const PREP_COUNTS: number[] = PLAN.map(
-  (d) => d.a.length + d.b.length + d.r.length
-);
-const PREP_TOTAL = PREP_COUNTS.reduce((s, n) => s + n, 0);
-
-interface PrepState {
-  started: boolean;
-  day: number;
-  planDone: number;
-  todayDone: number;
-  todayTotal: number;
-}
-
-// Compute the widget's PrepState from a stored prep28 state object (the same
-// shape used by the /prep28 page and stored in Supabase).
-function computePrepState(s: Prep28State | null | undefined): PrepState {
-  // Progress recorded against an older plan is dropped by the /prep28 page, so
-  // it must not be counted here either.
-  if (
-    !s ||
-    s.v !== PLAN_VERSION ||
-    (!s.start && !s.dayOverride && !(s.done && Object.keys(s.done).length))
-  ) {
-    return { started: false, day: 1, planDone: 0, todayDone: 0, todayTotal: 0 };
-  }
-  let day = 1;
-  if (s.dayOverride) day = s.dayOverride;
-  else if (s.start) {
-    const t = new Date();
-    t.setHours(0, 0, 0, 0);
-    day = Math.min(PLAN_DAYS, Math.max(1, Math.floor((t.getTime() - new Date(s.start).getTime()) / 86400000) + 1));
-  }
-  const done = s.done || {};
-  let planDone = 0;
-  let todayDone = 0;
-  for (const k of Object.keys(done)) {
-    if (!done[k]) continue;
-    planDone++;
-    if (k.startsWith(day + "-")) todayDone++;
-  }
-  return {
-    started: Boolean(s.start),
-    day,
-    planDone,
-    todayDone,
-    todayTotal: PREP_COUNTS[day - 1],
-  };
-}
-
 const WEEKLY_TARGET = 50;
 const indiaToday = () => new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
@@ -136,31 +81,9 @@ export default function DashboardPage() {
   const [hrEmailTodos, setHrEmailTodos] = useState<HrEmailTodo[]>([]);
   const [hrEmailSaving, setHrEmailSaving] = useState<number | null>(null);
   const [hrEmailLoadError, setHrEmailLoadError] = useState(false);
-  const [prep, setPrep] = useState<PrepState | null>(null);
   const [fuDrafts, setFuDrafts] = useState<Record<number, FollowUpDraft>>({});
   const [fuOpen, setFuOpen] = useState<Set<number>>(new Set());
   const [fuLoading, setFuLoading] = useState<number | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const s = await getPrep28();
-        if (!cancelled) setPrep(computePrepState(s));
-      } catch {
-        // Backend unreachable — fall back to the local cache the /prep28 page keeps.
-        try {
-          const raw = localStorage.getItem("prep28");
-          if (!cancelled) setPrep(computePrepState(raw ? JSON.parse(raw) : null));
-        } catch {
-          if (!cancelled) setPrep(null);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const toggleFuDraft = async (fu: FollowUp) => {
     const id = fu.id;
@@ -309,44 +232,6 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* ---- Interview Prep ---- */}
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <GraduationCap className="h-5 w-5 text-sky-400" />
-              Interview Prep
-            </CardTitle>
-            <CardDescription>
-              {prep?.started
-                ? `Day ${prep.day} of ${PLAN_DAYS} — one chapter a day, plus night recall`
-                : "Your daily prep plan — pick a Day 1 to start the clock"}
-            </CardDescription>
-          </div>
-          <Button size="sm" asChild>
-            <Link href="/prep28">
-              {prep?.started ? "Open today's plan" : "Start the 28 days"}
-            </Link>
-          </Button>
-        </CardHeader>
-        {prep?.started && (
-          <CardContent className="space-y-2">
-            <Progress
-              value={Math.round((100 * prep.planDone) / PREP_TOTAL)}
-              className="h-3"
-            />
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>
-                today {prep.todayDone}/{prep.todayTotal}
-              </span>
-              <span>
-                plan {prep.planDone}/{PREP_TOTAL} ·{" "}
-                {Math.round((100 * prep.planDone) / PREP_TOTAL)}%
-              </span>
-            </div>
-          </CardContent>
-        )}
-      </Card>
 
       {/* ---- Empty State CTA ---- */}
       {stats?.total === 0 && (

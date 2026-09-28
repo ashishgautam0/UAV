@@ -22,11 +22,9 @@ import {
 import { useState } from "react";
 import { NotificationBell } from "./notification-bell";
 
-// Hidden, not removed: /tonight (Today Todo) and /prep28 (Interview Prep) still
-// work for anyone with the URL, and their data keeps flowing. Re-add the entry
-// here to show either one again:
+// Hidden, not removed: /tonight (Today Todo) still works for anyone with the
+// URL, and its data keeps flowing. Re-add the entry here to show it again:
 //   { href: "/tonight", label: "Today Todo", icon: Moon },
-//   { href: "/prep28", label: "Interview Prep", icon: GraduationCap },
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tracker", label: "Tracker", icon: ClipboardList },
