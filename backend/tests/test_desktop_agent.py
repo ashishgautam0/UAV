@@ -449,6 +449,28 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertIn("(No companies are excluded.)", empty["content"])
         self.assertNotIn("{{", empty["content"])
 
+    def test_nothing_mid_run_waits_on_the_user(self):
+        """The run is meant to be pasted once and left alone: every gap has to
+        cost one job, not stall until the user comes back."""
+        for required in (
+            "Do not ask me anything mid-run. Skip instead.",
+            "abandon that one application",
+            "Wherever some later section says to ask me",
+            "Once the run is going, nothing stops it except an account lockout",
+            # the per-case skips that replaced the asks
+            "skip that job** rather than claiming",
+            "skip that job and move on",
+            "never stop to ask me",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.prompt)
+
+        # Only two pre-run stops remain, and each retries before stopping.
+        self.assertIn("only two things that may stop the run before it", self.prompt)
+        self.assertIn("second and last thing that", self.prompt)
+        self.assertIn("retry the download once", self.prompt)
+        self.assertIn("retry it twice", self.prompt)
+
     def test_the_form_answers_live_in_the_prompt_not_in_settings(self):
         """The answers were moved out of Settings into the prompt text, so the
         agent must find every one of them in the shipped file with no
@@ -521,7 +543,7 @@ class DesktopPromptTests(unittest.TestCase):
         for required in (
             # saved answers beat guesses
             "use these, do not guess",
-            "ask me** rather than claiming\n  experience",
+            "skip that job** rather than claiming",
             # the three standard employer questions
             "THE THREE STANDARD COMPANY QUESTIONS",
             "worked for an *affiliate*",
