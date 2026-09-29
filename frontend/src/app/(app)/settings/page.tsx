@@ -135,7 +135,7 @@ export default function SettingsPage() {
       <OutreachPrompt kind="followup" title="HR follow-up email prompt" description="Use your Gmail and Dashboard’s Follow-ups Due queue. Check recipient evidence, dates, Sent history and bounces before sending." initialValue={applicationSettings.followup_template} />
     </>}
     <Card>
-      <CardHeader><CardTitle>Exclude companies from scraped jobs</CardTitle><p className="text-sm text-muted-foreground">Enter one employer per line. The hourly scraper skips new jobs from these companies, and the list is written into the Claude Desktop prompt above so the agent skips them too. Existing Tracker jobs and history stay intact.</p></CardHeader>
+      <CardHeader><CardTitle>Exclude companies from scraped jobs</CardTitle><p className="text-sm text-muted-foreground">Enter one employer per line. The list is written into the Claude Desktop prompt above, so the agent never applies to these companies. Existing Tracker jobs and history stay intact.</p></CardHeader>
       <CardContent className="space-y-3">
         <label htmlFor="excluded-company-names" className="text-sm font-medium">Company names to skip</label>
         <Textarea id="excluded-company-names" value={excludedCompaniesText} rows={8} disabled={!exclusionsLoaded || savingExclusions} onChange={(event) => { setExcludedCompaniesText(event.target.value); setExclusionsDirty(true); }} placeholder="Example Company\nAnother Company" />
@@ -169,7 +169,7 @@ export default function SettingsPage() {
           <Button variant="outline" disabled={!active.backend_text} onClick={async () => { try { await navigator.clipboard.writeText(active.backend_text || ""); toast.success("Backend resume text copied"); } catch { toast.error("Select and copy the text above."); } }}>Copy backend text</Button>
         </div>
         <p className="text-xs text-muted-foreground">Edit the verified facts below, then save to update future backend reads. To replace source text, projects or contact details, upload and activate an updated PDF. The source PDF text stays unchanged as evidence.</p>
-        <p className="text-xs text-muted-foreground">Today Todo automatically uses the latest PDF uploaded here on every browser and device.</p>
+        <p className="text-xs text-muted-foreground">Every prompt above serves the latest PDF uploaded here, on every browser and device.</p>
       </CardContent>
     </Card> : !loadError && <p className="rounded border p-4 text-sm">No active backend resume. Upload a PDF and confirm its extracted facts to activate it.</p>}
     {pending && pending.id !== active?.id && <div className="flex flex-wrap items-center justify-between gap-3 rounded border p-4 text-sm"><span>Awaiting review: {pending.source_filename} · v{pending.version}. The backend still uses the active profile above.</span><Button variant="outline" disabled={busy} onClick={() => { setCandidate(pending); setReview(toReview(pending)); }}>Review uploaded PDF</Button></div>}

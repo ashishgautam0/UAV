@@ -150,10 +150,13 @@ class ResumeTests(unittest.IsolatedAsyncioTestCase):
 
     def test_today_todo_prompt_and_its_answer_fields_are_gone_from_settings(self):
         """The Today Todo prompt went first; the answers it carried have since
-        moved into the Claude Desktop prompt text, so Settings holds neither."""
-        page = (ROOT.parent / "frontend/src/app/(app)/tonight/page.tsx").read_text()
-        self.assertNotIn("ApplyWithCodex", page)
-        self.assertNotIn("Codex application prompt", page)
+        moved into the Claude Desktop prompt text, so Settings holds neither.
+
+        The Today Todo page itself went with the job scrapers that fed it, so
+        neither it nor the Codex apply component it hosted may come back."""
+        self.assertFalse(
+            (ROOT.parent / "frontend/src/app/(app)/tonight").exists()
+        )
         self.assertFalse(
             (ROOT.parent / "frontend/src/components/apply-with-codex.tsx").exists()
         )

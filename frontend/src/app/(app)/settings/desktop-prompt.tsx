@@ -57,7 +57,7 @@ export function DesktopPrompt() {
     <CardHeader>
       <CardTitle>Claude Desktop job search prompt</CardTitle>
       <p className="text-sm text-muted-foreground">
-        Paste into Claude Desktop (Cowork) to browse eleven portals using Computer Use — LinkedIn, Indeed, Naukri, Instahyre, Cutshort, Wellfound, Shine, Glassdoor India, FirstNaukri, Unstop and Apna. On every portal it skips jobs you already applied to or dismissed, applies to matching entry-level AI/ML roles, and records each one in your tracker. Jobs the hourly scraper left in Today Todo stay appliable.
+        Paste into Claude Desktop (Cowork) to browse eleven portals using Computer Use — LinkedIn, Indeed, Naukri, Instahyre, Cutshort, Wellfound, Shine, Glassdoor India, FirstNaukri, Unstop and Apna. On every portal it skips jobs you already applied to or dismissed, applies to matching entry-level AI/ML roles, and records each one in your tracker. This agent is the only thing that finds jobs — nothing scrapes on your behalf.
       </p>
     </CardHeader>
     <CardContent className="space-y-3">

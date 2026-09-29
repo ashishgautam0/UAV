@@ -1,7 +1,7 @@
 """
 JD Analyzer — NOC compatibility check, skill match scoring, red flag detection,
 ATS resume compatibility check.
-Used both in the Streamlit UI (full analysis) and in hourly.py (quick verdict).
+Used by ranking.py to score and rank tracked jobs.
 """
 
 import re

@@ -401,9 +401,9 @@ export default function JobDetailPage() {
         <p className="text-muted-foreground">
           This job no longer exists (it may have been dismissed and deleted).
         </p>
-        <Button variant="outline" onClick={() => router.push("/tonight")}>
+        <Button variant="outline" onClick={() => router.push("/tracker")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Today Todo
+          Back to Tracker
         </Button>
       </div>
     );

@@ -66,35 +66,29 @@ class IntakePolicyTests(unittest.TestCase):
         self.assertEqual(kept, jobs[:2])
         self.assertEqual(len(removed), 1)
 
-    def test_active_scraper_aggregator_excludes_gulf_and_partner_ats(self):
-        # Execute the real aggregator with offline source fixtures; no third-party
-        # packages, network requests or production database are involved.
-        source = (ROOT / "modules" / "scraper.py").read_text()
-        node = next(n for n in ast.parse(source).body
-                    if isinstance(n, ast.FunctionDef) and n.name == "run_all_scrapers")
-        fixture = lambda: [{"company": "Infosys", "description": ""},
-                           {"company": "Small Startup", "description": "30 months experience"},
-                           {"company": "Small Startup", "description": "1 year experience"}]
-        import os
-        env = {"os": os, "scrape_indeed_india": fixture, "scrape_linkedin": fixture}
-        # No inactive-source bindings: including Gulf, Partner ATS, Naukri,
-        # Google Jobs, or Amazon would fail this integration test.
-        exec(compile(ast.Module(body=[node], type_ignores=[]), "<aggregator>", "exec"), env)
-        with patch.dict(os.environ, {}, clear=True):
-            jobs, counts, errors = env["run_all_scrapers"](company_exclusions=[])
-        self.assertEqual(len(jobs), 4)
-        self.assertEqual(counts, {"Indeed India": 3, "LinkedIn AI/ML": 3})
-        self.assertFalse(errors)
-        self.assertTrue(all(j["description"] in ("1 year experience", "") for j in jobs))
-        with patch.dict(os.environ, {}, clear=True):
-            excluded_jobs, _, _ = env["run_all_scrapers"](company_exclusions=["Small Startup"])
-        self.assertEqual(len(excluded_jobs), 2)
-        self.assertTrue(all(j["company"] == "Infosys" for j in excluded_jobs))
-        with patch("profile.get_company_exclusions", return_value=["Small Startup"]) as load, \
-             patch.dict(os.environ, {}, clear=True):
-            loaded_jobs, _, _ = env["run_all_scrapers"]()
-        self.assertEqual(len(loaded_jobs), 2)
-        load.assert_called_once_with()
+    def test_the_job_scrapers_are_gone_and_nothing_imports_them(self):
+        """Job discovery moved to the Claude Desktop agent entirely.
+
+        The LinkedIn/Indeed scrapers and the hourly pipeline that drove them
+        were removed; the exclusion list they used now reaches the agent
+        through the desktop prompt instead. Nothing may import them back.
+        """
+        for gone in ("scraper.py", "hourly.py"):
+            with self.subTest(gone=gone):
+                self.assertFalse((ROOT / "modules" / gone).exists())
+        for source in (ROOT / "modules").glob("*.py"):
+            text = source.read_text()
+            for banned in ("from scraper import", "import scraper",
+                           "from hourly import", "import hourly", "jobspy"):
+                with self.subTest(source=source.name, banned=banned):
+                    self.assertNotIn(banned, text)
+        requirements = (ROOT / "requirements.txt").read_text()
+        self.assertNotIn("jobspy", requirements)
+
+    def test_company_exclusions_still_reach_the_desktop_agent(self):
+        """Removing the scraper must not orphan the Settings exclusion list."""
+        prompt = (ROOT.parent / "prompts" / "job-agent-desktop.md").read_text()
+        self.assertIn("{{excluded_companies}}", prompt)
 
     def test_persistence_guard_before_database_access(self):
         source = (ROOT / "modules" / "tracker.py").read_text()

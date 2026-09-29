@@ -25,8 +25,9 @@ router = APIRouter()
 def seen_urls():
     """Posting URLs already applied to or dismissed, for the agent's skip list.
 
-    Deliberately excludes postings the hourly scraper merely discovered: those
-    are still waiting in Today Todo, and applying to them is the agent's job.
+    Deliberately excludes postings that are merely present and unhandled, such
+    as the rows the removed job scraper left behind: those were never applied
+    to, so applying to them is still the agent's job.
     """
     urls = get_handled_job_urls()
     return {"urls": sorted(urls), "count": len(urls)}
@@ -36,13 +37,13 @@ def seen_urls():
 def record_job(body: DesktopAgentJobRequest):
     """Record a handled posting, whichever portal it came from.
 
-    Applied postings reach the Tracker and leave Today Todo. Skipped ones are
-    dismissed, which both hides them and puts them on the next run's skip list.
+    Applied postings reach the Tracker. Skipped ones are dismissed, which both
+    hides them and puts them on the next run's skip list.
     """
-    # Only insert a posting the scraper has not already saved. save_scraped_job
-    # overwrites the whole row, which on a known job would replace the full JD
-    # with the agent's summary, wipe the score and analysis the scraper built,
-    # and mark its cover letter outdated.
+    # Only insert a posting no row already holds. save_scraped_job overwrites
+    # the whole row, which on a known job would replace the full JD with the
+    # agent's summary, wipe any score and analysis already on it, and mark its
+    # cover letter outdated.
     scraped = find_scraped_job_by_url(body.url)
     if not scraped:
         save_scraped_job(
