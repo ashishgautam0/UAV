@@ -1,106 +1,156 @@
-# Job Search HQ
+# AI Job Application Agent
 
-A full-stack AI-powered job search automation platform for AI/ML roles. Combines intelligent LinkedIn job scraping, LLM-generated personalized outreach, application tracking, and analytics — with hourly automated runs via a scheduled Claude routine.
+**Automate the whole job hunt: find AI/ML jobs across 11 portals, apply to them
+automatically with Claude Computer Use, then research each employer, build a
+working demo for the role, and write the recruiter outreach — all tracked in one
+place.**
 
-## Features
+Built for entry-level AI/ML roles in India. Applies on **LinkedIn, Indeed,
+Naukri, Instahyre, Cutshort, Wellfound, Shine, Glassdoor India, FirstNaukri,
+Unstop and Apna**, including jobs that hand off to the employer's own site or
+ATS (Greenhouse, Lever, Workday, SmartRecruiters, Taleo).
 
-### Job Scraper
-- Scrapes **LinkedIn** via JobSpy across 24 AI/ML search queries × 2 locations (India, Remote)
-- Filters by AI/ML keywords, role level, and location
-- Deduplication and company blacklist filtering
+> Keywords: auto apply bot · job application automation · AI job search agent ·
+> Claude Computer Use · LinkedIn auto apply · Naukri auto apply · recruiter
+> outreach automation · cold DM generator · application tracker · job scraper
 
-### AI Message Generator
-- No LLM API key: every message is written by the scheduled Claude routine
-- Requests queued from the UI are fulfilled on the next hourly run
-- **Cold DMs** — 2 variants per company (direct + curiosity-driven)
-- **Follow-ups** — Value-add messages, not generic check-ins
-- **Cover Letters** — Under 200 words, personalized; audited drafts for
-  explicitly eligible high-match jobs are versioned and provenance-tracked
-- **Thank You Notes** — Post-interview, referencing discussion points
-- **Demo Outreach** — Messages showcasing custom demo projects
+---
 
-### Application Tracker
-- Log applications with metadata: company, role, platform, status, date, follow-up reminders
-- Track job type, platform source, regional annotations, conversion potential, salary
-- PDF-only, versioned resume profiles with reviewed facts and evidence
-- Separate document readability, mandatory eligibility, resume–JD match, and application priority
-- Audited cover-letter drafts for explicitly eligible high-match jobs (configurable, default 90)
-- Auto-set 7-day follow-up reminders
-- Filter by status, type, and platform
+## What it actually does
 
-Matching is deterministic and evidence-oriented, not a universal ATS
-certification or a claim of market superiority. Scanned/image-only PDFs are
-rejected because OCR is not available; incomplete extraction, ambiguous dates,
-and unknown mandatory criteria are surfaced for review rather than guessed.
+```
+  You paste one prompt into Claude Desktop
+            │
+            ▼
+  ┌──────────────────────────────┐
+  │  Auto-apply agent            │   11 portals, no cap, no time limit
+  │  (Claude Computer Use)       │   fills forms, creates accounts, submits
+  └──────────────┬───────────────┘   skips anything it cannot answer truthfully
+                 │ records every job it handles
+                 ▼
+  ┌──────────────────────────────┐
+  │  Tracker (Supabase)          │   day 1: the job is logged
+  └──────────────┬───────────────┘
+                 │
+                 ▼
+  ┌──────────────────────────────┐
+  │  Outreach pipeline           │   runs itself every 3 hours
+  │  (scheduled Claude routine)  │   research → demo → drafts
+  └──────────────┬───────────────┘
+                 │
+                 ▼
+     day 8: HR email + LinkedIn connection note, each with that job's demo
+     day 16: one follow-up round, then the record is marked Ghosted
+```
 
-### Analytics Dashboard
-- Weekly progress tracking (target: 50 applications/week)
-- Follow-up reminders widget
-- Platform effectiveness comparison
-- Response rate analytics by platform
-- Job vs internship split
-- Status funnel (applied → interview → offer)
+### 1. Apply automatically
 
-### Tonight's Plan
-- View scraped jobs from the past 24 hours
-- Filter by work mode (remote/hybrid/onsite)
-- Show saved jobs newest-first, with optional work-mode filtering
-- Quick-apply button to log applications directly
+A single prompt (`prompts/job-agent-desktop.md`) drives Claude Computer Use in
+your own browser. It searches each portal, judges every posting against title,
+experience and red-flag rules, fills the form from your saved answers and
+submits — **without asking permission each time**.
 
-### Hourly Automation
-- A scheduled Claude routine runs the scraper every hour (`59 * * * *`)
-- Scrapes LinkedIn, filters and deduplicates against previous runs
-- Saves new jobs and a markdown digest to Supabase
-- Writes a cold outreach DM for each new job — the routine session is Claude, so
-  it composes them itself and stores them in `job_messages`. No LLM API key.
-- Raises an in-app notification and a web push
+- **No application cap and no time limit.** It works a portal until it runs out,
+  moves to the next, then cycles back for new postings.
+- **Follows the job off-site.** Most real openings apply on the employer's own
+  site or an ATS; it goes there, registers an account if required, and finishes
+  the application.
+- **Never invents an answer.** If a form asks something your saved answers and
+  resume do not cover, it skips that job rather than guessing or stopping to ask.
+- **Deduplicates across runs and portals** against a server-side skip list, so
+  the same role is never applied to twice.
+- **Honours your excluded-companies list.**
 
-### Additional Tools
-- **Company Research** — Web search with result caching
-- **Mini Demos** — Track custom demo projects for target companies
+### 2. Research, demo and outreach — hands-off
 
-## Tech Stack
+A scheduled Claude routine runs every 3 hours and, for each tracked job:
+
+| Step | What it produces |
+|---|---|
+| **Screening** | Reads your verified résumé against the JD; dismisses genuine mismatches |
+| **Company research** | Official website, a real hiring contact, and the employer's **published** hiring email with the page it came from |
+| **Mini demo** | A working, interactive, job-specific demo deployed at `/api/demo/<id>` |
+| **Cold DM** | One truthful LinkedIn connection note, under 300 characters |
+| **HR email** | A 70–110 word application email carrying that job's demo link |
+| **Résumé points** | Tailored bullets and an ATS keyword line for that posting |
+| **Follow-ups** | A fresh follow-up when the date arrives — never a "just circling back" |
+
+There is **no LLM API key**. The scheduled session *is* Claude, so it writes
+every message itself and stores the drafts.
+
+### 3. Outreach cadence
+
+| Day | What happens |
+|---|---|
+| **1** | The job enters the tracker |
+| **8** | HR email **and** LinkedIn connection note, each with the job's demo |
+| **16** | One follow-up round, then the record is marked Ghosted |
+
+The LinkedIn follow-up DM only goes out **if the connection was accepted** —
+LinkedIn will not deliver one otherwise. The follow-up email goes regardless.
+
+### 4. Nothing is sent without you
+
+The pipeline **drafts and stores**; it never sends. Sending happens through your
+own Gmail and LinkedIn, from a prompt you paste, with a confirmation step before
+each send. Connection invitations are capped at 10 per day.
+
+### 5. Tracker and analytics
+
+Application tracker with status funnel, per-platform response rates, weekly
+progress against a target, follow-ups due, and versioned PDF résumé profiles
+whose extracted facts you review and approve before anything uses them.
+
+---
+
+## Recipient evidence — why emails say "unknown" sometimes
+
+An HR email may only go to an address that is **on record**: one the employer
+published on its own careers or contact page (cached with that URL), or one
+printed in the job posting itself.
+
+Addresses are **never constructed** — not `firstname.lastname@`, and not
+`careers@` assembled from a domain. A draft whose recipient matches no evidence
+is rejected when it is saved. When nothing is published, the draft says
+`To: unknown — recipient verification required`, which is the honest outcome
+rather than a plausible-looking guess.
+
+---
+
+## Tech stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Next.js 16, React 19, TypeScript |
-| Styling | Tailwind CSS 4, shadcn/ui, Lucide icons |
-| Backend | FastAPI, Uvicorn |
-| AI/LLM | Claude, via the scheduled routine (no API key) |
-| Database | Supabase (PostgreSQL) |
+| Auto-apply | Claude Computer Use (Claude Desktop), driven by a markdown prompt |
+| Automation | Scheduled Claude Code routine, every 3 hours — no LLM API key |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui |
+| Backend | FastAPI on Vercel serverless |
+| Database | Supabase (PostgreSQL, RLS enabled with no policies) |
 | Scraping | requests, BeautifulSoup4, python-jobspy |
-| Automation | Scheduled Claude routine (hourly cron) |
-| Deployment | Vercel (frontend) |
 
-## Project Structure
+## Project structure
 
 ```
-job_search_tool/
+├── prompts/
+│   └── job-agent-desktop.md     # THE auto-apply prompt — paste into Claude Desktop
+├── .claude/agents/              # One specialist agent per pipeline step
+│   ├── resume-screener.md       # résumé vs JD, pass/fail/review
+│   ├── job-research.md          # website, hiring contact, published hiring email
+│   ├── demo-builder.md          # deploys a job-specific interactive demo
+│   ├── cold-dm.md               # LinkedIn connection note
+│   ├── recruiter-email.md       # HR email with evidenced recipient
+│   ├── resume-tailor.md         # tailored bullets + ATS keywords
+│   └── followup.md              # follow-up rounds
 ├── backend/
-│   ├── app/
-│   │   ├── main.py              # FastAPI app entry point
-│   │   ├── config.py            # Settings & environment config
-│   │   ├── routers/             # API route handlers
-│   │   └── models/              # Pydantic schemas
+│   ├── app/routers/             # FastAPI routes
 │   └── modules/
-│       ├── scraper.py           # 12+ job source scrapers
-│       ├── message_generator.py # LLM-powered message generation
-│       ├── tracker.py           # Application tracking (Supabase)
-│       ├── hourly.py            # Hourly automation script
-│       ├── jd_analyzer.py       # Job description analysis
-│       ├── company_research.py  # Company research & caching
-│       ├── pending_messages.py  # CLI the Claude routine drives to write DMs
-│       └── digest.py            # Markdown digest builder
-├── frontend/
-│   └── src/app/
-│       ├── (app)/
-│       │   ├── dashboard/       # Analytics dashboard
-│       │   ├── tonight/         # Today Todo view (hidden from nav)
-│       │   ├── tracker/         # Application tracker
-│       │   └── settings/        # Settings
-│       └── page.tsx             # Landing page
-└── supabase/
-    └── schema.sql               # Database schema
+│       ├── tracker.py           # applications, messages, cadence (Supabase)
+│       ├── pending_messages.py  # the CLI the routine drives
+│       ├── email_finder.py      # harvests published addresses; never guesses
+│       ├── outreach_quality.py  # deterministic draft checks
+│       └── scraper.py           # job source scrapers
+├── frontend/src/app/(app)/      # dashboard · tracker · jobs · settings
+└── supabase/schema.sql          # database schema
 ```
 
 ## Setup
@@ -109,6 +159,7 @@ job_search_tool/
 - Python 3.11+
 - Node.js 18+
 - Supabase project
+- Claude Desktop (for the auto-apply agent)
 
 ### Database
 
@@ -166,35 +217,14 @@ npm run dev
 
 The frontend runs on `http://localhost:3000` and the backend on `http://localhost:8000`.
 
-The Settings page stores the editable Today Todo browser-agent template and
-application answers in the backend. Its **Ready-to-paste Codex prompt** is
-rendered from the current Today Todo rows plus the latest Settings PDF, with a
-fixed job ID/URL batch. Copying remains disabled when the resume, jobs,
-submission authorization, or a supported placeholder is missing. Pasting the
-rendered prompt starts the supported browser work, but login, CAPTCHA,
-sensitive-data approval, missing truthful answers, and final third-party
-submission can still require user confirmation.
+Settings holds the generated prompts — the Claude Desktop job search prompt,
+the initial HR email, cold DM and HR follow-up prompts, the excluded-company
+list, and the résumé profile. None of the prompts are editable in the app: each
+ships with the repository, so **Generate** always renders the current version
+with your live API links, résumé links and saved answers resolved into it.
 
-The generated prompt uses Dashboard's Company HR email todos as the email queue,
-including previously tracked jobs outside the application batch. It opens each
-todo's linked Tracker detail instead of scanning company details or all Tracker
-records, and returns to Dashboard to verify completion and process the next todo.
-It uses the stored draft's To/Subject/body, verifies the hiring
-contact and live mini-demo link, and attaches the actual latest Settings PDF.
-Missing drafts/demos or mail access are reported as blocked/pending, not sent.
-Codex must request confirmation immediately before sending, check Sent mail to
-avoid duplicates, and mark the HR todo complete only after verified sending.
-This is a prompt-driven mail-client workflow, not a background email service;
-the Claude routine still only stores drafts and no schedule is changed.
-
-The prompt also processes Dashboard's **Follow-ups Due** queue through each
-linked Tracker detail. It checks dates/history, uses the current numbered draft,
-requires confirmation before sending, and records the exact sent message/channel
-with **Record sent follow-up** only after verified delivery to the mail provider.
-Missing drafts are pending; future dates and follow-ups immediately after a new
-HR email are deferred. Initial HR completion and follow-up history stay separate.
-The recording control checks existing history and locks after an uncertain write;
-it is not a database-level concurrency guarantee across multiple browser sessions.
+Pasting a generated prompt starts browser work in your own session. Login,
+sensitive-data approval and the final send still require your confirmation.
 
 ## Deployment
 
@@ -222,135 +252,83 @@ Environment variables:
   `http://localhost:8000`), so set it **before** the first build, or redeploy
   after adding it.
 
-### Scheduled scraping
+### Running the auto-apply agent
 
-The scraper is not triggered by the deployed API — a full run makes 48 LinkedIn
-queries with pauses between them, far longer than a serverless function may run.
-It is instead executed every hour by a scheduled Claude routine (`59 * * * *`),
-which checks out this repository, installs `backend/requirements.txt`, and runs:
+1. Log into all eleven portals in your browser.
+2. **Settings → Claude Desktop job search prompt → Generate prompt → Copy prompt.**
+3. Paste it into Claude Desktop (Cowork) and leave it running.
 
-```bash
-cd backend/modules && python hourly.py
-```
+The prompt resolves your live tracker API links, résumé links and excluded
+companies at generate time. It is not editable in the app — improvements to the
+shipped file reach the agent on the next Generate.
 
-Settings → **Exclude companies from scraped jobs** saves employer names in the
-existing Supabase `user_profile.scoring_weights.company_exclusions` setting.
-Enter one employer per line. Each hourly run loads the list before scraping;
-the shared intake filter and final save guard skip those employers before
-persistence or digests. Matches use exact normalized employer names (case,
-punctuation and common legal suffixes are ignored), not substring matches in
-job descriptions. The existing large-MNC and experience filters remain active.
-Changing the list affects future runs and does not remove existing Tracker rows
-or application history. The routine must have its existing Supabase credentials
-to load this setting; a failed read stops intake rather than ignoring exclusions.
+### The scheduled outreach routine
 
-It then writes the outreach messages itself — there is no hosted LLM call in
-this path. The routine lists jobs with no message yet, composes one per job, and
-saves it:
+Job discovery and applying belong to the desktop agent. The routine handles
+everything *after* a job is tracked, every 3 hours (`59 */3 * * *`): screening,
+company research, demos, cold DMs, HR emails, résumé points and follow-ups. It
+processes at most 15 items per firing, best-fit first, and a backlog drains over
+later runs.
+
+It checks out this repository, installs `backend/requirements.txt`, and drives
+the same CLI you can run by hand:
 
 ```bash
-python pending_messages.py list --limit 10
-python pending_messages.py save --job-id <ID> < message.txt
-
-# tracked jobs that need the one-time Company HR email draft
-python pending_messages.py list --type hr_email --limit 10
+cd backend/modules
+python pending_messages.py list --type hr_email --limit 10   # what needs a draft
 python pending_messages.py save --type hr_email --job-id <ID> < message.txt
+python pending_messages.py intel --name "<Company>"          # cached research
+python pending_messages.py followups                         # queue what is due
+python pending_messages.py requests --limit 15               # drain the queue
+python pending_messages.py notify --title "..." --body "..." # one push per run
 ```
 
-Each candidate includes a purpose-specific `draft_spec`. Follow it alongside
-`.claude/agents/cold-dm.md` and `.claude/agents/recruiter-email.md`, using the
-active verified PDF profile and exact JD. Cold DMs are single LinkedIn connection
-notes: target 180–260 characters, maximum 300, one truthful hook and an invitation
-to connect. They do not need a demo or claim attachments. Direct save and queued
-fulfil reject long/variant drafts; rewrite rather than truncate. Research and
-cold notes can proceed before demo creation; HR emails follow the demo.
-The Claude routine stores drafts only and does not send outreach.
-Settings → **Cold DM prompt** → **Generate prompt** builds a fixed JSON batch
-from due Tracker follow-ups. Each entry carries the matched scraped job ID,
-Tracker ID, job details, due date and stored Cold DM text. Screening results
-are omitted from the job JSON. A new-job screen is required to apply to a new
-job, not to send a follow-up for an already tracked job. Missing or stale notes
-and unmatched Tracker jobs are excluded and counted separately.
-The Dashboard Cold DMs Due card uses the same PDF version, job mapping and draft
-checks as the generated batch. An older draft may remain visible
-inside a Tracker job while its card shows **Not ready**; the card and Settings
-prompt show the blocking reason. A new PDF may require activation and draft
-regeneration before that saved note can enter a new batch. Do not send an
-omitted note merely because its text is visible in Tracker.
-The Today Todo application prompt also includes only backend-confirmed passing
-jobs and omits screening results from its JSON batch. The generated Cold DM
-prompt does not require browsing Dashboard cards to
-retrieve drafts, and generating it does not send invitations or alter the
-Claude schedule. Recheck the live Tracker follow-up date and history before
-sending. A confirmed LinkedIn invitation with its note is recorded
-in Tracker as **LinkedIn connection** using **Record sent follow-up**, advancing
-one outreach slot. This removes the job from the Cold DMs Due card. Its separate
-Follow-ups Due card appears only when the new saved date is due and at least seven
-Asia/Kolkata calendar days have passed since the recorded LinkedIn send. Each
-later confirmed follow-up schedules the next round seven days from that send,
-up to three recorded rounds total. Blocked, future, already-pending or uncertain
-sends do not advance the schedule. Recording is available
-without an email follow-up draft. Existing history/status writes are separate;
-after uncertain logging, inspect both and do not blindly record twice.
-The authoritative Cold DM prompt limits LinkedIn connection invitations to 10
-per Asia/Kolkata calendar day across runs and manual sends. It checks sent
-invitations before sending, stops if today's count cannot be verified, and
-defers the rest at the cap. This personal cap cannot guarantee LinkedIn will
-allow 10 invitations on a given day.
+That environment needs `SUPABASE_URL` and `SUPABASE_KEY` only. Web push also
+needs `VAPID_PRIVATE_KEY` and `VAPID_CLAIM_EMAIL` in the routine's environment
+and `VAPID_PUBLIC_KEY` on the API project; without them the in-app notification
+still lands and only the push is skipped.
 
-HR email candidates are emitted only after the job is in Tracker and its mini
-demo is live. Each brief stored draft must include that demo URL and say that
-the latest Settings PDF is attached. The app still does not send email; the
-user's separate Gmail workflow verifies the recipient and attaches the PDF
-before sending it. Use an evidenced hiring address or an explicit unknown
-recipient marker, never guessed email patterns. Body target: 70–110 words,
-one JD-to-profile connection and one request, at most 150 words total.
-Merging these instructions does not prove the saved Claude schedule has loaded
-them or that a scheduled drafting run has executed.
+### Excluding companies
 
-It also drains the freeform queue. Anything parked in `message_requests` is
-rendered back into the prompt the app would have sent, and the routine answers it:
+Settings → **Exclude companies from scraped jobs**, one employer per line. The
+list filters the scraper's intake **and** is written into the desktop prompt, so
+the auto-apply agent skips them too. Matching normalises case, punctuation and
+common legal suffixes, so `Rivet AI Pvt. Ltd.` matches an entry of `Rivet AI`. A
+company merely *mentioned* in a job description is not the employer and does not
+trigger it.
 
-```bash
-python pending_messages.py requests
-python pending_messages.py fulfil --request-id <ID> < message.txt
-```
-
-Each run ends with a summary notification — saved in-app and pushed to every
-device subscribed through the installed PWA:
-
-```bash
-python pending_messages.py notify --title "Job scan" --body "3 new jobs, 3 DMs"
-```
-
-Web push needs `VAPID_PRIVATE_KEY` and `VAPID_CLAIM_EMAIL` in the routine's
-environment, and `VAPID_PUBLIC_KEY` on the API project (the bell icon in the
-app uses it to subscribe the device). Without them the push is skipped and the
-in-app notification still lands.
-
-That environment needs `SUPABASE_URL` and `SUPABASE_KEY` only.
-
-Audited cover-letter drafts for explicitly eligible, high-match jobs follow the
-same interface — a queue command, then a save that re-derives the resume/JD
-provenance from the live row rather than trusting the caller:
-
-```bash
-python pending_messages.py cover-letter-list --limit 10
-python pending_messages.py save-cover-letter --job-id <ID> < letter.txt
-```
-
-## API Routes
+## API routes
 
 ```
-GET/POST /api/applications    # Application CRUD
-GET      /api/stats           # Dashboard analytics
-GET      /api/scraped-jobs    # Scraped job listings
-GET      /api/scraped-jobs/{id}/message  # Routine-written outreach message
-GET      /api/tonight         # Tonight's Plan jobs
-POST     /api/company-research # Company research
-GET/POST /api/desktop-agent   # Skip list + job recording for the Desktop agent
-GET/POST /api/demos           # Mini demo projects
-GET/PUT  /api/profile         # User profile
-POST     /api/notifications   # Push notifications
-GET      /api/health          # Health check
+GET/POST /api/applications     # application CRUD
+GET      /api/stats            # dashboard analytics
+GET      /api/scraped-jobs     # scraped job listings
+GET/POST /api/desktop-agent    # skip list + job recording for the auto-apply agent
+GET      /api/demos/{id}       # the deployed per-job mini demo
+POST     /api/company-research # company research
+GET/PUT  /api/profile          # résumé profile, settings, generated prompts
+POST     /api/notifications    # web push
+GET      /api/health           # health check
 ```
+
+## Honest limits
+
+- **The auto-apply agent runs in your browser, on your machine.** It cannot be
+  scheduled from the cloud — you paste the prompt and it goes. Everything after
+  a job is tracked *is* fully automatic.
+- **CAPTCHAs end that one application.** The agent does not attempt them and
+  never uses a solving service, so postings gated behind one are skipped and
+  listed at the end of the run.
+- **Nothing is emailed or DM'd automatically.** Drafts are stored; you send them
+  through your own accounts with a confirmation step.
+- **Portal terms of service vary.** Several job boards restrict automated
+  applying. Per-application pauses and a daily invitation cap are built in, but
+  you are responsible for how you use this against a given site's rules.
+- Résumé matching is deterministic and evidence-oriented — not an ATS
+  certification. Scanned or image-only PDFs are rejected because OCR is not
+  available, and anything ambiguous is surfaced for review rather than guessed.
+
+## Licence
+
+No licence file is present, so the default applies: all rights reserved. Open an
+issue if you would like to use it.
