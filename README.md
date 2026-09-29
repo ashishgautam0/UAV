@@ -12,7 +12,7 @@ ATS (Greenhouse, Lever, Workday, SmartRecruiters, Taleo).
 
 > Keywords: auto apply bot · job application automation · AI job search agent ·
 > Claude Computer Use · LinkedIn auto apply · Naukri auto apply · recruiter
-> outreach automation · cold DM generator · application tracker · job scraper
+> outreach automation · cold DM generator · application tracker · ATS auto apply
 
 ---
 
@@ -147,8 +147,7 @@ rather than a plausible-looking guess.
 │       ├── tracker.py           # applications, messages, cadence (Supabase)
 │       ├── pending_messages.py  # the CLI the routine drives
 │       ├── email_finder.py      # harvests published addresses; never guesses
-│       ├── outreach_quality.py  # deterministic draft checks
-│       └── scraper.py           # job source scrapers
+│       └── outreach_quality.py  # deterministic draft checks
 ├── frontend/src/app/(app)/      # dashboard · tracker · jobs · settings
 └── supabase/schema.sql          # database schema
 ```
@@ -291,8 +290,8 @@ still lands and only the push is skipped.
 ### Excluding companies
 
 Settings → **Exclude companies from scraped jobs**, one employer per line. The
-list filters the scraper's intake **and** is written into the desktop prompt, so
-the auto-apply agent skips them too. Matching normalises case, punctuation and
+list is written into the desktop prompt, so the auto-apply agent never applies
+to them. Matching normalises case, punctuation and
 common legal suffixes, so `Rivet AI Pvt. Ltd.` matches an entry of `Rivet AI`. A
 company merely *mentioned* in a job description is not the employer and does not
 trigger it.

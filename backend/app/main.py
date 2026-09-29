@@ -20,7 +20,6 @@ from .routers import (
     profile,
     scraper,
     stats,
-    tonight,
 )
 
 # Inject env vars from settings so modules read them via os.environ
@@ -74,7 +73,6 @@ app.add_middleware(
 app.include_router(applications.router, prefix="/api/applications", tags=["Applications"])
 app.include_router(stats.router, prefix="/api/stats", tags=["Stats"])
 app.include_router(scraper.router, prefix="/api/scraped-jobs", tags=["Scraped Jobs"])
-app.include_router(tonight.router, prefix="/api/tonight", tags=["Tonight"])
 app.include_router(company_research.router, prefix="/api/company-research", tags=["Company Research"])
 app.include_router(mini_demos.router, prefix="/api/demos", tags=["Mini Demos"])
 app.include_router(profile.router, prefix="/api/profile", tags=["Profile"])

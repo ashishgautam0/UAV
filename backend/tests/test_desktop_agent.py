@@ -604,10 +604,21 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertIn("Do not send `skipped` for a job you did not judge", step2)
         self.assertIn("hit an OTP prompt, could not load the page", step2)
 
-    def test_prompt_states_scraper_jobs_are_still_appliable(self):
+    def test_prompt_states_unhandled_database_jobs_are_still_appliable(self):
+        """The skip list is applied-or-dismissed only. Rows the removed scraper
+        left behind were never applied to, so they must stay appliable."""
         step0 = self.prompt.split("STEP 0 — LOAD THE SKIP LIST", 1)[1].split("## WHAT TO SEARCH", 1)[0]
-        self.assertIn("Today Todo", step0)
         self.assertIn("Never skip a job just because it was already in my database", step0)
+        self.assertIn("only an applied or", step0)
+        self.assertNotIn("Today Todo", step0)
+
+    def test_prompt_does_not_promise_a_scraper_that_no_longer_runs(self):
+        """Job discovery is the desktop agent's alone; a prompt that says
+        something else searches too would have it leave roles unfound."""
+        for stale in ("hourly scraper", "Today Todo", "my scraper"):
+            with self.subTest(stale=stale):
+                self.assertNotIn(stale, self.prompt)
+        self.assertIn("You are the only thing that finds jobs", self.prompt)
 
     def test_prompt_fits_the_saved_field_limit(self):
         """Nothing expands into the prompt now that the answers are inline, so

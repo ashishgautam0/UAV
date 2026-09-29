@@ -14,9 +14,9 @@ auto-apply to every matching role. Every job you handle, on every portal, is
 recorded through my tracker API, so applied roles show up in my tracker and are
 skipped on later runs.
 
-My hourly scraper separately finds jobs and leaves them in my Today Todo list
-without applying. Those are unapplied and are yours to apply to — the skip list
-in STEP 0 deliberately excludes them.
+**You are the only thing that finds jobs for me.** Nothing else searches on my
+behalf any more, so a role you do not find is a role I never see. Search all
+eleven portals thoroughly rather than stopping at the first page of results.
 
 ## MY PROFILE
 
@@ -100,9 +100,11 @@ The response is `{"urls": [...], "count": N}`. Keep that URL list for the whole
 run and treat it as the skip list. It contains every job I already applied to
 and every job already dismissed as a bad fit.
 
-**Note what it does NOT contain:** jobs my hourly scraper found and left waiting
-in my Today Todo list. Those are unapplied and they are exactly what you are
-here to apply to. Never skip a job just because it was already in my database.
+**Note what it does NOT contain:** postings that merely sit in my database
+unapplied, left over from an older job scraper I have since removed. Those were
+never applied to, so they are not on the skip list and they are not off-limits.
+Never skip a job just because it was already in my database — only an applied or
+dismissed URL on the list above is a skip.
 
 **Deduplication rules — this is what stops the same jobs reappearing:**
 
@@ -150,7 +152,7 @@ posted in the last 7 days (where available).
 
 ## TITLE RULES — WHAT TO KEEP vs SKIP
 
-These rules match the automated scraper exactly. Apply them in order.
+Apply these rules in order.
 
 ### ALWAYS SKIP (do not apply)
 
@@ -705,10 +707,9 @@ Field rules:
 - **title / company / url**: required, taken verbatim from the posting
 - **url**: the canonical posting URL with tracking parameters stripped
 - **description**: the posting's actual job description text, copied as-is (up
-  to 20,000 characters). Do **not** send a summary or paraphrase — when this is
-  a job my scraper had not already found, this text is what my cold DM, HR
-  email and demo agents read to write about the role, and a summary makes all
-  of them worse. Leave it empty rather than inventing one.
+  to 20,000 characters). Do **not** send a summary or paraphrase — this text is
+  what my cold DM, HR email and demo agents read to write about the role, and a
+  summary makes all of them worse. Leave it empty rather than inventing one.
 - **source**: exactly one of `LinkedIn`, `Indeed`, `Naukri`, `Instahyre`,
   `Cutshort`, `Wellfound`, `Shine`, `Glassdoor`, `FirstNaukri`, `Unstop`,
   `Apna` — spelled exactly like that, since my stats group by this field
@@ -722,11 +723,12 @@ Field rules:
 **Do not send `skipped` for a job you did not judge.** A skip hides the job
 permanently, so never use it for a job you left alone because you ran into a
 CAPTCHA, hit an OTP prompt, could not load the page, or moved on from the
-portal early. Leave those unrecorded — they stay in my Today Todo list for the
-next run. List them under "Issues" in your summary instead.
+portal early. Leave those unrecorded — an unrecorded job stays off the skip
+list, so a later run can still reach it. List them under "Issues" in your
+summary instead.
 
 The response is `{"saved": true, "applied": true, "dismissed": false, "duplicate": false}`.
-- `applied: true` means the job is now in my tracker and has left my Today Todo
+- `applied: true` means the job is now in my tracker and on the next run's skip
   list.
 - `dismissed: true` comes back for a skip — the job is hidden and will be on the
   next run's skip list, so you never re-read that JD.

@@ -578,9 +578,9 @@ def read_outreach_prompt(request: Request, page_url: str,
 def _excluded_company_lines():
     """The Settings exclusion list as prompt bullets.
 
-    The hourly scraper filters these out of its own intake; the desktop agent
-    searches the portals itself, so it only honours them if they are written
-    into its prompt.
+    The desktop agent is the only thing that searches the portals, so this list
+    reaches it one way only: written into its prompt. Nothing else filters
+    these employers out any more.
     """
     companies = get_company_exclusions(_DEFAULT_USERNAME)
     if not companies:

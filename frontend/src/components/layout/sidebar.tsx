@@ -22,9 +22,6 @@ import {
 import { useState } from "react";
 import { NotificationBell } from "./notification-bell";
 
-// Hidden, not removed: /tonight (Today Todo) still works for anyone with the
-// URL, and its data keeps flowing. Re-add the entry here to show it again:
-//   { href: "/tonight", label: "Today Todo", icon: Moon },
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tracker", label: "Tracker", icon: ClipboardList },
