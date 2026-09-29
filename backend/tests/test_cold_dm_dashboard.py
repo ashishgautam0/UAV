@@ -91,6 +91,9 @@ class ColdDmDashboardTests(unittest.TestCase):
             self.assertEqual([card["id"] for card in tracker.get_cold_dm_todos(5)], [1, 4])
 
     def test_recorded_send_schedules_next_followup_from_send_day_not_old_application_date(self):
+        """The day-16 round is placed 8 days after the day-8 send is recorded,
+        not 15 days after a long-past application date — a late send must not
+        arrive already overdue."""
         db = MagicMock()
         db.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value.data = {
             "follow_up_count": 0, "date_applied": "2026-08-01"}
@@ -99,7 +102,7 @@ class ColdDmDashboardTests(unittest.TestCase):
         ):
             tracker.update_status(42, "Follow-up Sent")
         db.table.return_value.update.assert_called_once_with({
-            "status": "Follow-up Sent", "follow_up_count": 1, "follow_up_date": "2026-10-04"})
+            "status": "Follow-up Sent", "follow_up_count": 1, "follow_up_date": "2026-10-05"})
 
     def test_invalid_connection_timestamp_neither_resends_nor_activates_followup(self):
         apps = [{"id": 8, "company": "Example", "role": "Engineer", "url": "https://jobs/8",

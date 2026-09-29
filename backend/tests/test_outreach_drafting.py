@@ -7,7 +7,9 @@ from unittest.mock import MagicMock, patch
 
 from test_settings_profile import ROOT, function
 from email_finder import extract_published_emails
+from outreach_quality import draft_recipient, unsourced_recipient
 from message_generator import build_cold_dm_prompt, build_hr_email_prompt
+from outreach_quality import UNKNOWN_RECIPIENT
 from outreach_quality import validate_outreach_draft, wrong_demo_links
 
 
@@ -147,6 +149,42 @@ class OutreachDraftingTests(unittest.TestCase):
         # Punctuation, casing and duplicates.
         self.assertEqual(extract_published_emails("(hr@a.com). Also HR@A.COM"), ["hr@a.com"])
         self.assertEqual(extract_published_emails(None), [])
+
+    def test_a_recipient_without_a_source_on_record_is_rejected(self):
+        """17 of 27 stored drafts had an address traceable to nothing, and one
+        replaced its own cached address with hr@<tradingname>.in. Saving now
+        requires the recipient to match evidence we hold."""
+        body = "Subject: Application\n\nHello,\n\nBody text.\n\nSubidh Khanal"
+        cached = ["info@rawats.com"]
+
+        # The real failure: an evidenced address on record, a different one used.
+        invented = validate_outreach_draft(
+            "hr_email", f"To: hr@disruptive.in\n{body}", 7, evidenced_emails=cached)
+        self.assertIn("hr@disruptive.in", invented)
+        self.assertIn("no source on record", invented)
+
+        # The cached address, and one the posting printed, both pass.
+        for good in ("info@rawats.com", "careers@acme.co.in"):
+            with self.subTest(recipient=good):
+                self.assertIsNone(validate_outreach_draft(
+                    "hr_email", f"To: {good}\n{body}", 7,
+                    evidenced_emails=["info@rawats.com", "careers@acme.co.in"]))
+
+        # Honestly declining to name one stays valid — that is the fallback.
+        self.assertIsNone(validate_outreach_draft(
+            "hr_email", f"To: {UNKNOWN_RECIPIENT}\n{body}", 7, evidenced_emails=[]))
+        # Callers that pass no evidence list are unaffected, so cold DMs and
+        # older call sites keep saving exactly as before.
+        self.assertIsNone(validate_outreach_draft("hr_email", f"To: any@where.com\n{body}", 7))
+
+    def test_recipient_parsing_survives_real_draft_shapes(self):
+        self.assertEqual(draft_recipient("To:   Careers@ACME.com  \nSubject: x"),
+                         "careers@acme.com")
+        self.assertEqual(draft_recipient(f"To: {UNKNOWN_RECIPIENT}"), "")
+        self.assertEqual(draft_recipient("no to line here"), "")
+        # Case and surrounding whitespace must not defeat the match.
+        self.assertEqual(unsourced_recipient("To: HR@Acme.com", ["hr@acme.com"]), "")
+        self.assertEqual(unsourced_recipient("To: hr@acme.com", []), "hr@acme.com")
 
     def test_harvesting_imports_without_any_third_party_package(self):
         """This lane installs nothing. A module-level `import requests` in

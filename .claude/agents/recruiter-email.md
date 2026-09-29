@@ -38,8 +38,29 @@ list is deliberate — do not stop before you have tried all of it.
    like) — these sometimes publish a recruiting contact on the listing footer.
 
 Sources 2–5 are the fallback for a company researched before the cache held an
-email, or one where research found none. When you do find an address this way,
-say so in your report with its source URL so it can be cached for next time.
+email, or one where research found none.
+
+**A cached address wins.** When `published_emails` already has one, use it —
+do not go looking for a "better" one and do not substitute your own. Replacing
+an evidenced address with one you assembled is the single worst outcome here,
+because it reads as verified and is not.
+
+**Cache anything you find before you use it.** If sources 2–5 turn up a
+published address, save it to the company intel first, with the page it came
+from:
+
+```
+cat > /tmp/intel.json <<'JSON'
+{"hiring_email":"careers@company.example",
+ "hiring_email_source":"https://company.example/careers"}
+JSON
+python pending_messages.py save-company --name "<Company>" < /tmp/intel.json
+```
+
+Then use it. This is not bookkeeping: **a draft whose `To:` address is neither
+the cached one nor printed in the posting is rejected on save**, so an
+uncached find cannot be stored. Every other job at that employer then reuses
+it for free.
 
 Never construct an address from a domain — not firstname.lastname@, and not
 careers@ or jobs@ either. SMTP probes, catch-all results and directory guesses

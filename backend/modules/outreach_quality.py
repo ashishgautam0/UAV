@@ -3,6 +3,35 @@ import re
 
 _DEMO_LINK = re.compile(r"/api/demo/(\d+)")
 _DEMO_LINKED_KINDS = {"cold_dm", "cold-dm", "hr_email"}
+# The recipient on an HR email draft's To: line.
+_TO_LINE = re.compile(r"(?im)^\s*to\s*:\s*(.+?)\s*$")
+_ADDRESS = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+UNKNOWN_RECIPIENT = "unknown — recipient verification required"
+
+
+def draft_recipient(content):
+    """The address on the draft's To: line, or "" when it is the unknown marker."""
+    match = _TO_LINE.search(content or "")
+    if not match:
+        return ""
+    found = _ADDRESS.search(match.group(1))
+    return found.group(0).lower() if found else ""
+
+
+def unsourced_recipient(content, evidenced):
+    """The draft's recipient when nothing on record published it.
+
+    Every address has to trace to a source we hold: the one company research
+    cached for this employer, or one the posting itself printed. An address
+    that matches neither was either found without being recorded — in which
+    case the agent must cache it with its source first — or assembled from a
+    domain, which is the failure this check exists to stop.
+    """
+    recipient = draft_recipient(content)
+    if not recipient:
+        return ""
+    allowed = {str(item).strip().lower() for item in (evidenced or []) if item}
+    return "" if recipient in allowed else recipient
 
 
 def wrong_demo_links(content, scraped_job_id):
@@ -19,7 +48,14 @@ def wrong_demo_links(content, scraped_job_id):
     })
 
 
-def validate_outreach_draft(kind, content, scraped_job_id=None):
+def validate_outreach_draft(kind, content, scraped_job_id=None, evidenced_emails=None):
+    if kind == "hr_email" and evidenced_emails is not None:
+        stray = unsourced_recipient(content, evidenced_emails)
+        if stray:
+            return (f"Recipient {stray} has no source on record. Use the address "
+                    f"company research cached, or one the posting prints; if you "
+                    f"found a new one, save it to the company intel with its "
+                    f"source URL first. Otherwise write 'To: {UNKNOWN_RECIPIENT}'.")
     if kind in _DEMO_LINKED_KINDS:
         foreign = wrong_demo_links(content, scraped_job_id)
         if foreign:

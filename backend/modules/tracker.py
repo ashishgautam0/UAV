@@ -12,8 +12,12 @@ from zoneinfo import ZoneInfo
 from supabase import create_client
 import json
 
-# --- Follow-up cadence (global defaults) ---
-APPLICATION_CADENCE = [7, 14, 21]   # first outreach on day 7; at most 3 rounds
+# --- Outreach cadence (global defaults) ---
+# Day offsets from the application date. Day 1 the job is tracked; day 8
+# (offset 7) is the first outreach — HR email plus a LinkedIn connection note,
+# each carrying that job's demo. Day 16 (offset 15) is the single follow-up
+# round. Two rounds only: after the second, the record is marked Ghosted.
+APPLICATION_CADENCE = [7, 15]
 INTERVIEW_FOLLOW_UP_DAYS = 3
 TERMINAL_STATUSES = ["Offer", "Rejected", "Ghosted", "Not Interested"]
 USER_TIMEZONE = ZoneInfo("Asia/Kolkata")
@@ -57,7 +61,7 @@ def add_application(company, role, job_type, platform, url="",
                     salary="", notes=""):
     db = _get_client()
     today = _user_now().strftime("%Y-%m-%d")
-    follow_up = (_user_now() + timedelta(days=7)).strftime("%Y-%m-%d")
+    follow_up = (_user_now() + timedelta(days=APPLICATION_CADENCE[0])).strftime("%Y-%m-%d")
     db.table("applications").insert({
         "company": company,
         "role": role,
@@ -87,10 +91,12 @@ def update_status(app_id, new_status):
         count = (app.get("follow_up_count") or 0) + 1
         update_data["follow_up_count"] = count
         if count < len(APPLICATION_CADENCE):
-            # Start the next seven-day window when outreach is recorded, not
-            # from the original application date. Late sends must not make the
-            # next follow-up immediately overdue.
-            update_data["follow_up_date"] = (_user_now().date() + timedelta(days=7)).isoformat()
+            # Start the next window when outreach is recorded, not from the
+            # original application date. Late sends must not make the next
+            # round immediately overdue, so the cadence supplies the gap
+            # between rounds rather than an absolute date.
+            gap = APPLICATION_CADENCE[count] - APPLICATION_CADENCE[count - 1]
+            update_data["follow_up_date"] = (_user_now().date() + timedelta(days=gap)).isoformat()
         else:
             # Cadence exhausted — auto-mark as Ghosted
             update_data["follow_up_date"] = None
@@ -676,6 +682,34 @@ def get_job_message(scraped_job_id, message_type=DEFAULT_MESSAGE_TYPE):
         return None
 
 
+def evidenced_hiring_emails(scraped_job_id):
+    """Addresses on record for this job's employer, newest evidence first.
+
+    The address company research cached for the company, plus anything the
+    posting itself printed. Returns [] when the job cannot be read, which
+    leaves an unknown-recipient draft valid and a claimed address rejected.
+    """
+    from email_finder import extract_published_emails
+
+    try:
+        db = _get_client()
+        resp = (db.table("scraped_jobs")
+                .select("company,description")
+                .eq("id", int(scraped_job_id)).limit(1).execute())
+    except Exception as exc:
+        print(f"[tracker] evidenced_hiring_emails lookup failed: {exc}")
+        return []
+    row = (resp.data or [{}])[0]
+    found = []
+    cached = get_cached_research(row.get("company") or "") or {}
+    if cached.get("hiring_email"):
+        found.append(cached["hiring_email"].strip().lower())
+    for email in extract_published_emails(row.get("description")):
+        if email not in found:
+            found.append(email)
+    return found
+
+
 def save_job_message(scraped_job_id, content, message_type=DEFAULT_MESSAGE_TYPE,
                      generated_by="claude-routine", profile_version=None):
     """Store (or replace) the message for a job. Returns True on success."""
@@ -686,12 +720,23 @@ def save_job_message(scraped_job_id, content, message_type=DEFAULT_MESSAGE_TYPE,
     # other job's demo link, which would send this employer someone else's demo.
     # Only this check here — the rest of the outreach rules stay in cmd_save,
     # so this cannot start rejecting drafts that save fine today.
-    from outreach_quality import wrong_demo_links
+    from outreach_quality import unsourced_recipient, wrong_demo_links
     foreign = wrong_demo_links(content, scraped_job_id)
     if foreign:
         print(f"Rejected {message_type} for job {scraped_job_id}: "
               f"it links demo(s) {', '.join(foreign)} belonging to another job.")
         return False
+    # An HR email may only go to an address we can trace: the one company
+    # research cached for this employer, or one the posting itself printed.
+    # Without this a draft could carry an address assembled from a domain,
+    # which reads as evidenced and is not.
+    if message_type == "hr_email":
+        stray = unsourced_recipient(content, evidenced_hiring_emails(scraped_job_id))
+        if stray:
+            print(f"Rejected hr_email for job {scraped_job_id}: recipient {stray} "
+                  f"has no source on record. Cache it with its source URL first, "
+                  f"or leave the unknown-recipient marker.")
+            return False
     db = _get_client()
     try:
         profile_dependent = message_type in {

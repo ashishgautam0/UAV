@@ -77,14 +77,26 @@ class OutreachSettingsTests(unittest.TestCase):
                          "Follow-ups Due card must appear only after", "at most one outreach action"):
             self.assertIn(required, prompt)
 
-    def test_saved_followup_templates_also_require_a_recorded_connection_and_a_week(self):
+    def test_saved_followup_templates_still_get_the_authoritative_cadence(self):
+        """A template saved before the cadence changed must not keep its old
+        timing: the rules block is appended and marked authoritative over it."""
         prompt, unknown = self.renderer()("My old saved follow-up instructions", {},
                                           "https://app", "https://pdf", "followup")
         self.assertFalse(unknown)
-        for required in ("My old saved follow-up instructions", "FOLLOW-UP CARD TIMING (authoritative)",
-                         "recorded on that exact Tracker job", "at least seven calendar days",
-                         "saved follow_up_date must also be due", "do not send an email follow-up"):
-            self.assertIn(required, prompt)
+        for required in (
+            "My old saved follow-up instructions",
+            "FOLLOW-UP CARD TIMING (authoritative)",
+            "Day 8 is the first outreach",
+            "Day 16 is the single follow-up round",
+            "saved follow_up_date is actually due",
+            # The DM is conditional; the email is not.
+            "LINKEDIN FOLLOW-UP DM IS CONDITIONAL",
+            "whatever happened on LinkedIn",
+            # And the superseded wording is named so it cannot win.
+            "does not override this timing",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, prompt)
 
     def test_connection_recording_uses_existing_history_and_cadence(self):
         from unittest.mock import MagicMock
