@@ -5,7 +5,7 @@ import pathlib
 import sys
 import types
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -104,6 +104,73 @@ class HrEmailTodoTests(unittest.TestCase):
             else:
                 sys.modules["analytics"] = original
         self.assertEqual(app_query.null_filter, ("hr_email_sent_at", "null"))
+
+    def test_the_cadence_is_day_8_outreach_then_one_day_16_follow_up(self):
+        """Day 1 tracked, day 8 HR email + connection note, day 16 the single
+        follow-up round, then Ghosted. The gap between rounds is taken from the
+        cadence so a late send does not make the next round instantly overdue."""
+        # The shipped constant, read without importing supabase.
+        source = (ROOT / "modules/tracker.py").read_text()
+        cadence = next(line for line in source.splitlines()
+                       if line.startswith("APPLICATION_CADENCE"))
+        self.assertIn("[7, 15]", cadence)
+
+        moment = datetime.fromisoformat("2026-09-29T10:00:00+05:30")
+        db = MagicMock()
+        add_with_db = function(ROOT / "modules/tracker.py", "add_application", {
+            "_get_client": lambda: db, "_user_now": lambda: moment,
+            "APPLICATION_CADENCE": [7, 15], "timedelta": timedelta,
+        })
+        add_with_db("Acme", "ML Engineer", "Full-time", "LinkedIn")
+        inserted = db.table.return_value.insert.call_args.args[0]
+        self.assertEqual(inserted["date_applied"], "2026-09-29")
+        # Day 1 + 7 = day 8.
+        self.assertEqual(inserted["follow_up_date"], "2026-10-06")
+
+    def test_recording_the_day_8_send_schedules_day_16_then_stops(self):
+        moment = datetime.fromisoformat("2026-10-06T10:00:00+05:30")
+
+        def run(existing_count):
+            db = MagicMock()
+            (db.table.return_value.select.return_value.eq.return_value
+               .single.return_value.execute.return_value.data) = {
+                   "follow_up_count": existing_count}
+            update = function(ROOT / "modules/tracker.py", "update_status", {
+                "_get_client": lambda: db, "_user_now": lambda: moment,
+                "APPLICATION_CADENCE": [7, 15], "timedelta": timedelta,
+                "TERMINAL_STATUSES": ["Offer", "Rejected", "Ghosted", "Not Interested"],
+                "INTERVIEW_FOLLOW_UP_DAYS": 3,
+            })
+            update(42, "Follow-up Sent")
+            return db.table.return_value.update.call_args.args[0]
+
+        # First round recorded on day 8 → next due 8 days later, day 16.
+        first = run(0)
+        self.assertEqual(first["follow_up_count"], 1)
+        self.assertEqual(first["follow_up_date"], "2026-10-14")
+        self.assertNotEqual(first.get("status"), "Ghosted")
+        # Second round recorded → cadence exhausted, no third.
+        second = run(1)
+        self.assertEqual(second["follow_up_count"], 2)
+        self.assertIsNone(second["follow_up_date"])
+        self.assertEqual(second["status"], "Ghosted")
+
+    def test_the_linkedin_follow_up_needs_an_accepted_connection(self):
+        rules = (ROOT / "modules/outreach_prompts.py").read_text()
+        for required in (
+            "day 1 the job enters the Tracker",
+            "Day 8 is the first outreach",
+            "Day 16 is the single follow-up round",
+            "LINKEDIN FOLLOW-UP DM IS CONDITIONAL",
+            "once the invitation has been ACCEPTED",
+            # The email is NOT gated on the connection.
+            "whatever happened on LinkedIn",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, rules)
+        agent = (ROOT.parent / ".claude/agents/followup.md").read_text()
+        self.assertIn("requires an accepted connection", agent)
+        self.assertIn("Never send another invitation in its place", agent)
 
     def test_schema_backfills_only_old_rows_before_new_todos_begin(self):
         schema = (ROOT.parent / "supabase/schema.sql").read_text()

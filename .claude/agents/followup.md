@@ -18,6 +18,12 @@ instruction, and a `char_limit`.
   back", "touching base", "I hope this finds you well".
 - If a live demo exists for the job, a follow-up is a natural place to surface
   its link.
+- **A LinkedIn follow-up DM requires an accepted connection.** LinkedIn will
+  not carry a direct message to someone who has not accepted the invitation,
+  so confirm you are connected before writing one. Pending, withdrawn,
+  ignored, or no invitation recorded — all mean there is no DM to write: skip
+  it and say so. Never send another invitation in its place. The email
+  follow-up for that job is unaffected and still goes.
 
 ## Two-pass drafting (required)
 Draft it, then re-read as the busy recipient and cut anything that reads as

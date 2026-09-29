@@ -46,7 +46,13 @@ These connection-note, daily-cap, fixed-batch and due-date rules override older 
 """
 
 FOLLOW_UP_AFTER_CONNECTION_RULES = """FOLLOW-UP CARD TIMING (authoritative):
-Only use the Dashboard's Follow-ups Due cards after a confirmed LinkedIn connection invitation was recorded on that exact Tracker job. Verify the 'LinkedIn connection' history entry, its sent_at date in Asia/Kolkata, and that at least seven calendar days have passed since that send. The saved follow_up_date must also be due. If the connection is unrecorded, the seven days have not passed, or the saved date is future/missing, do not send an email follow-up; leave it pending. Never change the date to make a card due. A separate Company HR email todo is unaffected. After a confirmed follow-up, record it on that Tracker job; the next round is scheduled seven days after the recorded send, up to the existing three-round cap. Older wording based only on days since application does not override this timing.
+THE CADENCE: day 1 the job enters the Tracker. Day 8 is the first outreach — the HR email and the LinkedIn connection note, each carrying that job's demo. Day 16 is the single follow-up round, and the last: after it is recorded the record is marked Ghosted. Only use a Follow-ups Due card when its saved follow_up_date is actually due in Asia/Kolkata. Never change a date to make a card due, and never send a round early because a draft exists.
+
+THE EMAIL FOLLOW-UP goes on day 16 whenever the day-8 HR email was sent, whatever happened on LinkedIn. A connection that was never accepted does not hold it back — they are separate channels.
+
+THE LINKEDIN FOLLOW-UP DM IS CONDITIONAL. LinkedIn only carries a direct message once the invitation has been ACCEPTED. Before writing one, open the recipient's profile and confirm you are connected. If the invitation is still Pending, was withdrawn, was ignored, or no invitation was recorded at all, there is no DM to send: skip it, say so in your report, and leave it — do not send a second invitation, do not withdraw and reinvite, do not switch to InMail or email in its place, and do not treat a pending invitation as a delivered message. The email follow-up for that job still goes.
+
+Record each confirmed send on that Tracker job. A single recorded follow-up completes the day-16 slot whether it went by email, by LinkedIn, or both; do not record twice for one slot. Older wording about three rounds, seven-day spacing, or blocking the email follow-up on an unaccepted connection does not override this timing.
 
 """
 
