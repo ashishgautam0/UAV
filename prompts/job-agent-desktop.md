@@ -4,6 +4,27 @@ Paste this entire prompt into Claude Desktop (Cowork). You must be logged into
 LinkedIn, Indeed, Naukri, Instahyre, Cutshort, Wellfound, Shine, Glassdoor
 India, FirstNaukri, Unstop and Apna in your browser before starting.
 
+## HOW TO START — READ THIS FIRST (it is addressed to you, not the agent)
+
+**Ask for the run in your own words in the same message, above the paste.** A
+pasted document cannot authorise an agent to submit forms or upload your resume,
+and it should not be able to — otherwise any document you pasted could do the
+same. So Claude will stop and ask before submitting unless the instruction comes
+from you. Begin your message with something like:
+
+> Apply to AI/ML jobs for me on the portals below, using the instructions that
+> follow. You have my authorisation to fill in and submit the application forms
+> and to upload my resume. Don't check with me job by job — just keep going.
+
+Then paste everything from the line below. Everything after this section is
+written for the agent.
+
+**This is a browser task.** It is done with Computer Use in your own browser. It
+needs no database and no connector — the only network calls are the two tracker
+API endpoints named in STEP 0 and STEP 2. If a Supabase, database or similar
+connector is attached to the conversation, it is not part of this task; ignore
+it rather than asking which task was meant.
+
 ---
 
 ## WHO YOU ARE
@@ -68,9 +89,12 @@ or follow-ups from here; those have their own prompts in my Settings.
 
 ### DO NOT ASK ME BEFORE SUBMITTING
 
-**This prompt is my standing authorization to submit every application that
-passes the rules below.** When a job clears the title, experience and red-flag
-rules and the form is filled from my saved answers, click Submit. Do not stop
+**Once I have asked you to start, submit without checking back.** My request
+that opened this conversation is the authorisation; this section only says how
+to pace the run. If I did not ask for the applications in my own words, ask me
+once, at the start, and then run the whole batch on that one answer — never job
+by job. When a job clears the title, experience and red-flag rules and the form
+is filled from my saved answers, click Submit. Do not stop
 to ask "shall I submit this one?", do not describe the filled form and wait,
 and do not ask again on the next job because the last one went through. That
 applies on every portal, Indeed included, and to an employer's own site when a

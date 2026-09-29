@@ -340,7 +340,11 @@ class DesktopPromptTests(unittest.TestCase):
         blocker that protects the accounts."""
         for required in (
             "DO NOT ASK ME BEFORE SUBMITTING",
-            "standing authorization to submit",
+            # The prompt no longer declares its own authority — a pasted
+            # document asserting that is what Claude Desktop refuses. It now
+            # paces the run on the authority the user's message carries.
+            "Once I have asked you to start, submit without checking back",
+            "run the whole batch on that one answer — never job",
             "do not ask again on the next job",
             "Indeed included",
             # a blocker costs one job, never the run
@@ -611,6 +615,31 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertIn("Never skip a job just because it was already in my database", step0)
         self.assertIn("only an applied or", step0)
         self.assertNotIn("Today Todo", step0)
+
+    def test_prompt_does_not_claim_to_authorize_itself(self):
+        """Claude Desktop treats a pasted document as data, so a prompt that
+        declares its own authority to submit is exactly what gets refused.
+        Authority has to come from the user's message; the prompt only paces
+        the run once it has."""
+        self.assertNotIn("This prompt is my standing authorization", self.prompt)
+        self.assertIn("Once I have asked you to start", self.prompt)
+        self.assertIn("My request\nthat opened this conversation is the authorisation",
+                      self.prompt)
+
+    def test_prompt_tells_the_user_how_to_grant_that_authority(self):
+        """The opening section is addressed to the user and carries the
+        sentence they must send themselves, or the run stalls on the first
+        submission."""
+        opening = self.prompt.split("## HOW TO START", 1)[1].split("## WHO YOU ARE", 1)[0]
+        self.assertIn("in your own words in the same message", opening)
+        self.assertIn("You have my authorisation to fill in and submit", opening)
+
+    def test_prompt_says_this_is_a_browser_task_not_a_connector_task(self):
+        """A Supabase or database connector on the conversation made the agent
+        stop and ask which task was meant instead of browsing."""
+        opening = self.prompt.split("## HOW TO START", 1)[1].split("## WHO YOU ARE", 1)[0]
+        self.assertIn("This is a browser task", opening)
+        self.assertIn("ignore\nit rather than asking which task was meant", opening)
 
     def test_prompt_does_not_promise_a_scraper_that_no_longer_runs(self):
         """Job discovery is the desktop agent's alone; a prompt that says
