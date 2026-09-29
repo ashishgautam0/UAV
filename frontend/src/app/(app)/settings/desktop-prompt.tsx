@@ -8,6 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
+// Claude Desktop treats a pasted document as data, not as an instruction from
+// the user — so submission authority has to arrive in the user's own message.
+// This is that sentence; the prompt's own opening section explains why.
+const STARTER_MESSAGE =
+  "Apply to AI/ML jobs for me on the portals below, using the instructions that follow. " +
+  "You have my authorisation to fill in and submit the application forms and to upload my resume. " +
+  "Don't check with me job by job — just keep going.";
+
 export function DesktopPrompt() {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(true);
@@ -68,6 +76,21 @@ export function DesktopPrompt() {
         </div>
         <label htmlFor="prompt-desktop" className="text-sm font-medium">Desktop prompt</label>
         <Textarea id="prompt-desktop" readOnly value={text} rows={16} />
+      </div>
+      <div className="rounded-lg border border-amber-600/30 bg-amber-600/5 p-3 text-sm">
+        <p className="font-medium">Start your message with this, then paste the prompt under it.</p>
+        <p className="mt-1 text-muted-foreground">
+          A pasted document can’t authorise Claude to submit forms or upload your resume —
+          it will stop and ask unless you say so yourself. One sentence in your own message fixes it.
+        </p>
+        <p className="mt-2 rounded border bg-background p-2 font-mono text-xs">{STARTER_MESSAGE}</p>
+        <Button className="mt-2" variant="outline" size="sm" onClick={async () => {
+          try {
+            if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
+            await navigator.clipboard.writeText(STARTER_MESSAGE);
+            toast.success("Starter message copied — paste the prompt under it");
+          } catch { toast.error("Select and copy the sentence above."); }
+        }}>Copy starter message</Button>
       </div>
       <p className="text-xs text-muted-foreground">
         Log into all eleven portals in your browser before starting. Generate resolves the live tracker API and resume links. No application cap and no time limit — it keeps applying until you tell it to stop. Placeholders: {"{{seen_urls_url}}"}, {"{{record_url}}"}, {"{{resume_url}}"}, {"{{resume_filename}}"}, {"{{resume_sha256}}"}.
