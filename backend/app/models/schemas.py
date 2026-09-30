@@ -64,6 +64,12 @@ class CompanyExclusionsSettings(BaseModel):
     companies: list[str] = Field(default_factory=list, max_length=100)
 
 
+class CompanyExclusionsResponse(BaseModel):
+    """The user's own exclusions plus the companies excluded by being tracked."""
+    companies: list[str]
+    tracked: list[str] = Field(default_factory=list)
+
+
 class RenderedApplicationPrompt(BaseModel):
     """A fixed, ready-to-paste browser-agent batch assembled by the backend."""
     prompt: str

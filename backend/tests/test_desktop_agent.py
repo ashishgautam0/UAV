@@ -287,87 +287,103 @@ class RecordJobTests(unittest.TestCase):
 
 
 class TrackedCompaniesAreExcludedTests(unittest.TestCase):
-    """Once a company reaches the tracker it joins the Settings exclusion
-    list, so the desktop agent never applies to the same company twice."""
+    """Every tracker company is excluded, read live beside the user's own list.
+
+    They used to be copied into the Settings list, which grew past the 100
+    names Settings can load, so the page failed with "Could not load excluded
+    companies" and the user's own list could no longer be edited.
+    """
 
     TRACKER = ROOT / "modules" / "tracker.py"
+    ROUTER = ROOT / "app/routers/profile.py"
 
-    def helpers(self):
-        """The module-level names the extracted functions rely on."""
+    def placeholders(self):
         import ast
         line = next(l for l in self.TRACKER.read_text().splitlines()
                     if l.startswith("_PLACEHOLDER_COMPANIES"))
-        placeholders = ast.literal_eval(line.split("=", 1)[1].strip())
-        return {"_is_real_company": function(self.TRACKER, "_is_real_company",
-                                             {"_PLACEHOLDER_COMPANIES": placeholders})}
+        return ast.literal_eval(line.split("=", 1)[1].strip())
 
-    def test_recording_an_application_excludes_its_company(self):
-        from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
-        excluded = []
-        env = {"_get_client": lambda: MagicMock(), "timedelta": timedelta,
-               "_user_now": lambda: datetime(2026, 9, 30),
-               "APPLICATION_CADENCE": [7, 15],
-               "_exclude_applied_company": excluded.append}
-        add_application = function(self.TRACKER, "add_application", env)
-        add_application("Acme AI", "GenAI Engineer", "Full-time", "LinkedIn")
-        self.assertEqual(excluded, ["Acme AI"])
-
-    def exclude(self, company, current, save=None):
-        saved = []
-        with patch.object(profile_data, "get_company_exclusions", return_value=current), \
-             patch.object(profile_data, "save_company_exclusions",
-                          side_effect=save or (lambda companies: saved.append(companies))):
-            function(self.TRACKER, "_exclude_applied_company", self.helpers())(company)
-        return saved
-
-    def test_a_new_company_is_appended_to_the_list(self):
-        self.assertEqual(self.exclude("Acme AI", ["AI Job Fever"]),
-                         [["AI Job Fever", "Acme AI"]])
-
-    def test_a_company_already_listed_is_not_added_twice(self):
-        """Matching ignores case, punctuation and legal suffixes, the same way
-        the prompt tells the agent to match."""
-        self.assertEqual(self.exclude("ACME AI Pvt. Ltd.", ["Acme AI"]), [])
-        self.assertEqual(self.exclude("   ", ["Acme AI"]), [])
-
-    def test_placeholder_company_names_never_become_exclusions(self):
-        """Old tracker rows carry "nan" and "Unknown" as the company. Neither is
-        an employer, and excluding them would skip unrelated postings."""
-        for placeholder in ("nan", "Unknown", "None", "N/A", "null"):
-            with self.subTest(placeholder=placeholder):
-                self.assertEqual(self.exclude(placeholder, []), [])
-
-    def test_a_failure_never_breaks_recording_the_application(self):
-        def boom(companies):
-            raise RuntimeError("database unavailable")
-        self.exclude("Acme AI", [], save=boom)  # must not raise
-
-    def test_existing_tracker_companies_can_be_backfilled(self):
+    def tracked(self, pages):
         from unittest.mock import MagicMock
         client = MagicMock()
-        client.table.return_value.select.return_value.execute.return_value.data = [
-            {"company": "Acme AI"}, {"company": "acme ai"}, {"company": ""},
-            {"company": "nan"}, {"company": "Unknown"}, {"company": None},
-            {"company": "Beta Labs"}]
-        stored = []
-        def save(companies):
-            stored.append(companies)
-            return list(dict.fromkeys(c.lower() for c in companies))
-        with patch.object(profile_data, "get_company_exclusions", return_value=["AI Job Fever"]), \
-             patch.object(profile_data, "save_company_exclusions", side_effect=save):
-            added = function(self.TRACKER, "exclude_all_tracked_companies",
-                             {"_get_client": lambda: client, **self.helpers()})()
-        self.assertEqual(stored, [["AI Job Fever", "Acme AI", "acme ai", "Beta Labs"]])
-        self.assertEqual(added, 2)
+        ranged = client.table.return_value.select.return_value.order.return_value.range
+        ranged.return_value.execute.side_effect = [SimpleNamespace(data=page) for page in pages]
+        names = function(self.TRACKER, "get_tracked_companies", {
+            "_get_client": lambda: client, "_PLACEHOLDER_COMPANIES": self.placeholders()})()
+        return names, ranged
 
-    def test_the_prompt_skips_a_company_applied_to_earlier_in_the_same_run(self):
-        """The list is fixed when the prompt is generated, so a company the
-        agent applies to mid-run must be skipped from then on by the agent."""
-        prompt = (ROOT.parent / "prompts" / "job-agent-desktop.md").read_text()
-        section = prompt.split("### COMPANIES I HAVE EXCLUDED", 1)[1].split("{{excluded_companies}}", 1)[0]
-        self.assertIn("**every company I have already applied to**", section)
-        self.assertIn("once you submit an\napplication to a company, treat that company as excluded", section)
+    def test_tracker_companies_are_listed_once_each(self):
+        """Matching ignores case, punctuation and legal suffixes, as the
+        prompt tells the agent to match."""
+        names, _ = self.tracked([[{"company": "Acme AI"}, {"company": "ACME AI Pvt. Ltd."},
+                                  {"company": " Beta Labs "}]])
+        self.assertEqual(names, ["Acme AI", "Beta Labs"])
+
+    def test_placeholder_company_names_are_never_excluded(self):
+        """Old tracker rows carry "nan" and "Unknown" as the company. Neither is
+        an employer, and excluding them would skip unrelated postings."""
+        names, _ = self.tracked([[{"company": c} for c in
+                                  ("nan", "Unknown", "None", "N/A", "null", "", None)]])
+        self.assertEqual(names, [])
+
+    def test_every_page_of_the_tracker_is_read(self):
+        first = [{"company": f"Company {i}"} for i in range(1000)]
+        names, ranged = self.tracked([first, [{"company": "Last One"}]])
+        self.assertEqual(len(names), 1001)
+        self.assertEqual([c.args for c in ranged.call_args_list], [(0, 999), (1000, 1999)])
+
+    def test_recording_an_application_no_longer_rewrites_the_settings_list(self):
+        source = self.TRACKER.read_text()
+        body = source.split("def add_application(", 1)[1].split("\n\n\n", 1)[0]
+        self.assertNotIn("exclusion", body)
+        self.assertNotIn("_exclude_applied_company", source)
+
+    def lists(self, saved, tracked):
+        with patch.dict(sys.modules, {"tracker": SimpleNamespace(
+                get_tracked_companies=lambda: list(tracked))}):
+            return function(self.ROUTER, "_company_exclusion_lists", {
+                "get_company_exclusions": lambda _username: list(saved),
+                "_DEFAULT_USERNAME": "subidh"})()
+
+    def test_the_users_list_and_the_tracker_list_never_overlap(self):
+        """The saved list still holds the tracker names the old copy put there;
+        each shows once, under the tracker, and drops out on the next save."""
+        custom, tracked = self.lists(["Rivet AI", "Acme AI Pvt Ltd", "Small Startup"],
+                                     ["Acme AI", "Beta Labs"])
+        self.assertEqual(custom, ["Rivet AI", "Small Startup"])
+        self.assertEqual(tracked, ["Acme AI", "Beta Labs"])
+
+    def test_settings_loads_however_many_companies_are_tracked(self):
+        tracked = [f"Company {i}" for i in range(250)]
+        with patch.dict(sys.modules, {"tracker": SimpleNamespace(
+                get_tracked_companies=lambda: tracked)}):
+            lists = function(self.ROUTER, "_company_exclusion_lists", {
+                "get_company_exclusions": lambda _username: ["Rivet AI", *tracked],
+                "_DEFAULT_USERNAME": "subidh"})
+        read = function(self.ROUTER, "read_company_exclusions", {
+            "_company_exclusion_lists": lambda: (["Rivet AI"], tracked),
+            "CompanyExclusionsResponse": lambda **kw: kw})
+        self.assertEqual(read(), {"companies": ["Rivet AI"], "tracked": tracked})
+        source = (ROOT / "app/models/schemas.py").read_text()
+        response = source.split("class CompanyExclusionsResponse", 1)[1].split("\nclass ", 1)[0]
+        self.assertNotIn("max_length", response)
+
+    def test_saving_stores_only_the_users_own_list(self):
+        saved = []
+        update = function(self.ROUTER, "update_company_exclusions", {
+            "save_company_exclusions": lambda username, companies: saved.append(companies),
+            "_company_exclusion_lists": lambda: (["Rivet AI"], ["Acme AI"]),
+            "_DEFAULT_USERNAME": "subidh", "HTTPException": RuntimeError,
+            "CompanyExclusionsResponse": lambda **kw: kw,
+            "CompanyExclusionsSettings": SimpleNamespace})
+        result = update(SimpleNamespace(companies=["Rivet AI"]))
+        self.assertEqual(saved, [["Rivet AI"]])
+        self.assertEqual(result, {"companies": ["Rivet AI"], "tracked": ["Acme AI"]})
+
+    def test_the_prompt_gets_both_lists(self):
+        lines = function(self.ROUTER, "_excluded_company_lines", {
+            "_company_exclusion_lists": lambda: (["Rivet AI"], ["Acme AI"])})
+        self.assertEqual(lines(), "- Rivet AI\n- Acme AI")
 
 
 class DesktopPromptTests(unittest.TestCase):
@@ -394,8 +410,7 @@ class DesktopPromptTests(unittest.TestCase):
         """Call the endpoint with the data layer stubbed, as the CI lane has no DB."""
         module, _ = stub_tracker()
         lines = function(ROOT / "app/routers/profile.py", "_excluded_company_lines", {
-            "get_company_exclusions": lambda _username: list(excluded),
-            "_DEFAULT_USERNAME": "subidh",
+            "_company_exclusion_lists": lambda: (list(excluded), []),
         })
         with patch.dict(sys.modules, {"tracker": module}):
             endpoint = function(ROOT / "app/routers/profile.py", "read_desktop_prompt", {

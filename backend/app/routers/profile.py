@@ -10,6 +10,7 @@ from pypdf import PdfReader
 
 from ..models.schemas import (
     ApplicationPromptSettings,
+    CompanyExclusionsResponse,
     CompanyExclusionsSettings,
     RenderedApplicationPrompt,
     ResumeProfileResponse,
@@ -165,18 +166,37 @@ def update_application_settings(body: ApplicationPromptSettings):
     return ApplicationPromptSettings(**saved)
 
 
-@router.get("/company-exclusions", response_model=CompanyExclusionsSettings)
+def _company_exclusion_lists():
+    """The user's own exclusions and the tracker's companies, without overlap.
+
+    Tracker companies are read live, not stored in the Settings list: copying
+    them there pushed the list past what Settings can load and edit. A saved
+    name that is also a tracker company is shown once, under the tracker.
+    """
+    from intake_policy import normalize_employer
+    from tracker import get_tracked_companies
+
+    tracked = get_tracked_companies()
+    tracked_keys = {normalize_employer(name) for name in tracked}
+    custom = [name for name in get_company_exclusions(_DEFAULT_USERNAME)
+              if normalize_employer(name) not in tracked_keys]
+    return custom, tracked
+
+
+@router.get("/company-exclusions", response_model=CompanyExclusionsResponse)
 def read_company_exclusions():
-    return CompanyExclusionsSettings(companies=get_company_exclusions(_DEFAULT_USERNAME))
+    custom, tracked = _company_exclusion_lists()
+    return CompanyExclusionsResponse(companies=custom, tracked=tracked)
 
 
-@router.put("/company-exclusions", response_model=CompanyExclusionsSettings)
+@router.put("/company-exclusions", response_model=CompanyExclusionsResponse)
 def update_company_exclusions(body: CompanyExclusionsSettings):
+    """Save the user's own list; tracker companies are never stored here."""
     if any(len(name.strip()) > 120 for name in body.companies):
         raise HTTPException(status_code=422, detail="Each company name must be at most 120 characters.")
-    return CompanyExclusionsSettings(companies=save_company_exclusions(
-        _DEFAULT_USERNAME, body.companies,
-    ))
+    save_company_exclusions(_DEFAULT_USERNAME, body.companies)
+    custom, tracked = _company_exclusion_lists()
+    return CompanyExclusionsResponse(companies=custom, tracked=tracked)
 
 
 def _render_application_prompt(template, settings, jobs, resume, page_url, resume_url):
@@ -576,13 +596,14 @@ def read_outreach_prompt(request: Request, page_url: str,
 
 
 def _excluded_company_lines():
-    """The Settings exclusion list as prompt bullets.
+    """Every excluded company as prompt bullets: the user's list, then the tracker's.
 
     The desktop agent is the only thing that searches the portals, so this list
     reaches it one way only: written into its prompt. Nothing else filters
     these employers out any more.
     """
-    companies = get_company_exclusions(_DEFAULT_USERNAME)
+    custom, tracked = _company_exclusion_lists()
+    companies = custom + tracked
     if not companies:
         return "- (No companies are excluded.)"
     return "\n".join(f"- {name}" for name in companies)
