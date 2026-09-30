@@ -135,7 +135,7 @@ export default function SettingsPage() {
       <OutreachPrompt kind="followup" title="HR follow-up email prompt" description="Use your Gmail and Dashboard’s Follow-ups Due queue. Check recipient evidence, dates, Sent history and bounces before sending." initialValue={applicationSettings.followup_template} />
     </>}
     <Card>
-      <CardHeader><CardTitle>Exclude companies from scraped jobs</CardTitle><p className="text-sm text-muted-foreground">Enter one employer per line. The list is written into the Claude Desktop prompt above, so the agent never applies to these companies. Existing Tracker jobs and history stay intact.</p></CardHeader>
+      <CardHeader><CardTitle>Exclude companies from scraped jobs</CardTitle><p className="text-sm text-muted-foreground">Enter one employer per line. The list is written into the Claude Desktop prompt above, so the agent never applies to these companies. Every company that reaches your Tracker is added here automatically, so you never apply to the same company twice. Existing Tracker jobs and history stay intact.</p></CardHeader>
       <CardContent className="space-y-3">
         <label htmlFor="excluded-company-names" className="text-sm font-medium">Company names to skip</label>
         <Textarea id="excluded-company-names" value={excludedCompaniesText} rows={8} disabled={!exclusionsLoaded || savingExclusions} onChange={(event) => { setExcludedCompaniesText(event.target.value); setExclusionsDirty(true); }} placeholder="Example Company\nAnother Company" />

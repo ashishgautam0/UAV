@@ -246,6 +246,90 @@ class RecordJobTests(unittest.TestCase):
         self.assertEqual(len(calls["scraped"]), 1)
 
 
+class TrackedCompaniesAreExcludedTests(unittest.TestCase):
+    """Once a company reaches the tracker it joins the Settings exclusion
+    list, so the desktop agent never applies to the same company twice."""
+
+    TRACKER = ROOT / "modules" / "tracker.py"
+
+    def helpers(self):
+        """The module-level names the extracted functions rely on."""
+        import ast
+        line = next(l for l in self.TRACKER.read_text().splitlines()
+                    if l.startswith("_PLACEHOLDER_COMPANIES"))
+        placeholders = ast.literal_eval(line.split("=", 1)[1].strip())
+        return {"_is_real_company": function(self.TRACKER, "_is_real_company",
+                                             {"_PLACEHOLDER_COMPANIES": placeholders})}
+
+    def test_recording_an_application_excludes_its_company(self):
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+        excluded = []
+        env = {"_get_client": lambda: MagicMock(), "timedelta": timedelta,
+               "_user_now": lambda: datetime(2026, 9, 30),
+               "APPLICATION_CADENCE": [7, 15],
+               "_exclude_applied_company": excluded.append}
+        add_application = function(self.TRACKER, "add_application", env)
+        add_application("Acme AI", "GenAI Engineer", "Full-time", "LinkedIn")
+        self.assertEqual(excluded, ["Acme AI"])
+
+    def exclude(self, company, current, save=None):
+        saved = []
+        with patch.object(profile_data, "get_company_exclusions", return_value=current), \
+             patch.object(profile_data, "save_company_exclusions",
+                          side_effect=save or (lambda companies: saved.append(companies))):
+            function(self.TRACKER, "_exclude_applied_company", self.helpers())(company)
+        return saved
+
+    def test_a_new_company_is_appended_to_the_list(self):
+        self.assertEqual(self.exclude("Acme AI", ["AI Job Fever"]),
+                         [["AI Job Fever", "Acme AI"]])
+
+    def test_a_company_already_listed_is_not_added_twice(self):
+        """Matching ignores case, punctuation and legal suffixes, the same way
+        the prompt tells the agent to match."""
+        self.assertEqual(self.exclude("ACME AI Pvt. Ltd.", ["Acme AI"]), [])
+        self.assertEqual(self.exclude("   ", ["Acme AI"]), [])
+
+    def test_placeholder_company_names_never_become_exclusions(self):
+        """Old tracker rows carry "nan" and "Unknown" as the company. Neither is
+        an employer, and excluding them would skip unrelated postings."""
+        for placeholder in ("nan", "Unknown", "None", "N/A", "null"):
+            with self.subTest(placeholder=placeholder):
+                self.assertEqual(self.exclude(placeholder, []), [])
+
+    def test_a_failure_never_breaks_recording_the_application(self):
+        def boom(companies):
+            raise RuntimeError("database unavailable")
+        self.exclude("Acme AI", [], save=boom)  # must not raise
+
+    def test_existing_tracker_companies_can_be_backfilled(self):
+        from unittest.mock import MagicMock
+        client = MagicMock()
+        client.table.return_value.select.return_value.execute.return_value.data = [
+            {"company": "Acme AI"}, {"company": "acme ai"}, {"company": ""},
+            {"company": "nan"}, {"company": "Unknown"}, {"company": None},
+            {"company": "Beta Labs"}]
+        stored = []
+        def save(companies):
+            stored.append(companies)
+            return list(dict.fromkeys(c.lower() for c in companies))
+        with patch.object(profile_data, "get_company_exclusions", return_value=["AI Job Fever"]), \
+             patch.object(profile_data, "save_company_exclusions", side_effect=save):
+            added = function(self.TRACKER, "exclude_all_tracked_companies",
+                             {"_get_client": lambda: client, **self.helpers()})()
+        self.assertEqual(stored, [["AI Job Fever", "Acme AI", "acme ai", "Beta Labs"]])
+        self.assertEqual(added, 2)
+
+    def test_the_prompt_skips_a_company_applied_to_earlier_in_the_same_run(self):
+        """The list is fixed when the prompt is generated, so a company the
+        agent applies to mid-run must be skipped from then on by the agent."""
+        prompt = (ROOT.parent / "prompts" / "job-agent-desktop.md").read_text()
+        section = prompt.split("### COMPANIES I HAVE EXCLUDED", 1)[1].split("{{excluded_companies}}", 1)[0]
+        self.assertIn("**every company I have already applied to**", section)
+        self.assertIn("once you submit an\napplication to a company, treat that company as excluded", section)
+
+
 class DesktopPromptTests(unittest.TestCase):
     def setUp(self):
         self.prompt = profile_data.default_desktop_prompt()
