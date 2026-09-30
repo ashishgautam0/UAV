@@ -385,13 +385,20 @@ The procedure is the same wherever the hand-off comes from:
 
 1. **Follow the link** to the employer's site or ATS and let the page load
    fully, even when it is slow or opens in a new tab.
-2. **If the site requires an account first, create one** — my real name, the
-   email from my resume, and a fresh strong password; agree to the site's terms
-   and verify the email as CAPTCHA, OTP & BLOCKERS describes. Let the browser's
-   password manager save it, and list the site under "Accounts created" in the
-   summary so I know the account exists.
-   Never reuse a password from another site, and never type an existing
-   password of mine into a site you did not just create that account on.
+2. **If the site requires an account first:**
+   - **Already signed in** (the browser is logged in to that site): just apply.
+   - **A sign-in I already have is offered** — "Continue with Google", "Sign in
+     with LinkedIn", "Apply with Indeed": use it. I am logged into those in
+     this browser, so no new password is involved. Agree to the site's terms
+     and carry on, and list the site under "Signed in with Google / LinkedIn /
+     Indeed" in the summary.
+   - **Only a new password will do:** do not create one — your computer-use
+     tools require me to enter new credentials myself, so do not ask me for one
+     mid-run either. Leave the job unrecorded and add it to "Needs an account —
+     do these yourself" in the summary with the company, role, posting URL and
+     sign-up page. I will create those accounts and finish those applications
+     in one sitting.
+   Never type an existing password of mine, and never reset one.
 3. **If a CAPTCHA appears, abandon this job immediately** and move to the next
    one — do not attempt it. See CAPTCHA, OTP & BLOCKERS below.
 4. **Fill the form** from my resume and saved answers per the FORM FILLING
@@ -402,8 +409,8 @@ The procedure is the same wherever the hand-off comes from:
    `source` and the portal's posting URL as `url` — not the ATS URL — so the
    skip list matches it next time.
 
-A longer form, a multi-step wizard and a required account are all normal parts
-of this and none of them is a reason to abandon the job. What does end an
+A longer form, a multi-step wizard and a sign-in step are all normal parts of
+this and none of them is a reason to abandon the job. What does end an
 off-site application: a CAPTCHA, a fee, a statement that would not be true, a
 timed test, an OTP prompt, or a page that will not load. Each of those ends
 that one application, not the run.
@@ -444,8 +451,8 @@ back.
       - **"Apply" that opens the company's own site or an ATS** (Greenhouse,
         Lever, Workday, SmartRecruiters, Taleo) — follow it and complete the
         application there, per APPLYING ON THE EMPLOYER'S OWN SITE above.
-        Creating an account is part of that and is not a reason to skip; a
-        CAPTCHA is — abandon that job. These are the jobs the Easy Apply filter
+        A sign-in step is handled by step 2 there — an existing sign-in, or
+        queued for me; a CAPTCHA ends that job. These are the jobs the Easy Apply filter
         would have hidden, so expect plenty of them.
       - **After an external application succeeds, go back to that job on
         LinkedIn and click "Yes" on the "Did you apply?" prompt**, so LinkedIn
@@ -482,8 +489,8 @@ back.
         employer questions using the FORM FILLING RULES, then submit on the
         review step.
       - If the button says "Apply on company site", follow it and complete the
-        application there, per APPLYING ON THE EMPLOYER'S OWN SITE, creating
-        an account where one is required. On Indeed these are most of the good
+        application there, per APPLYING ON THE EMPLOYER'S OWN SITE, handling
+        any sign-in step as its step 2 says. On Indeed these are most of the good
         listings; never leave one because it is not an Indeed-hosted apply.
       - If Indeed shows the job as already applied, treat it as already handled
         and skip it.
@@ -582,8 +589,8 @@ question's meaning is genuinely unclear, skip that job and move on.
 
 I authorize you to read and accept required application terms, privacy and
 data-processing consents, acknowledgements and submission confirmations on my
-behalf — **and the terms of service and privacy policy of any site you create
-an account on to apply.** Agree to them, tick the required boxes and continue to
+behalf — **and the terms of service and privacy policy of any site you sign
+into to apply.** Agree to them, tick the required boxes and continue to
 the next step — do not stop to ask me about each one.
 **Do not** opt into optional marketing.
 
@@ -603,12 +610,12 @@ and go straight to the next posting — never sit waiting for me to answer.
   application and go to the next job. Do not click through it, do not retry the
   page hoping for a different challenge, and do not wait for me. My time is
   better spent on the jobs that do not ask. Note it under Issues at the end.
-- **Sign-in or account required**: **create an account and carry on** — see
-  APPLYING ON THE EMPLOYER'S OWN SITE, step 2. A sign-up page is never a reason
-  to skip. Skip only when an account already exists for my email and you do not
-  have its password; note it under Issues. Never reset a password.
-- **Verification email after sign-up**: when the site emails a link or code to
-  the address you just registered with, open my email in a new tab, open only
+- **Sign-in or account required**: follow APPLYING ON THE EMPLOYER'S OWN SITE,
+  step 2 — sign in with Google, LinkedIn or Indeed where offered; where only a
+  new password will do, queue the job under "Needs an account — do these
+  yourself" and move on without asking me. Never reset a password.
+- **Verification email after signing in**: when the site emails a link or code to
+  confirm the sign-in, open my email in a new tab, open only
   that site's newest message, use the link or code, close the tab and carry on.
   Do not open, read, reply to or delete any other email. If my email is not
   open in the browser, leave the job unrecorded and note it under Issues.
@@ -816,9 +823,14 @@ When I stop you, present:
 | 1 | Indeed | BigCorp | Senior AI Lead | Senior-level title |
 | ... |
 
-### Accounts created
-- [Any company site or ATS where you had to register to apply, so I know the
-  account exists and can find the saved password]
+### Needs an account — do these yourself
+| # | Company | Role | Posting URL | Sign-up page |
+|---|---------|------|-------------|--------------|
+| 1 | MailerMen | Generative AI / LLM Engineer | [link] | [link] |
+| ... |
+
+### Signed in with Google / LinkedIn / Indeed
+- [Each site where you used one of those sign-ins to apply]
 
 ### Not Recorded
 - [Any job whose POST failed, so I can add it manually]
