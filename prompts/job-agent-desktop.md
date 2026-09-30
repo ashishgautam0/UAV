@@ -163,10 +163,12 @@ that one job and nothing more. Skip it, note it, keep going.
 
 ## WHAT TO SEARCH
 
-Search each portal for these queries (adapt to each site's search UI):
-1. "AI Engineer"
-2. "ML Engineer" or "Machine Learning Engineer"
-3. "GenAI Engineer" or "Generative AI Engineer"
+Search each portal for these queries, in this order (adapt to each site's
+search UI). **Start with "Gen AI Engineer" — it is the role I most want.**
+1. "Gen AI Engineer", then "GenAI Engineer" and "Generative AI Engineer" as
+   separate searches — portals match these spellings differently
+2. "AI Engineer"
+3. "ML Engineer" or "Machine Learning Engineer"
 4. "NLP Engineer"
 5. "LLM Engineer"
 6. "Deep Learning Engineer"
@@ -175,8 +177,17 @@ Search each portal for these queries (adapt to each site's search UI):
 9. "Data Engineer" (only if AI/ML is in the description)
 10. "Applied Scientist" or "Research Engineer"
 
-Filter by: India location, 0-2 years experience (where the filter exists),
-posted in the last 7 days (where available).
+**Filters, on every search:**
+- **LinkedIn**: Location = India, **Date posted = Past 24 hours**, Experience
+  level = **Entry level** and **Associate** (both ticked, nothing else).
+- **Indeed**: Where = India, **Date posted = Last 24 hours**.
+
+**Go through every results page, not just the first.** When you reach the last
+job on a page, open the next page (LinkedIn's page numbers under the list,
+Indeed's "Next" arrow) and keep going until there is no next page. Only move to
+the next query when the current one has no pages left. With the 24-hour filter
+the list is short enough to finish, and the jobs past page 1 are the ones
+nobody else has applied to yet.
 
 ## TITLE RULES — WHAT TO KEEP vs SKIP
 
@@ -212,7 +223,7 @@ Apply these rules in order.
 **AI/ML core titles — any title containing:**
 - AI, Artificial Intelligence, ML, Machine Learning, Deep Learning
 - NLP, Natural Language, LLM, Large Language Model
-- GenAI, Generative AI, Agentic AI, RAG, LangChain
+- Gen AI, GenAI, Generative AI, Agentic AI, RAG, LangChain
 - Prompt Engineer, Conversational AI, Chatbot
 - OCR, Document AI, Speech Recognition
 - Predictive Modeling, Multimodal, Optimization Algorithm
@@ -235,7 +246,7 @@ Apply these rules in order.
 A title must reference at least one AI/ML domain to qualify. These are
 valid domain signals in the title or JD: ai, ml, artificial intelligence,
 machine learning, deep learning, data science, nlp, natural language,
-computer vision, llm, genai, generative ai, agentic, rag, langchain,
+computer vision, llm, gen ai, genai, generative ai, agentic, rag, langchain,
 python, fastapi, mlops, prompt engineer, chatbot, conversational ai,
 iot, robotics, uav, digital twin, edge computing, simulation, ocr,
 document ai, speech recognition, predictive modeling, multimodal, aws,
@@ -271,6 +282,8 @@ Before applying, scan the JD for these red flags:
   **top** of what it states is below **₹4 LPA** (₹4,00,000 a year) for a
   yearly figure, or below **₹30,000 a month** for a monthly salary or stipend.
   See PAY FLOOR below for how to read the figures.
+- **MNC employer**: the company is a multinational corporation. See MNCs —
+  HOW TO TELL below.
 
 **Flag but still apply (note in the record):**
 - **Bond risk**: "bond", "service agreement", "minimum commitment",
@@ -301,6 +314,34 @@ card already show it, skip the job from there without opening the posting.
 - Record the skip through STEP 2 with a note quoting the figure, for example
   `"Pay below floor: ₹20,000/month stipend"`, so it lands on the skip list and
   is never opened again.
+
+### MNCs — HOW TO TELL
+
+I do not want to apply to multinational corporations. Skip the job when **any**
+of these is true, using what the posting page itself shows — do not open extra
+pages to research a company:
+
+- **Company size is 5,001 employees or more.** LinkedIn shows it in the
+  job's "About the company" panel ("5,001-10,000 employees", "10,001+
+  employees"); Indeed sometimes shows it on the company card.
+- **It is a well-known multinational or global IT-services and consulting
+  firm** — for example Google, Microsoft, Amazon, Meta, Apple, IBM, Oracle, SAP,
+  Adobe, Salesforce, Cisco, Intel, Nvidia, Qualcomm, Samsung, Accenture,
+  Deloitte, PwC, EY, KPMG, Capgemini, Cognizant, TCS, Infosys, Wipro, HCLTech,
+  Tech Mahindra, LTIMindtree, Genpact, JPMorgan Chase, Goldman Sachs. The list is
+  examples, not the whole set: any company of that kind counts.
+- **It is the India office or subsidiary of a foreign multinational group** —
+  "<Global brand> India Pvt Ltd", "<Global brand> Technology Centre",
+  "<Global brand> Global Capability Centre".
+- **The posting hires on an MNC's behalf** — "hiring for a leading MNC",
+  "for our MNC client".
+
+Keep startups and small or mid-size companies, including an Indian startup that
+has an office abroad, when none of the above applies. If the size is not shown
+and the company is not recognisably a multinational, apply as normal.
+
+Record the skip through STEP 2 with a note naming the signal, for example
+`"MNC: Accenture"` or `"MNC: 10,001+ employees"`.
 
 ### COMPANIES I HAVE EXCLUDED — NEVER APPLY
 
@@ -333,7 +374,8 @@ The procedure is the same wherever the hand-off comes from:
 1. **Follow the link** to the employer's site or ATS and let the page load
    fully, even when it is slow or opens in a new tab.
 2. **If the site requires an account first, create one** — my real name, the
-   email from my resume, and a fresh strong password. Let the browser's
+   email from my resume, and a fresh strong password; agree to the site's terms
+   and verify the email as CAPTCHA, OTP & BLOCKERS describes. Let the browser's
    password manager save it, and list the site under "Accounts created" in the
    summary so I know the account exists.
    Never reuse a password from another site, and never type an existing
@@ -402,7 +444,9 @@ back.
         handled and skip it.
    f. Record the job through the API (see STEP 2 below)
    g. Wait 20-30 seconds before the next application (avoid detection)
-5. Repeat for each search query
+5. When every card on the page is handled, go to the next results page and
+   repeat step 4. Keep paging until there is no next page, then repeat for
+   each search query
 6. If LinkedIn shows a "You've reached the weekly application limit" or a
    security checkpoint, stop this portal and move to Indeed
 
@@ -433,7 +477,9 @@ back.
         and skip it.
    f. Record the job through the API (see STEP 2 below)
    g. Wait 20-30 seconds before the next application (avoid detection)
-5. Repeat for each search query
+5. When every result on the page is handled, click Indeed's "Next" arrow and
+   repeat step 4. Keep paging until there is no next page — Indeed buries many
+   good listings on pages 2 and beyond — then repeat for each search query
 6. Indeed shows a verification page when it suspects automation. If one appears,
    treat it as a rate limit (CAPTCHA, OTP & BLOCKERS): rest Indeed for at least
    15 minutes, work the next allowed portal meanwhile, and note it under Issues.
@@ -524,8 +570,10 @@ question's meaning is genuinely unclear, skip that job and move on.
 
 I authorize you to read and accept required application terms, privacy and
 data-processing consents, acknowledgements and submission confirmations on my
-behalf. Tick the required boxes and continue to the next step — do not stop to
-ask me about each one. **Do not** opt into optional marketing.
+behalf — **and the terms of service and privacy policy of any site you create
+an account on to apply.** Agree to them, tick the required boxes and continue to
+the next step — do not stop to ask me about each one.
+**Do not** opt into optional marketing.
 
 If acceptance requires a factual statement my resume and saved answers do not
 support, a payment, or an agreement unrelated to applying for this job, stop
@@ -543,10 +591,18 @@ and go straight to the next posting — never sit waiting for me to answer.
   application and go to the next job. Do not click through it, do not retry the
   page hoping for a different challenge, and do not wait for me. My time is
   better spent on the jobs that do not ask. Note it under Issues at the end.
-- **OTP / 2FA**: do not wait for a code. Leave that job unrecorded, note it
-  under Issues, and continue. Tell me at the end which jobs needed a code so I
-  can do those myself.
-- **Login required**: stop that job, note it, and continue with the others.
+- **Sign-in or account required**: **create an account and carry on** — see
+  APPLYING ON THE EMPLOYER'S OWN SITE, step 2. A sign-up page is never a reason
+  to skip. Skip only when an account already exists for my email and you do not
+  have its password; note it under Issues. Never reset a password.
+- **Verification email after sign-up**: when the site emails a link or code to
+  the address you just registered with, open my email in a new tab, open only
+  that site's newest message, use the link or code, close the tab and carry on.
+  Do not open, read, reply to or delete any other email. If my email is not
+  open in the browser, leave the job unrecorded and note it under Issues.
+- **OTP / 2FA sent to my phone**: do not wait for a code. Leave that job
+  unrecorded, note it under Issues, and continue. Tell me at the end which jobs
+  needed one so I can do those myself.
 - **Rate limit** — "too many requests", "you're doing that too fast", HTTP 429,
   a portal refusing to load results: **rest that portal, not the run.** Leave
   that portal alone for at least 15 minutes and work the next allowed portal
@@ -658,8 +714,8 @@ any other number. Keep searching and keep applying until I tell you to stop.
   again** — new postings appear through the day, and the skip list means a
   second pass costs almost nothing: already-handled jobs are skipped without
   being opened.
-- On a later pass, also go deeper into the results than you did before, and
-  work the search queries you had not reached yet.
+- Every pass already works every page of every query, so a later pass mostly
+  finds jobs posted since the one before — that is the point of going round.
 - If a portal is down, not loading, or has nothing left, note it and move on —
   never let one portal end the run.
 

@@ -641,6 +641,72 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertIn("only an applied or", step0)
         self.assertNotIn("Today Todo", step0)
 
+    def test_mnc_employers_are_skipped_on_signals_the_posting_shows(self):
+        """The user does not want to apply to multinationals. The rule has to
+        be checkable from the posting page — size band, recognisable name,
+        India arm of a foreign group, or hiring on an MNC's behalf — and must
+        keep startups and unknown-size companies."""
+        red_flags = self.prompt.split("## RED FLAGS — CHECK EVERY JD", 1)[1] \
+                               .split("### COMPANIES I HAVE EXCLUDED", 1)[0]
+        skip_list = red_flags.split("**SKIP immediately if any of these appear:**", 1)[1] \
+                             .split("**Flag but still apply", 1)[0]
+        self.assertIn("**MNC employer**", skip_list)
+        mnc = red_flags.split("### MNCs — HOW TO TELL", 1)[1]
+        for required in ("**Company size is 5,001 employees or more.**",
+                         "Accenture", "TCS", "Infosys",
+                         "**It is the India office or subsidiary of a foreign multinational group**",
+                         "hiring for a leading MNC",
+                         "do not open extra\npages to research a company",
+                         "Keep startups and small or mid-size companies",
+                         "If the size is not shown",
+                         '"MNC: Accenture"'):
+            with self.subTest(required=required):
+                self.assertIn(required, mnc)
+
+    def test_gen_ai_engineer_is_searched_first_under_every_spelling(self):
+        search = self.prompt.split("## WHAT TO SEARCH", 1)[1].split("## TITLE RULES", 1)[0]
+        first = search.split("1. ", 1)[1].split("\n2. ", 1)[0]
+        for spelling in ('"Gen AI Engineer"', '"GenAI Engineer"', '"Generative AI Engineer"'):
+            with self.subTest(spelling=spelling):
+                self.assertIn(spelling, first)
+        keep = self.prompt.split("### KEEP (apply if JD also fits)", 1)[1].split("### DOMAIN", 1)[0]
+        self.assertIn("Gen AI, GenAI, Generative AI", keep)
+        gate = self.prompt.split("### DOMAIN KEYWORD GATE", 1)[1].split("## EXPERIENCE", 1)[0]
+        self.assertIn("gen ai, genai", gate)
+
+    def test_searches_use_24_hours_and_page_past_the_first_page(self):
+        """The general filter line said "last 7 days" and overrode the
+        per-portal 24-hour filter; nothing told the agent to page past the
+        first results page."""
+        search = self.prompt.split("## WHAT TO SEARCH", 1)[1].split("## TITLE RULES", 1)[0]
+        self.assertNotIn("7 days", self.prompt)
+        self.assertIn("**Date posted = Past 24 hours**", search)
+        self.assertIn("**Entry level** and **Associate**", search)
+        self.assertIn("**Date posted = Last 24 hours**", search)
+        self.assertIn("**Go through every results page, not just the first.**", search)
+        for portal, marker in (("LINKEDIN", "go to the next results page"),
+                               ("INDEED INDIA", "click Indeed's \"Next\" arrow")):
+            section = self.prompt.split(f"{portal}\n", 1)[1].split("\n### ", 1)[0]
+            with self.subTest(portal=portal):
+                self.assertIn(marker, section)
+                self.assertIn("Keep paging until there is no next page", section)
+
+    def test_sign_up_is_never_a_skip_and_account_terms_are_accepted(self):
+        """"Login required: stop that job" contradicted the instruction to
+        create accounts. Sign-up, its terms and its verification email are now
+        part of applying; only an existing account with an unknown password,
+        or a phone OTP, ends the job."""
+        blockers = self.prompt.split("## CAPTCHA, OTP & BLOCKERS", 1)[1].split("## STEP 2", 1)[0]
+        self.assertNotIn("**Login required**: stop that job", self.prompt)
+        self.assertIn("**create an account and carry on**", blockers)
+        self.assertIn("Never reset a password.", blockers)
+        self.assertIn("open only\n  that site's newest message", blockers)
+        self.assertIn("Do not open, read, reply to or delete any other email.", blockers)
+        self.assertIn("**OTP / 2FA sent to my phone**", blockers)
+        terms = self.prompt.split("### TERMS AND CONSENT CHECKBOXES", 1)[1].split("## CAPTCHA", 1)[0]
+        self.assertIn("terms of service and privacy policy of any site you create\nan account on",
+                      terms)
+
     def test_jobs_paying_below_the_floor_are_skipped(self):
         """The user's pay floor: under ₹4 LPA a year or ₹30,000 a month is
         not worth applying to. It compares the top of the stated range, so a
