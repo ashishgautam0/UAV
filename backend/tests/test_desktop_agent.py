@@ -349,7 +349,7 @@ class DesktopPromptTests(unittest.TestCase):
             "Once I have asked you to start, submit without checking back",
             "run the whole batch on that one answer — never job",
             "do not ask again on the next job",
-            "Indeed included",
+            "That covers **every way a job is applied to**",
             # a blocker costs one job, never the run
             "A blocker ends that one job, not the run",
             "do not wait for a code",
@@ -787,6 +787,38 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertIn("require visa sponsorship to work in the US: Yes", answers)
         self.assertIn("Legally authorised to work in the US without sponsorship: No", answers)
         self.assertIn("*which* sponsorship or visa type", answers)
+
+    def test_every_apply_route_on_both_portals_is_submitted_without_asking(self):
+        """Easy Apply and company-site redirects on both portals are all
+        submitted by the agent; a redirect must not read as a new application
+        that needs fresh permission."""
+        section = self.prompt.split("### DO NOT ASK ME BEFORE SUBMITTING", 1)[1] \
+                             .split("**Do not ask me anything mid-run.", 1)[0]
+        for route in ("LinkedIn **Easy Apply**",
+                      "LinkedIn **Apply** → company site or ATS",
+                      "Indeed **Apply now**",
+                      "Indeed **Apply on company site**"):
+            with self.subTest(route=route):
+                self.assertIn(route, section)
+        self.assertIn("click the final Submit yourself", section)
+        self.assertIn("A redirect to the company's site does not reset any of this", section)
+
+    def test_settings_starter_message_matches_the_prompt_and_names_every_route(self):
+        """Authority to submit has to come from the user's own message, so the
+        sentence Settings copies must be the one the prompt shows — and it has
+        to name company-site redirects, not just Easy Apply."""
+        tsx = (ROOT.parent / "frontend/src/app/(app)/settings/desktop-prompt.tsx").read_text()
+        body = tsx.split("const STARTER_MESSAGE =", 1)[1].split(";", 1)[0]
+        starter = "".join(re.findall(r'"([^"]*)"', body))
+        opening = self.prompt.split("## HOW TO START", 1)[1].split("## WHO YOU ARE", 1)[0]
+        quoted = " ".join(line[2:].strip() for line in opening.splitlines()
+                          if line.startswith("> "))
+        self.assertEqual(starter, quoted)
+        for phrase in ("LinkedIn Easy Apply", "Indeed Apply",
+                       "the company's own site when a job redirects there",
+                       "Submit each one yourself without asking me first"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, starter)
 
     def test_prompt_does_not_claim_to_authorize_itself(self):
         """Claude Desktop treats a pasted document as data, so a prompt that
