@@ -65,7 +65,7 @@ export function DesktopPrompt() {
     <CardHeader>
       <CardTitle>Claude Desktop job search prompt</CardTitle>
       <p className="text-sm text-muted-foreground">
-        Paste into Claude Desktop (Cowork) to browse eleven portals using Computer Use — LinkedIn, Indeed, Naukri, Instahyre, Cutshort, Wellfound, Shine, Glassdoor India, FirstNaukri, Unstop and Apna. On every portal it skips jobs you already applied to or dismissed, applies to matching entry-level AI/ML roles, and records each one in your tracker. This agent is the only thing that finds jobs — nothing scrapes on your behalf.
+        Paste into Claude Desktop (Cowork) to browse LinkedIn and Indeed using Computer Use — the other portals are paused while these two are tuned. On both it skips jobs you already applied to or dismissed, applies to matching entry-level AI/ML roles, and records each one in your tracker. This agent is the only thing that finds jobs — nothing scrapes on your behalf.
       </p>
     </CardHeader>
     <CardContent className="space-y-3">
@@ -93,7 +93,7 @@ export function DesktopPrompt() {
         }}>Copy starter message</Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Log into all eleven portals in your browser before starting. Generate resolves the live tracker API and resume links. No application cap and no time limit — it keeps applying until you tell it to stop. Placeholders: {"{{seen_urls_url}}"}, {"{{record_url}}"}, {"{{resume_url}}"}, {"{{resume_filename}}"}, {"{{resume_sha256}}"}.
+        Log into LinkedIn and Indeed in your browser before starting. Generate resolves the live tracker API and resume links. No application cap and no time limit — it keeps applying until you tell it to stop. Placeholders: {"{{seen_urls_url}}"}, {"{{record_url}}"}, {"{{resume_url}}"}, {"{{resume_filename}}"}, {"{{resume_sha256}}"}.
       </p>
       <p className="text-xs text-muted-foreground">
         This prompt ships with the app and is not editable here, so improvements reach the agent on the next Generate. The answers it fills into forms — notice period, compensation, location, education — live in the prompt text itself.

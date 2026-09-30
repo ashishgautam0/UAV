@@ -10,8 +10,12 @@ import profile as profile_data
 
 # The `source` values the prompt tells the agent to send, spelled as the stats
 # pages group them. Keep in step with the portal sections in the prompt.
-PORTAL_SOURCES = ("LinkedIn", "Indeed", "Naukri", "Instahyre", "Cutshort",
-                  "Wellfound", "Shine", "Glassdoor", "FirstNaukri", "Unstop", "Apna")
+# The prompt works LinkedIn and Indeed only while those two are tuned. The
+# other portals are paused, not dropped: the recording endpoint still accepts
+# them, so they can return to the prompt without a backend change.
+PORTAL_SOURCES = ("LinkedIn", "Indeed")
+PAUSED_SOURCES = ("Naukri", "Instahyre", "Cutshort", "Wellfound", "Shine",
+                  "Glassdoor", "FirstNaukri", "Unstop", "Apna")
 
 
 def stub_tracker(handled_urls=(), applied_urls=(), scraped_id=None, insert_id=7):
@@ -206,7 +210,7 @@ class RecordJobTests(unittest.TestCase):
         self.assertEqual(calls["marked"], [(7, "applied")])
 
     def test_every_portal_records_the_same_way(self):
-        for portal in PORTAL_SOURCES:
+        for portal in PORTAL_SOURCES + PAUSED_SOURCES:
             with self.subTest(portal=portal):
                 module, calls = stub_tracker(scraped_id=None, insert_id=7)
                 result = self.endpoint(module)(self.job(source=portal))
@@ -315,8 +319,7 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertTrue(any("PDF" in issue for issue in result["issues"]))
         self.assertIn("Resume.pdf", result["content"])
 
-    PORTALS = ("LINKEDIN", "INDEED", "NAUKRI", "INSTAHYRE", "CUTSHORT", "WELLFOUND",
-               "SHINE", "GLASSDOOR", "FIRSTNAUKRI", "UNSTOP", "APNA")
+    PORTALS = ("LINKEDIN", "INDEED")
 
     def test_prompt_covers_every_portal_dedup_tracker_and_no_caps(self):
         for portal in self.PORTALS:
@@ -370,7 +373,7 @@ class DesktopPromptTests(unittest.TestCase):
                              .split("## PORTAL-BY-PORTAL", 1)[0]
         for required in (
             "Follow it and finish the application there",
-            "every one of the eleven portals",
+            "This applies on **both portals**",
             # what the off-site flow has to survive
             "If the site requires an account first, create one",
             "If a CAPTCHA appears, abandon this job immediately",
@@ -431,7 +434,7 @@ class DesktopPromptTests(unittest.TestCase):
         for portal in PORTAL_SOURCES:
             with self.subTest(portal=portal):
                 self.assertIn(portal, step2)
-        self.assertIn("every portal", step2)
+        self.assertIn("both portals", step2)
 
     def test_no_portal_section_overrides_the_shared_title_rules(self):
         """A per-portal note must not re-admit titles the global rules reject —
@@ -446,6 +449,25 @@ class DesktopPromptTests(unittest.TestCase):
                     if exempting in lowered:
                         self.assertIn("title rules", lowered,
                                       f"{name} relaxes a rule without deferring to TITLE RULES")
+
+    def test_paused_portals_are_neither_searched_nor_recorded_as_skips(self):
+        """Only LinkedIn and Indeed are worked for now. A posting that hands
+        off to another job board is left unrecorded, not skipped, so it stays
+        reachable once that portal returns to the prompt."""
+        order = self.prompt.split("Work the portals in this order:", 1)[1].split("###", 1)[0]
+        step2 = self.prompt.split("STEP 2 — RECORD EVERY JOB", 1)[1].split("## KEEP GOING", 1)[0]
+        summary = self.prompt.split("## SUMMARY — WHEN I STOP YOU", 1)[1]
+        for portal in PAUSED_SOURCES:
+            with self.subTest(portal=portal):
+                self.assertNotRegex(self.prompt,
+                                    re.compile(rf"^### \d+\. {portal.upper()}", re.M))
+                self.assertNotIn(portal, step2)
+                self.assertNotIn(portal, summary)
+        self.assertNotIn("Naukri", order.split("**Only these two portals", 1)[0])
+        self.assertIn("**Only these two portals for now.**", order)
+        self.assertIn("*another job board* to apply, leave it unrecorded", order)
+        self.assertIn("An employer's own site or ATS is\nstill fine", order)
+        self.assertNotIn("eleven", self.prompt)
 
     def test_summary_and_run_order_cover_every_portal(self):
         summary = self.prompt.split("## SUMMARY — WHEN I STOP YOU", 1)[1]
