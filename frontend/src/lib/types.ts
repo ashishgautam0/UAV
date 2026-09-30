@@ -54,6 +54,10 @@ export interface FollowUp {
   platform?: string;
   follow_up_count?: number;
   scraped_job_id?: number | null;
+  // A follow-up is only sendable with both halves: a written draft and an
+  // address to send it to.
+  draft_ready?: boolean;
+  recipient?: string | null;
 }
 
 export interface ColdDmTodo {

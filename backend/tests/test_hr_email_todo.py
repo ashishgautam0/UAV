@@ -191,14 +191,14 @@ class HrEmailTodoTests(unittest.TestCase):
         self.assertLess(migration.index("update public.applications"),
                         migration.index("create index if not exists"))
 
-    def test_dashboard_detail_and_claude_flow_expose_the_todo(self):
+    def test_dashboard_and_detail_expose_the_todo(self):
+        """The README no longer documents the flow — it is intentionally empty —
+        so the UI surfaces are what this guards."""
         dashboard = (ROOT.parent / "frontend/src/app/(app)/dashboard/page.tsx").read_text()
         detail = (ROOT.parent / "frontend/src/app/(app)/jobs/[id]/page.tsx").read_text()
-        readme = (ROOT.parent / "README.md").read_text()
         self.assertIn("Email Company HR", dashboard)
         self.assertIn("Mark emailed", dashboard)
         self.assertIn("Todo now — email Company HR", detail)
-        self.assertIn("--type hr_email", readme)
 
     def test_dashboard_lists_a_cold_dm_only_once_its_note_is_ready(self):
         """A due job whose note is not written yet is counted, not listed —

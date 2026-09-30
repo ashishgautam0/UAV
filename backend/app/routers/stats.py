@@ -21,8 +21,36 @@ def dashboard_stats():
 
 @router.get("/follow-ups")
 def follow_ups():
+    """Due follow-ups, each marked with whether it is actually sendable.
+
+    A follow-up needs both halves: a written draft and an address to send it
+    to. Dashboard hides the ones missing either rather than offering a card
+    that cannot be acted on.
+    """
+    from tracker import get_cached_research, get_follow_up_draft
+
     df = get_post_connection_follow_ups_due()
-    return df.astype(object).where(df.notna(), None).to_dict("records") if not df.empty else []
+    if df.empty:
+        return []
+    rows = df.astype(object).where(df.notna(), None).to_dict("records")
+
+    recipients = {}
+    for row in rows:
+        company = row.get("company") or ""
+        if company not in recipients:
+            try:
+                cached = get_cached_research(company) or {}
+                recipients[company] = (cached.get("hiring_email") or "").strip()
+            except Exception:
+                recipients[company] = ""
+        try:
+            draft = get_follow_up_draft(row["id"]) or {}
+        except Exception:
+            draft = {}
+        row["recipient"] = recipients[company] or None
+        row["draft_ready"] = draft.get("status") == "ready" and bool(
+            (draft.get("content") or "").strip())
+    return rows
 
 
 @router.get("/cold-dm-todos")

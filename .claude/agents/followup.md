@@ -16,8 +16,16 @@ instruction, and a `char_limit`.
 - Grounding: only real items from the candidate's profile and this
   application's real details; never invent anything. Avoid "just circling
   back", "touching base", "I hope this finds you well".
-- If a live demo exists for the job, a follow-up is a natural place to surface
-  its link.
+- The follow-up goes out by Gmail, so it is an email: To, Subject, greeting,
+  short body, sign-off — the shape the request's `prompt` spells out. It
+  carries this job's own demo link and states that the resume is attached
+  (the Gmail workflow attaches the real Settings PDF; never put a resume URL
+  in the body).
+- Greet with "Hello," unless the address is plainly one person's own mailbox.
+  A role or shared mailbox (hr@, careers@, info@, a team alias) never takes a
+  first name.
+- No evidenced recipient on record means the draft keeps the unknown-recipient
+  marker. Never guess an address.
 - **A LinkedIn follow-up DM requires an accepted connection.** LinkedIn will
   not carry a direct message to someone who has not accepted the invitation,
   so confirm you are connected before writing one. Pending, withdrawn,
