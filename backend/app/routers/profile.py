@@ -610,6 +610,8 @@ def read_desktop_prompt(request: Request):
     values = {
         "seen_urls_url": str(request.url_for("desktop_agent_seen_urls")),
         "record_url": str(request.url_for("desktop_agent_record_job")),
+        "cold_dms_url": str(request.url_for("desktop_agent_cold_dms")),
+        "cold_dm_record_url": str(request.url_for("desktop_agent_record_cold_dm")),
         "resume_url": str(request.url_for("download_application_resume")),
         "resume_filename": (resume or {}).get("filename") or "Resume.pdf",
         "resume_sha256": (resume or {}).get("sha256") or "unavailable",

@@ -151,6 +151,16 @@ class DesktopAgentJobRequest(BaseModel):
     notes: str = Field(default="", max_length=2_000)
 
 
+class DesktopAgentColdDmRequest(BaseModel):
+    """One LinkedIn connection invitation with a note the desktop agent sent."""
+    model_config = ConfigDict(extra="forbid")
+    tracker_id: int = Field(gt=0)
+    recipient_name: str = Field(min_length=1, max_length=200)
+    recipient_profile_url: str = Field(
+        min_length=1, max_length=500, pattern=r"^https://([a-z]+\.)?linkedin\.com/")
+    note: str = Field(min_length=1, max_length=1_000)
+
+
 class UpdateStatusRequest(BaseModel):
     status: str
 

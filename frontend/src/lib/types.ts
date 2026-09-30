@@ -40,6 +40,8 @@ export interface DashboardStats {
   this_week: number;
   today: number;
   daily_target: number;
+  dms_today: number;
+  dm_target: number;
   [key: string]: number;
 }
 

@@ -61,6 +61,7 @@ import {
   BarChart3,
   CheckCircle2,
   Mail,
+  Send,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -221,6 +222,10 @@ export default function DashboardPage() {
   const dailyTarget = stats?.daily_target || DEFAULT_DAILY_TARGET;
   const dailyPct = Math.min(Math.round((todayCount / dailyTarget) * 100), 100);
   const dailyMet = todayCount >= dailyTarget;
+  const dmCount = stats?.dms_today ?? 0;
+  const dmTarget = stats?.dm_target || DEFAULT_DAILY_TARGET;
+  const dmPct = Math.min(Math.round((dmCount / dmTarget) * 100), 100);
+  const dmMet = dmCount >= dmTarget;
 
   return (
     <div className="space-y-8">
@@ -270,26 +275,48 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* ---- Daily Target ---- */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-emerald-400" />
-            Daily Target
-          </CardTitle>
-          <CardDescription>
-            {todayCount} / {dailyTarget} applications today across LinkedIn and Indeed
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Progress value={dailyPct} className="h-3" />
-          <p className="text-muted-foreground text-right text-sm">
-            {dailyMet
-              ? "Target reached — the agent stops for today"
-              : `${dailyTarget - todayCount} to go · ${dailyPct}%`}
-          </p>
-        </CardContent>
-      </Card>
+      {/* ---- Daily Targets: applications, then cold DMs ---- */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-emerald-400" />
+              Daily Target — Applications
+            </CardTitle>
+            <CardDescription>
+              {todayCount} / {dailyTarget} applications today across LinkedIn and Indeed
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Progress value={dailyPct} className="h-3" />
+            <p className="text-muted-foreground text-right text-sm">
+              {dailyMet
+                ? "Target reached — the agent moves on to cold DMs"
+                : `${dailyTarget - todayCount} to go · ${dailyPct}%`}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-sky-400" />
+              Daily Target — Cold DMs
+            </CardTitle>
+            <CardDescription>
+              {dmCount} / {dmTarget} LinkedIn connection notes sent today
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Progress value={dmPct} className="h-3" />
+            <p className="text-muted-foreground text-right text-sm">
+              {dmMet
+                ? "Target reached — the agent stops for today"
+                : `${dmTarget - dmCount} to go · ${dmPct}%`}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* ---- Immediate Company HR email todos ---- */}
       <Card>
