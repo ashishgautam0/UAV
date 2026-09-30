@@ -375,7 +375,7 @@ class DesktopPromptTests(unittest.TestCase):
             "Follow it and finish the application there",
             "This applies on **both portals**",
             # what the off-site flow has to survive
-            "If the site requires an account first, create one",
+            "If the site requires an account first:",
             "If a CAPTCHA appears, abandon this job immediately",
             "Submit and wait for the confirmation screen",
             # the record must key on the portal URL or dedup breaks next run
@@ -580,10 +580,27 @@ class DesktopPromptTests(unittest.TestCase):
             with self.subTest(field=protected):
                 self.assertIn(protected, self.prompt)
 
-    def test_account_creation_does_not_print_passwords_in_the_summary(self):
-        self.assertIn("password manager save it", self.prompt)
-        self.assertIn("Accounts created", self.prompt)
-        self.assertIn("Never reuse a password from another site", self.prompt)
+    def test_new_passwords_are_queued_for_the_user_not_created(self):
+        """The computer-use tool will not invent a new credential, so an
+        instruction to create accounts only cost jobs and explanations. The
+        agent now uses a sign-in the user already has, and queues the rest
+        in the summary with links, without asking mid-run."""
+        employer = self.prompt.split("## APPLYING ON THE EMPLOYER'S OWN SITE", 1)[1] \
+                              .split("## PORTAL-BY-PORTAL", 1)[0]
+        for required in ('"Continue with Google", "Sign in\n     with LinkedIn", "Apply with Indeed"',
+                         "**Only a new password will do:** do not create one",
+                         "do not ask me for one\n     mid-run either",
+                         '"Needs an account —\n     do these yourself"',
+                         "Never type an existing password of mine, and never reset one."):
+            with self.subTest(required=required):
+                self.assertIn(required, employer)
+        for gone in ("fresh strong password", "Accounts created",
+                     "create an account and carry on", "Creating an account is part of that"):
+            with self.subTest(gone=gone):
+                self.assertNotIn(gone, self.prompt)
+        summary = self.prompt.split("## SUMMARY — WHEN I STOP YOU", 1)[1]
+        self.assertIn("### Needs an account — do these yourself", summary)
+        self.assertIn("| Sign-up page |", summary)
 
     def test_prompt_carries_the_shared_apply_rules(self):
         """Rules ported from the Today Todo apply prompt, which the agent needs
@@ -691,20 +708,19 @@ class DesktopPromptTests(unittest.TestCase):
                 self.assertIn(marker, section)
                 self.assertIn("Keep paging until there is no next page", section)
 
-    def test_sign_up_is_never_a_skip_and_account_terms_are_accepted(self):
-        """"Login required: stop that job" contradicted the instruction to
-        create accounts. Sign-up, its terms and its verification email are now
-        part of applying; only an existing account with an unknown password,
-        or a phone OTP, ends the job."""
+    def test_sign_in_is_never_a_silent_skip_and_its_terms_are_accepted(self):
+        """"Login required: stop that job" dropped jobs silently. A sign-in
+        step now goes through an existing sign-in or into the user's queue,
+        its terms are accepted, and its verification email may be opened."""
         blockers = self.prompt.split("## CAPTCHA, OTP & BLOCKERS", 1)[1].split("## STEP 2", 1)[0]
         self.assertNotIn("**Login required**: stop that job", self.prompt)
-        self.assertIn("**create an account and carry on**", blockers)
+        self.assertIn("sign in with Google, LinkedIn or Indeed where offered", blockers)
         self.assertIn("Never reset a password.", blockers)
         self.assertIn("open only\n  that site's newest message", blockers)
         self.assertIn("Do not open, read, reply to or delete any other email.", blockers)
         self.assertIn("**OTP / 2FA sent to my phone**", blockers)
         terms = self.prompt.split("### TERMS AND CONSENT CHECKBOXES", 1)[1].split("## CAPTCHA", 1)[0]
-        self.assertIn("terms of service and privacy policy of any site you create\nan account on",
+        self.assertIn("terms of service and privacy policy of any site you sign\ninto to apply",
                       terms)
 
     def test_jobs_paying_below_the_floor_are_skipped(self):
