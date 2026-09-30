@@ -200,6 +200,40 @@ class HrEmailTodoTests(unittest.TestCase):
         self.assertNotIn("coldDmTodos.map(", dashboard)
         self.assertNotIn('"Not ready"', dashboard)
 
+    def test_a_cold_dm_waits_for_the_jobs_demo_too(self):
+        """The note carries this job's demo link, and this list only offers
+        jobs with no draft at all — so a note written before the demo existed
+        would keep its missing link for good."""
+        apps = [{"url": "https://jobs.test/ready", "status": "Applied"},
+                {"url": "https://jobs.test/no-demo", "status": "Applied"}]
+        jobs = [{"id": 10, "url": "https://jobs.test/ready", "title": "AI Engineer",
+                 "company": "Ready Co", "location": "", "description": "Role"},
+                {"id": 20, "url": "https://jobs.test/no-demo", "title": "ML Engineer",
+                 "company": "No Demo Co", "location": "", "description": "Role"}]
+
+        class Query:
+            def __init__(self, rows): self.rows = rows
+            def select(self, *_): return self
+            def in_(self, column, values):
+                self.rows = [row for row in self.rows if row.get(column) in values]
+                return self
+            def execute(self): return SimpleNamespace(data=self.rows)
+
+        tracker = types.ModuleType("tracker")
+        tracker.TERMINAL_STATUSES = ["Offer", "Rejected", "Ghosted", "Not Interested"]
+        tracker._get_client = lambda: SimpleNamespace(
+            table=lambda name: Query(list(apps if name == "applications" else jobs)))
+        tracker.get_job_message = lambda job_id, message_type: (
+            {"content": "demo"} if message_type == "demo_html" and job_id == 10 else None)
+        load = function(ROOT / "modules/pending_messages.py", "_tracked_jobs_missing", {"os": os})
+        with patch.dict(sys.modules, {"tracker": tracker}):
+            candidates, _ = load("cold_dm", 10)
+        self.assertEqual([row["id"] for row in candidates], [10])
+        # Asset types with no demo of their own are unaffected by the gate.
+        with patch.dict(sys.modules, {"tracker": tracker}):
+            other, _ = load("resume_points", 10)
+        self.assertEqual([row["id"] for row in other], [20, 10])
+
     def test_hr_email_candidates_require_tracker_and_live_demo(self):
         apps = [
             {"url": "https://jobs.test/ready", "status": "Applied"},

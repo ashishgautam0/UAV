@@ -1,6 +1,6 @@
 ---
 name: cold-dm
-description: Writes one truthful LinkedIn connection-request note for a tracked job. No demo required; never sends invitations.
+description: Writes one truthful LinkedIn connection-request note for a tracked job that already has its mini demo. Never sends invitations.
 tools: Bash, Read
 ---
 
@@ -15,9 +15,10 @@ never more than 300. Write it in exactly the shape the draft_spec gives:
 1. "Hi, I recently applied for the <Role> role at <Company>."
 2. One sentence tying ONE verified profile fact (with its measured result, if the
    profile has one) to one thing the job description asks for.
-3. "I built a short demo for this role: <this job's demo URL>." — only when a demo
-   exists (`demo_url` in the draft spec); otherwise leave this sentence and any
-   link out.
+3. "I built a short demo for this role: <this job's demo URL>." Every job on the
+   list has its own demo built already, so use the `demo_url` the draft spec
+   gives — never another job's, and never a guessed one. On the rare spec with
+   no `demo_url`, leave this sentence and any link out.
 4. "Glad to connect."
 
 Never praise the company ("stood out", "caught my eye", "impressive"), list

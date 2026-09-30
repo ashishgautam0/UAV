@@ -85,11 +85,14 @@ def _tracked_jobs_missing(message_type, limit):
             break
         if get_job_message(r["id"], message_type=message_type):
             continue
-        if message_type == "hr_email":
-            # The HR email is the final outreach asset: wait until the tracked
-            # job's live mini demo exists so the saved draft always includes it.
+        if message_type in {"cold_dm", "hr_email"}:
+            # Both outreach assets carry the job's own live mini demo, so
+            # neither is written before that demo exists. A note drafted early
+            # keeps its missing link for good: this list only offers jobs with
+            # no draft at all, so nothing ever comes back to add the link.
             if not get_job_message(r["id"], message_type="demo_html"):
                 continue
+        if message_type == "hr_email":
             api_base = os.environ.get(
                 "PUBLIC_API_URL", "https://uav-6qe7.vercel.app"
             ).rstrip("/")
