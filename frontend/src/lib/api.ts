@@ -245,12 +245,16 @@ export async function getApplicationPromptSettings(): Promise<ApplicationPromptS
   return apiFetch<ApplicationPromptSettings>("/api/profile/application-settings");
 }
 
-export async function getCompanyExclusions(): Promise<{ companies: string[] }> {
-  return apiFetch<{ companies: string[] }>("/api/profile/company-exclusions");
+// companies: the user's own list. tracked: every Tracker company, excluded
+// automatically and read live — never saved into the user's list.
+export interface CompanyExclusions { companies: string[]; tracked: string[] }
+
+export async function getCompanyExclusions(): Promise<CompanyExclusions> {
+  return apiFetch<CompanyExclusions>("/api/profile/company-exclusions");
 }
 
-export async function updateCompanyExclusions(companies: string[]): Promise<{ companies: string[] }> {
-  return apiFetch<{ companies: string[] }>("/api/profile/company-exclusions", {
+export async function updateCompanyExclusions(companies: string[]): Promise<CompanyExclusions> {
+  return apiFetch<CompanyExclusions>("/api/profile/company-exclusions", {
     method: "PUT",
     body: JSON.stringify({ companies }),
   });
