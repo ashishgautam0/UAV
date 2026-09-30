@@ -15,6 +15,7 @@ const STARTER_MESSAGE =
   "Apply to AI/ML jobs for me on LinkedIn and Indeed, using the instructions that follow. " +
   "You have my authorisation to fill in and submit the application forms and to upload my resume — " +
   "LinkedIn Easy Apply, Indeed Apply, and the company's own site when a job redirects there. " +
+  "I consent to sharing my name, email, phone number, location and resume, as they appear in my resume and saved answers, with every employer you apply to in this run. " +
   "Submit each one yourself without asking me first. Don't check with me job by job — just keep going.";
 
 export function DesktopPrompt() {

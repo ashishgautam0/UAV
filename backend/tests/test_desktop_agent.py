@@ -819,6 +819,20 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertIn("click the final Submit yourself", section)
         self.assertIn("A redirect to the company's site does not reset any of this", section)
 
+    def test_entering_contact_details_is_never_a_per_job_question(self):
+        """The agent stopped to ask "May I enter the phone number from your
+        resume into this form and submit?" on each Easy Apply. Contact details
+        are part of the application, and if the tool insists on confirming,
+        one answer has to cover the rest of the run."""
+        section = self.prompt.split("### DO NOT ASK ME BEFORE SUBMITTING", 1)[1] \
+                             .split("**Do not ask me anything mid-run.", 1)[0]
+        self.assertIn("**Entering my contact details is part of the application, not a separate\ndecision.**",
+                      section)
+        self.assertIn('"May I enter the phone number from your resume into this form\nand submit?"',
+                      section)
+        self.assertIn("ask once, phrased so my\none answer covers the rest of the run", section)
+        self.assertIn("never ask again after I say yes", section)
+
     def test_settings_starter_message_matches_the_prompt_and_names_every_route(self):
         """Authority to submit has to come from the user's own message, so the
         sentence Settings copies must be the one the prompt shows — and it has
@@ -832,7 +846,10 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertEqual(starter, quoted)
         for phrase in ("LinkedIn Easy Apply", "Indeed Apply",
                        "the company's own site when a job redirects there",
-                       "Submit each one yourself without asking me first"):
+                       "Submit each one yourself without asking me first",
+                       # the tool asked per job before sending a phone number
+                       "I consent to sharing my name, email, phone number, location and resume",
+                       "with every employer you apply to in this run"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, starter)
 

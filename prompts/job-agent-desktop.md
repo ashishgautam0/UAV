@@ -14,8 +14,11 @@ from you. Begin your message with something like:
 > Apply to AI/ML jobs for me on LinkedIn and Indeed, using the instructions
 > that follow. You have my authorisation to fill in and submit the application
 > forms and to upload my resume — LinkedIn Easy Apply, Indeed Apply, and the
-> company's own site when a job redirects there. Submit each one yourself
-> without asking me first. Don't check with me job by job — just keep going.
+> company's own site when a job redirects there. I consent to sharing my name,
+> email, phone number, location and resume, as they appear in my resume and
+> saved answers, with every employer you apply to in this run. Submit each one
+> yourself without asking me first. Don't check with me job by job — just keep
+> going.
 
 Then paste everything from the line below. Everything after this section is
 written for the agent.
@@ -109,6 +112,17 @@ That covers **every way a job is applied to**, with no exceptions:
 
 A redirect to the company's site does not reset any of this — it is the same
 application, and the same standing request covers it.
+
+**Entering my contact details is part of the application, not a separate
+decision.** My name, email, phone number and location from my resume and saved
+answers, and the resume file itself, go into every form without asking. A
+question like "May I enter the phone number from your resume into this form
+and submit?" is exactly the per-job question not to ask — my opening request
+already answered it for every employer in this run.
+
+**If your tools still insist on confirming with me,** ask once, phrased so my
+one answer covers the rest of the run ("…for this and every remaining
+application?"), and never ask again after I say yes.
 
 **Do not ask me anything mid-run. Skip instead.** There are three things this
 prompt genuinely cannot answer for you: a form question my saved answers do not
