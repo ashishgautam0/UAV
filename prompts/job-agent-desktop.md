@@ -17,15 +17,18 @@ from you. Begin your message with something like:
 > company's own site when a job redirects there. I consent to sharing my name,
 > email, phone number, location and resume, as they appear in my resume and
 > saved answers, with every employer you apply to in this run. Submit each one
-> yourself without asking me first. Don't check with me job by job — just keep
-> going.
+> yourself without asking me first. Once today's 10 applications are done, go
+> on to the cold DMs: send up to 10 LinkedIn connection invitations a day, each
+> with a note from the cold DM list in these instructions, to a recruiter or
+> hiring manager you have checked works at that company — send each one yourself
+> without asking me first. Don't check with me job by job — just keep going.
 
 Then paste everything from the line below. Everything after this section is
 written for the agent.
 
 **This is a browser task.** It is done with Computer Use in your own browser. It
-needs no database and no connector — the only network calls are the two tracker
-API endpoints named in STEP 0 and STEP 2. If a Supabase, database or similar
+needs no database and no connector — the only network calls are the tracker API
+endpoints named in STEP 0, STEP 2 and PHASE 2. If a Supabase, database or similar
 connector is attached to the conversation, it is not part of this task; ignore
 it rather than asking which task was meant.
 
@@ -38,6 +41,12 @@ for AI/ML engineering jobs on LinkedIn and Indeed, evaluate each one, and
 auto-apply to every matching role. Every job you handle, on every portal, is
 recorded through my tracker API, so applied roles show up in my tracker and are
 skipped on later runs.
+
+**The run has two phases, back to back, from this one message.** Phase 1 applies
+to jobs until today's target of 10 applications is met. Phase 2 then sends
+cold DMs — LinkedIn connection invitations with a note — until today's target
+of 10 DMs is met (see PHASE 2 below). Move from one to the other on your own;
+never stop between them to tell me or to ask.
 
 **You are the only thing that finds jobs for me.** Nothing else searches on my
 behalf any more, so a role you do not find is a role I never see. Search both
@@ -150,15 +159,18 @@ Before opening any portal, fetch the postings I have already dealt with:
 GET {{seen_urls_url}}
 ```
 
-The response is `{"urls": [...], "count": N, "applied_today": A, "daily_target": 10}`.
+The response is `{"urls": [...], "count": N, "applied_today": A, "daily_target": 10, "dms_today": D, "dm_target": 10}`.
 Keep that URL list for the whole run and treat it as the skip list. It contains
 every job I already applied to and every job already dismissed as a bad fit.
 
 `applied_today` is how many applications my tracker already holds for today,
-earlier runs included. **If it is already 10 or more, today's target is met:
-do not search or apply — end with the one line "Today's target is already met:
-A applications recorded today." and stop.** Otherwise the run applies until
-the total reaches 10 (see DAILY TARGET below).
+earlier runs included, and `dms_today` is how many cold DMs. **If
+`applied_today` is already 10 or more, today's application target is met: do
+not search or apply — go straight to PHASE 2.** If `dms_today` is also 10 or
+more, both targets are met: end with the one line "Today's targets are already
+met: A applications and D cold DMs recorded today." and stop. Otherwise the run
+applies until the total reaches 10 (see DAILY TARGET below), then moves on to
+PHASE 2.
 
 **Note what it does NOT contain:** postings that merely sit in my database
 unapplied, left over from an older job scraper I have since removed. Those were
@@ -764,8 +776,9 @@ start another application once it does.
   response carries `applied_today`; when it reaches 10, today's target is met.
   If it is ever missing or `null`, count your own confirmed applications and
   add them to the `applied_today` you got in STEP 0.
-- **When the target is met,** finish recording that last job, then give me the
-  summary and stop. Do not look for "one more".
+- **When the target is met,** finish recording that last job, then go straight
+  on to PHASE 2 — COLD DMs. Do not look for "one more", and do not write me a
+  summary or a note first: the summary comes at the very end, after Phase 2.
 - The day is my day in India: the count starts again from zero after midnight
   IST, so a run started the next day has a fresh 10.
 
@@ -788,21 +801,26 @@ turn, and an ended turn is a stopped run until I come back and type something.
 counts and your Issues list to yourself as you go, and give them to me only in
 the summary.
 
-**Your turn ends for four reasons only:**
-1. Today's target of 10 applications is met.
-2. I told you to stop.
-3. Two full passes in a row over every portal I allowed found nothing new to
-   apply to.
-4. The app forces it — a time, tool-use or context limit you cannot control.
+**If two full passes in a row over every portal I allowed find nothing new to
+apply to,** stop searching and go on to PHASE 2 anyway — the cold DMs do not
+depend on today's applications, and the day's DMs still need sending.
 
-A finished portal, a skipped job, a question, a rate limit, a closed listing
-and a form with no confirmation are **never** reasons. None of them is worth a
-message.
+**Your turn ends for three reasons only:**
+1. PHASE 2 is finished — today's 10 cold DMs are sent, or it has no DMs left
+   it can send (see PHASE 2).
+2. I told you to stop.
+3. The app forces it — a time, tool-use or context limit you cannot control.
+
+Meeting the application target is **not** one of them — it is the start of
+Phase 2. A finished portal, a skipped job, a question, a rate limit, a closed
+listing and a form with no confirmation are **never** reasons either. None of
+them is worth a message.
 
 **If the app forces you to stop**, end with one line — "Paused by the app
-limit: N applied this session. Say *continue* to resume." — and nothing else.
-**When I say continue**, fetch the skip list again (STEP 0), pick up on the
-portal and search query where you left off, and keep going. Do not re-read my
+limit: N applied and M cold DMs sent this session. Say *continue* to resume." —
+and nothing else. **When I say continue**, fetch the skip list again (STEP 0) —
+it tells you whether you are still in Phase 1 or already in Phase 2 — pick up
+where you left off, and keep going. Do not re-read my
 resume, re-verify the PDF, re-ask for authorisation or summarise what came
 before — my original request still stands.
 
@@ -818,6 +836,96 @@ The waits between applications stay, and so do the stop-this-portal rules
 below. They are what keeps my accounts alive: a portal that decides I am a bot
 locks me out and then nothing gets applied to at all. The daily target is
 about how many to send, never about sending them faster.
+
+## PHASE 2 — COLD DMs: 10 LINKEDIN CONNECTION NOTES A DAY
+
+Start this as soon as Phase 1 is over — today's 10 applications are met, the
+skip list showed they already were, or two passes found nothing new. It uses the
+same LinkedIn tab you are already signed into. **My target is 10 cold DMs a
+day**: a cold DM is a LinkedIn connection invitation with a personal note, sent
+to a recruiter or hiring manager at a company I applied to earlier whose
+follow-up is now due. It is not InMail, not a normal message and not an email.
+
+### Get the list
+
+```
+GET {{cold_dms_url}}
+```
+
+The response is `{"jobs": [...], "count": N, "not_ready": R, "dms_today": D, "dm_target": 10, ...}`.
+Each job carries `tracker_id`, `company`, `title`, `location`, `url`,
+`cold_dm` (the note I have already written for it), `recruiters_search_url`
+and `hiring_managers_search_url`. **Only these jobs get a cold DM** — never pick
+a company yourself, and never write a note for a job that is not on the list.
+`not_ready` counts due jobs whose note is not written yet; leave them alone.
+
+- If `dms_today` is already 10 or more, Phase 2 is done.
+- If the request fails, retry it twice. If it still fails, Phase 2 cannot run:
+  note it under Issues and finish with the summary.
+
+### For each job on the list, in order
+
+1. **Find one person.** Open `recruiters_search_url`. Open the profiles that
+   look relevant — at most five — and pick one who **currently** works at that
+   exact company (their headline or current Experience entry says so) as a
+   recruiter, talent-acquisition or HR person. If there is none, try
+   `hiring_managers_search_url` for someone who currently leads the team the
+   role is in. If nobody is verified, skip the job — never guess a person — and
+   list it under "Cold DMs not sent".
+2. **Check the connection first.** If we are already connected, or an
+   invitation is already Pending, skip the job. Never withdraw and re-invite.
+   Never invite the same person twice in a run, even for a different job.
+3. **Write the note from the job's `cold_dm`.** Use it as it is, changing only
+   the greeting to the person's first name, the exact company and role, and the
+   length. Keep it inside the character limit LinkedIn shows in the note box,
+   spaces included — shorten it and check again until it fits. Never add a fact
+   the note and my resume do not support, never claim an attachment, and never
+   send an invitation without a note.
+4. **Send it yourself.** Connect (under "More" if it is not shown) → Add a note
+   → your note → Send. My message at the top of this conversation already asked
+   you to send these without checking with me, so **do not ask me before
+   sending**.
+5. **Check it went.** The button turns to Pending, or LinkedIn confirms the
+   invitation was sent. If you cannot tell, look at My Network → Sent
+   invitations before doing anything else — never send a second one blindly.
+6. **Record it immediately:**
+
+```
+POST {{cold_dm_record_url}}
+Content-Type: application/json
+
+{
+  "tracker_id": 123,
+  "recipient_name": "Priya Sharma",
+  "recipient_profile_url": "https://www.linkedin.com/in/priya-sharma/",
+  "note": "<the exact note you sent>"
+}
+```
+
+   The response is `{"recorded": true, "duplicate": false, "dms_today": D, "dm_target": 10}`.
+   `duplicate: true` means that job already had a DM recorded — note it and move
+   on. **If the POST fails after the invitation went, retry only the POST —
+   never re-send the invitation.** If it still fails, list it under Not Recorded
+   and carry on.
+7. **Wait 30–60 seconds** before the next invitation, as you do between
+   applications.
+
+**Only a confirmed, recorded invitation counts.** Use `dms_today` from the
+record responses: when it reaches 10, stop sending. If it is ever missing or
+`null`, add your own confirmed sends to the `dms_today` you started with.
+
+### When Phase 2 ends
+
+- **10 cold DMs today** — done.
+- **The list runs out first** — fetch it once more, since notes get written
+  during the day. If nothing new is on it, Phase 2 is done with fewer than 10;
+  say how many were not ready (`not_ready`) in the summary.
+- **LinkedIn pushes back** — an invitation limit, a warning, a restriction, a
+  CAPTCHA, or "Add a note" no longer offered because the note allowance is used
+  up. Stop sending at once, for the day: pushing on risks my account. Put what
+  LinkedIn said under Issues.
+
+Then give me the summary. Until then, as in Phase 1, send me nothing.
 
 ## SAFETY RULES
 
@@ -836,10 +944,11 @@ about how many to send, never about sending them faster.
 
 ## SUMMARY — WHEN I STOP YOU
 
-The run ends when today's target of 10 is met. Produce this summary **only**
-when your turn ends for one of the reasons in KEEP GOING UNTIL I SAY STOP —
-the target is met, I tell you to stop, or two full passes find nothing new. Never produce it, or any part of it, as a per-portal update: that
-message is what stops the run. A turn the app forces to end gets the one-line
+The run ends when PHASE 2 ends — after both of today's targets, 10
+applications and then 10 cold DMs. Produce this summary **only** when your turn
+ends for one of the reasons in KEEP GOING UNTIL I SAY STOP — Phase 2 is
+finished or I tell you to stop. Never produce it, or any part of it, as a
+per-portal or end-of-Phase-1 update: that message is what stops the run. A turn the app forces to end gets the one-line
 pause notice instead, not this.
 
 When I stop you, present:
@@ -854,6 +963,8 @@ When I stop you, present:
 - TOTAL: XX applied, ZZ skipped, SS already handled
 - Passes completed over the portal list: N
 - Portals not reached this run: [none, or which ones]
+
+- Cold DMs: X sent this run, D of 10 today, N on the list, R not ready yet
 
 ### Applied Jobs (all recorded in the tracker)
 | # | Portal | Company | Title | Location | URL |
@@ -876,8 +987,18 @@ When I stop you, present:
 ### Signed in with Google / LinkedIn / Indeed
 - [Each site where you used one of those sign-ins to apply]
 
+### Cold DMs sent
+| # | Company | Role | Recipient | Profile URL |
+|---|---------|------|-----------|-------------|
+| 1 | Acme AI | ML Engineer | Priya Sharma (Talent Acquisition) | [link] |
+| ... |
+
+### Cold DMs not sent
+- [Each listed job skipped in Phase 2, and why: no verified person, already
+  connected, invitation pending]
+
 ### Not Recorded
-- [Any job whose POST failed, so I can add it manually]
+- [Any job or cold DM whose POST failed, so I can add it manually]
 
 ### Issues
 - [Any CAPTCHAs, OTP prompts, errors, portal problems encountered, and the jobs
@@ -894,6 +1015,7 @@ one.
 
 Apply to everything that passes the rules, without asking me first, and when
 you reach the last allowed portal go back to the first and start the next pass.
-Keep going until today's target of 10 applications is met, then stop. **Send me nothing until then** — no
-progress updates, no questions, no per-portal notes. Everything goes in the
-summary.
+Keep going until today's target of 10 applications is met, then go straight on
+to PHASE 2 and send today's 10 cold DMs, then stop.
+**Send me nothing until then** — no progress updates, no questions, no
+per-portal or end-of-phase notes. Everything goes in the summary.

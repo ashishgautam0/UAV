@@ -68,6 +68,20 @@ def count_applications_today():
     return resp.count if resp.count is not None else len(resp.data or [])
 
 
+# LinkedIn connection invitations with a note — the Cold DM — sent per day,
+# the second half of the desktop agent's run once the applications are done.
+DAILY_DM_TARGET = 10
+DM_CHANNEL = "LinkedIn connection"
+
+
+def count_dms_today():
+    """Cold DMs (LinkedIn connection notes) recorded since midnight, user's timezone."""
+    midnight = _user_now().replace(hour=0, minute=0, second=0, microsecond=0)
+    resp = (_get_client().table("follow_up_history").select("id", count="exact")
+            .eq("channel", DM_CHANNEL).gte("sent_at", midnight.isoformat()).execute())
+    return resp.count if resp.count is not None else len(resp.data or [])
+
+
 def add_application(company, role, job_type, platform, url="",
                     noc_compatible="Unknown", conversion="N/A",
                     salary="", notes=""):
@@ -413,6 +427,16 @@ def set_hr_email_todo_completed(app_id, completed=True):
     return value
 
 
+def _add_dm_progress(stats):
+    """Today's Cold DMs for the Dashboard; a failed count must not hide the rest."""
+    try:
+        stats['dms_today'] = count_dms_today()
+    except Exception as exc:
+        print(f"[tracker] could not count today's Cold DMs: {exc}")
+        stats['dms_today'] = 0
+    stats['dm_target'] = DAILY_DM_TARGET
+
+
 def get_stats():
     db = _get_client()
     resp = db.table("applications").select("status, type, platform, date_applied").execute()
@@ -428,6 +452,7 @@ def get_stats():
         stats['this_week'] = 0
         stats['today'] = 0
         stats['daily_target'] = DAILY_APPLICATION_TARGET
+        _add_dm_progress(stats)
         stats['jobs'] = 0
         stats['internships'] = 0
         stats['by_platform'] = []
@@ -448,6 +473,7 @@ def get_stats():
     stats['today'] = int((df['date_applied'].astype(str).str[:10]
                           == today.strftime("%Y-%m-%d")).sum())
     stats['daily_target'] = DAILY_APPLICATION_TARGET
+    _add_dm_progress(stats)
 
     stats['jobs'] = len(df[df['type'] == 'Job'])
     stats['internships'] = len(df[df['type'] == 'Internship'])

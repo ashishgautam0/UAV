@@ -19,7 +19,7 @@ PAUSED_SOURCES = ("Naukri", "Instahyre", "Cutshort", "Wellfound", "Shine",
 
 
 def stub_tracker(handled_urls=(), applied_urls=(), scraped_id=None, insert_id=7,
-                 applied_today=3):
+                 applied_today=3, dms_today=2):
     """Replace the data layer so router logic is tested without Supabase.
 
     scraped_id is the row the scraper already holds for this posting (None when
@@ -43,6 +43,8 @@ def stub_tracker(handled_urls=(), applied_urls=(), scraped_id=None, insert_id=7,
     module.dedup_window_days = lambda: 14
     module.count_applications_today = lambda: applied_today
     module.DAILY_APPLICATION_TARGET = 10
+    module.count_dms_today = lambda: dms_today
+    module.DAILY_DM_TARGET = 10
     return module, calls
 
 
@@ -50,6 +52,8 @@ def daily_progress(module):
     return function(ROOT / "app/routers/desktop_agent.py", "_daily_progress", {
         "count_applications_today": module.count_applications_today,
         "DAILY_APPLICATION_TARGET": module.DAILY_APPLICATION_TARGET,
+        "count_dms_today": module.count_dms_today,
+        "DAILY_DM_TARGET": module.DAILY_DM_TARGET,
     })
 
 
@@ -63,16 +67,22 @@ class SeenUrlsTests(unittest.TestCase):
     def test_the_skip_list_reports_todays_count_against_the_target(self):
         """STEP 0 needs today's total so a second run the same day knows how
         many are left, or that the target is already met."""
-        module, _ = stub_tracker(applied_today=4)
+        module, _ = stub_tracker(applied_today=4, dms_today=6)
         result = self.endpoint(module)()
         self.assertEqual((result["applied_today"], result["daily_target"]), (4, 10))
+        # ...and today's Cold DMs, so a run that starts with the applications
+        # already done goes straight to Phase 2 knowing how many are left.
+        self.assertEqual((result["dms_today"], result["dm_target"]), (6, 10))
 
     def test_a_counting_failure_reports_unknown_instead_of_failing(self):
         module, _ = stub_tracker()
         def boom():
             raise RuntimeError("database unavailable")
         module.count_applications_today = boom
-        self.assertIsNone(self.endpoint(module)()["applied_today"])
+        module.count_dms_today = boom
+        result = self.endpoint(module)()
+        self.assertIsNone(result["applied_today"])
+        self.assertIsNone(result["dms_today"])
 
     def test_returns_only_jobs_already_acted_on(self):
         module, _ = stub_tracker({"https://a/1", "https://b/2"})
@@ -228,7 +238,8 @@ class RecordJobTests(unittest.TestCase):
         # stops once it reaches daily_target.
         self.assertEqual(result, {"saved": True, "applied": True,
                                   "dismissed": False, "duplicate": False,
-                                  "applied_today": 3, "daily_target": 10})
+                                  "applied_today": 3, "daily_target": 10,
+                                  "dms_today": 2, "dm_target": 10})
         self.assertEqual(len(calls["scraped"]), 1)
         self.assertEqual(calls["scraped"][0]["source"], "LinkedIn")
         self.assertEqual(len(calls["applied"]), 1)
@@ -401,11 +412,15 @@ class DesktopPromptTests(unittest.TestCase):
     def test_rendering_leaves_no_unresolved_placeholder(self):
         self.assertIn("{{seen_urls_url}}", self.prompt)
         self.assertIn("{{record_url}}", self.prompt)
+        self.assertIn("{{cold_dms_url}}", self.prompt)
+        self.assertIn("{{cold_dm_record_url}}", self.prompt)
         result = self.render(resume={"filename": "résumé.pdf", "sha256": "abc"})
         self.assertNotIn("{{", result["content"])
         self.assertEqual(result["unresolved_placeholders"], [])
         self.assertIn("https://api.test/desktop_agent_seen_urls", result["content"])
         self.assertIn("https://api.test/desktop_agent_record_job", result["content"])
+        self.assertIn("https://api.test/desktop_agent_cold_dms", result["content"])
+        self.assertIn("https://api.test/desktop_agent_record_cold_dm", result["content"])
         self.assertIn("résumé.pdf", result["content"])
         self.assertFalse(result["customized"])
         self.assertEqual(result["issues"], [])
@@ -867,13 +882,17 @@ class DesktopPromptTests(unittest.TestCase):
                          "do not\nstart another application once it does",
                          "**Only a confirmed submission counts**",
                          "**Use the tracker's number, not your own tally.**",
-                         "1. Today's target of 10 applications is met.",
+                         "go straight\n  on to PHASE 2 — COLD DMs",
                          "after midnight\n  IST"):
             with self.subTest(required=required):
                 self.assertIn(required, keep_going)
         step0 = self.prompt.split("STEP 0 — LOAD THE SKIP LIST", 1)[1].split("## WHAT TO SEARCH", 1)[0]
         self.assertIn('"applied_today": A, "daily_target": 10', step0)
-        self.assertIn("**If it is already 10 or more, today's target is met", step0)
+        self.assertIn('"dms_today": D, "dm_target": 10', step0)
+        # A met application target no longer ends the run: it starts Phase 2.
+        self.assertIn("today's application target is met: do\nnot search or apply — go straight to PHASE 2.",
+                      step0)
+        self.assertIn("If `dms_today` is also 10 or\nmore, both targets are met", step0)
         self.assertNotIn("There is no application cap", self.prompt)
 
     def test_the_prompt_target_matches_the_backend_constant(self):
@@ -907,7 +926,8 @@ class DesktopPromptTests(unittest.TestCase):
         keep_going = self.prompt.split("## KEEP GOING UNTIL I SAY STOP", 1)[1] \
                                 .split("## SAFETY RULES", 1)[0]
         self.assertIn("**Do not send me progress updates.**", keep_going)
-        self.assertIn("**Your turn ends for four reasons only:**", keep_going)
+        self.assertIn("**Your turn ends for three reasons only:**", keep_going)
+        self.assertIn("Meeting the application target is **not** one of them", keep_going)
         self.assertIn("**Send me nothing until then**", self.prompt)
         # Two more mid-run "tell me" lines hid in the portal and API sections.
         self.assertNotIn("stop this portal, tell me, and move to Naukri", self.prompt)
@@ -999,7 +1019,11 @@ class DesktopPromptTests(unittest.TestCase):
                        "Submit each one yourself without asking me first",
                        # the tool asked per job before sending a phone number
                        "I consent to sharing my name, email, phone number, location and resume",
-                       "with every employer you apply to in this run"):
+                       "with every employer you apply to in this run",
+                       # Phase 2 sends invitations; that consent must be the user's too
+                       "Once today's 10 applications are done, go on to the cold DMs",
+                       "send up to 10 LinkedIn connection invitations a day",
+                       "send each one yourself without asking me first"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, starter)
 
@@ -1046,3 +1070,147 @@ class DesktopPromptTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def cold_dm_row(tracker_id, company="Acme AI", blocked="", note="Hi, I applied for ML Engineer."):
+    return {"job_id": tracker_id + 100, "tracker_id": tracker_id, "title": "ML Engineer",
+            "company": company, "location": "Bangalore", "source": "LinkedIn",
+            "url": f"https://portal/job/{tracker_id}", "follow_up_date": "2026-09-30",
+            "cold_dm": None if blocked else note, "cold_dm_generated_at": None,
+            "resume_version": 3, "blocked_reason": blocked}
+
+
+class ColdDmTests(unittest.TestCase):
+    """Phase 2: the run fetches the due Cold DMs live and records each send."""
+
+    def env(self, rows, connected=(), dms_today=4):
+        module, _ = stub_tracker(dms_today=dms_today)
+        calls = {"logged": [], "status": [], "versions": []}
+        def jobs(version, limit=100):
+            calls["versions"].append((version, limit))
+            return rows
+        ready = function(ROOT / "app/routers/desktop_agent.py", "_ready_cold_dms", {
+            "get_latest_profile_snapshot": lambda: {"version": 3},
+            "get_cold_dm_prompt_jobs": jobs,
+        })
+        from urllib.parse import quote
+        return {
+            "_ready_cold_dms": ready,
+            "_people_search": function(ROOT / "app/routers/desktop_agent.py", "_people_search",
+                                       {"quote": quote}),
+            "_daily_progress": daily_progress(module),
+            "_linkedin_connection_dates": lambda ids: {i: None for i in ids if i in connected},
+            "log_follow_up": lambda *a, **kw: calls["logged"].append((a, kw)),
+            "update_status": lambda app_id, status: calls["status"].append((app_id, status)),
+            "DM_CHANNEL": "LinkedIn connection",
+            "HTTPException": type("HTTPException", (Exception,), {
+                "__init__": lambda self, status_code, detail: Exception.__init__(self, status_code)}),
+            "DesktopAgentColdDmRequest": SimpleNamespace,
+        }, calls
+
+    def send(self, **overrides):
+        return SimpleNamespace(**{"tracker_id": 1, "recipient_name": "Priya Sharma",
+                                  "recipient_profile_url": "https://www.linkedin.com/in/priya/",
+                                  "note": "Hi Priya, I applied for ML Engineer.", **overrides})
+
+    def test_the_list_holds_only_jobs_with_a_current_note(self):
+        env, calls = self.env([cold_dm_row(1), cold_dm_row(2, blocked="No current Cold DM")])
+        result = function(ROOT / "app/routers/desktop_agent.py", "cold_dms", env)()
+        self.assertEqual([job["tracker_id"] for job in result["jobs"]], [1])
+        self.assertEqual((result["count"], result["not_ready"]), (1, 1))
+        self.assertEqual((result["dms_today"], result["dm_target"]), (4, 10))
+        job = result["jobs"][0]
+        self.assertEqual(job["cold_dm"], "Hi, I applied for ML Engineer.")
+        self.assertEqual(job["recruiters_search_url"],
+                         "https://www.linkedin.com/search/results/people/?keywords=Acme%20AI%20recruiter")
+        # Same eligibility as Settings: drafts must match the latest resume, and
+        # the live list is not capped at the Settings prompt's batch limit.
+        self.assertEqual(calls["versions"], [(3, None)])
+
+    def test_a_sent_note_is_recorded_like_the_tracker_form_does(self):
+        env, calls = self.env([cold_dm_row(1)], dms_today=5)
+        result = function(ROOT / "app/routers/desktop_agent.py", "record_cold_dm", env)(self.send())
+        self.assertEqual(result, {"recorded": True, "duplicate": False, "applied_today": 3,
+                                  "daily_target": 10, "dms_today": 5, "dm_target": 10})
+        (args, kwargs), = calls["logged"]
+        self.assertEqual(args, ("application", 1))
+        self.assertEqual(kwargs["channel"], "LinkedIn connection")
+        self.assertIn("Hi Priya, I applied for ML Engineer.", kwargs["message_content"])
+        self.assertIn("https://www.linkedin.com/in/priya/", kwargs["message_content"])
+        # Advances the follow-up schedule exactly as a manual record does.
+        self.assertEqual(calls["status"], [(1, "Follow-up Sent")])
+
+    def test_a_job_that_already_has_a_note_is_never_logged_twice(self):
+        env, calls = self.env([cold_dm_row(1)], connected={1})
+        result = function(ROOT / "app/routers/desktop_agent.py", "record_cold_dm", env)(self.send())
+        self.assertEqual((result["recorded"], result["duplicate"]), (False, True))
+        self.assertEqual((calls["logged"], calls["status"]), ([], []))
+
+    def test_a_job_not_on_the_list_is_refused(self):
+        env, calls = self.env([cold_dm_row(1), cold_dm_row(2, blocked="No current Cold DM")])
+        endpoint = function(ROOT / "app/routers/desktop_agent.py", "record_cold_dm", env)
+        for tracker_id in (2, 99):
+            with self.subTest(tracker_id=tracker_id), self.assertRaises(Exception) as caught:
+                endpoint(self.send(tracker_id=tracker_id))
+            self.assertEqual(caught.exception.args, (404,))
+        self.assertEqual((calls["logged"], calls["status"]), ([], []))
+
+    def test_todays_dms_are_counted_from_midnight_in_the_users_timezone(self):
+        from datetime import datetime
+        from unittest.mock import MagicMock
+        from zoneinfo import ZoneInfo
+        client = MagicMock()
+        query = client.table.return_value.select.return_value.eq.return_value.gte.return_value
+        query.execute.return_value = SimpleNamespace(count=7, data=[])
+        count = function(ROOT / "modules" / "tracker.py", "count_dms_today", {
+            "_get_client": lambda: client, "DM_CHANNEL": "LinkedIn connection",
+            "_user_now": lambda: datetime(2026, 9, 30, 1, 15, tzinfo=ZoneInfo("Asia/Kolkata"))})()
+        self.assertEqual(count, 7)
+        client.table.assert_called_once_with("follow_up_history")
+        client.table.return_value.select.return_value.eq.assert_called_once_with(
+            "channel", "LinkedIn connection")
+        client.table.return_value.select.return_value.eq.return_value.gte.assert_called_once_with(
+            "sent_at", "2026-09-30T00:00:00+05:30")
+
+    def test_the_request_only_takes_a_linkedin_profile(self):
+        # Read from the schema source: this CI lane installs no pydantic.
+        source = (ROOT / "app" / "models" / "schemas.py").read_text()
+        block = source.split("class DesktopAgentColdDmRequest", 1)[1].split("\nclass ", 1)[0]
+        pattern = re.search(r'pattern=r"([^"]+)"', block).group(1)
+        self.assertTrue(re.match(pattern, "https://www.linkedin.com/in/priya/"))
+        self.assertTrue(re.match(pattern, "https://in.linkedin.com/in/priya"))
+        for bad in ("https://evil.test/linkedin.com/", "http://www.linkedin.com/in/p",
+                    "https://linkedin.com.evil.test/"):
+            with self.subTest(url=bad):
+                self.assertIsNone(re.match(pattern, bad))
+
+    def test_the_dm_target_matches_the_prompt(self):
+        source = (ROOT / "modules" / "tracker.py").read_text()
+        line = next(l for l in source.splitlines() if l.startswith("DAILY_DM_TARGET"))
+        self.assertEqual(line.split("=", 1)[1].strip(), "10")
+        prompt = profile_data.default_desktop_prompt()
+        self.assertIn("## PHASE 2 — COLD DMs: 10 LINKEDIN CONNECTION NOTES A DAY", prompt)
+
+
+class ColdDmPromptTests(unittest.TestCase):
+    def setUp(self):
+        prompt = profile_data.default_desktop_prompt()
+        self.phase2 = prompt.split("## PHASE 2 — COLD DMs", 1)[1].split("## SAFETY RULES", 1)[0]
+
+    def test_phase_two_sends_without_asking_and_records_each_send(self):
+        for required in ("GET {{cold_dms_url}}", "POST {{cold_dm_record_url}}",
+                         "so **do not ask me before\n   sending**",
+                         "**Only these jobs get a cold DM**",
+                         "never re-send the invitation",
+                         "never guess a person",
+                         "never\n   send an invitation without a note"):
+            with self.subTest(required=required):
+                self.assertIn(required, self.phase2)
+
+    def test_phase_two_stops_when_linkedin_pushes_back(self):
+        self.assertIn("**LinkedIn pushes back**", self.phase2)
+        self.assertIn("Stop sending at once, for the day", self.phase2)
+
+    def test_phase_two_sends_nothing_to_me_until_the_summary(self):
+        self.assertIn("Then give me the summary. Until then, as in Phase 1, send me nothing.",
+                      self.phase2)
