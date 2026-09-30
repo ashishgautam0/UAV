@@ -248,6 +248,55 @@ class OutreachDraftingTests(unittest.TestCase):
         save.assert_not_called()
         complete.assert_not_called()
 
+    def test_the_note_follows_up_on_the_application_in_a_fixed_shape(self):
+        """The old notes opened with praise ("...stood out") and never said the
+        user had applied. The note is the follow-up on an application."""
+        demo = "https://uav-6qe7.vercel.app/api/demo/53891"
+        spec = build_cold_dm_prompt("Docusign", "GenAI Engineer", "LLM gateway work",
+                                    profile_text="Fine-tuned an LLM", demo_url=demo)["prompt"]
+        for required in ('1. "Hi, I recently applied for the GenAI Engineer role at Docusign."',
+                         f'3. "I built a short demo for this role: {demo}."',
+                         '4. "Glad to connect."', "stood out", "caught my eye"):
+            with self.subTest(required=required):
+                self.assertIn(required, spec)
+        self.assertNotIn("earn a connection, not an interview", spec.lower())
+        bare = build_cold_dm_prompt("Acme", "ML Engineer", "JD", profile_text="Python")["prompt"]
+        self.assertIn("No demo exists for this job", bare)
+        self.assertNotIn("/api/demo/", bare.split("Example (for shape only", 1)[0])
+
+    def test_a_note_that_praises_the_company_is_rejected(self):
+        for opener in ("Your real-time voice agents stood out.",
+                       "Docusign's gateway work caught my eye.",
+                       "Impressive platform!"):
+            with self.subTest(opener=opener):
+                self.assertIn("praises the company",
+                              validate_outreach_draft("cold_dm", f"{opener} Glad to connect."))
+        self.assertIsNone(validate_outreach_draft(
+            "cold_dm", "Hi, I recently applied for the ML Engineer role at Acme. Glad to connect."))
+
+    def test_saving_requires_the_application_and_this_jobs_demo(self):
+        save = MagicMock(return_value=True)
+        demo = "https://uav-6qe7.vercel.app/api/demo/7"
+        def command(demo_url):
+            return function(ROOT / "modules/pending_messages.py", "cmd_save", {
+                "sys": sys, "save_job_message": save, "_demo_url_for_job": lambda _: demo_url,
+                "get_job_message": lambda *a, **kw: {"content": "saved"}})
+        good = (f"Hi, I recently applied for the ML Engineer role at Acme. I built RAG systems "
+                f"like the one in the posting. I built a short demo for this role: {demo}. "
+                "Glad to connect.")
+        with patch("sys.stderr", new_callable=io.StringIO), \
+             patch("sys.stdout", new_callable=io.StringIO):
+            self.assertEqual(command(demo)(SimpleNamespace(type="cold_dm", job_id=7,
+                             content=good.replace("I recently applied for", "About"))), 1)
+            self.assertEqual(command(demo)(SimpleNamespace(type="cold_dm", job_id=7,
+                             content=good.replace(f" I built a short demo for this role: {demo}.", ""))), 1)
+            save.assert_not_called()
+            self.assertEqual(command(demo)(SimpleNamespace(type="cold_dm", job_id=7, content=good)), 0)
+            # No demo yet: the note simply has no link.
+            no_demo = good.replace(f" I built a short demo for this role: {demo}.", "")
+            self.assertEqual(command("")(SimpleNamespace(type="cold_dm", job_id=7, content=no_demo)), 0)
+        self.assertEqual(save.call_count, 2)
+
     def test_queue_keeps_valid_note_exactly(self):
         complete = MagicMock(return_value=True)
         queue = function(ROOT / "modules/pending_messages.py", "cmd_fulfil", {
