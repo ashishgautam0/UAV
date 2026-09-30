@@ -68,4 +68,7 @@ def validate_outreach_draft(kind, content, scraped_job_id=None, evidenced_emails
             return "Save one connection note only, without variants, headers or code fences."
         if re.search(r"(?i)(?:resume|cv|pdf).{0,30}attach|attach.{0,30}(?:resume|cv|pdf)", content):
             return "Connection notes cannot attach a resume."
+        if re.search(r"(?i)stood out|caught my eye|impress(?:ed|ive)|exciting work|love what", content):
+            return ("Connection note praises the company; follow up on the application "
+                    "instead, in the draft_spec's four-sentence shape.")
     return None
