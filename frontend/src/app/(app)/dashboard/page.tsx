@@ -222,6 +222,10 @@ export default function DashboardPage() {
   const dailyTarget = stats?.daily_target || DEFAULT_DAILY_TARGET;
   const dailyPct = Math.min(Math.round((todayCount / dailyTarget) * 100), 100);
   const dailyMet = todayCount >= dailyTarget;
+  // A due Cold DM is listed only once its note is ready to review; the rest
+  // are counted, not shown, until the routine writes their note.
+  const readyColdDms = coldDmTodos.filter((todo) => todo.cold_dm_ready && todo.scraped_job_id);
+  const waitingColdDms = coldDmTodos.length - readyColdDms.length;
   const dmCount = stats?.dms_today ?? 0;
   const dmTarget = stats?.dm_target || DEFAULT_DAILY_TARGET;
   const dmPct = Math.min(Math.round((dmCount / dmTarget) * 100), 100);
@@ -418,36 +422,36 @@ export default function DashboardPage() {
         <CardContent>
           {coldDmLoadError ? (
             <p role="alert" className="text-sm text-red-400">Cold DM todos could not be loaded. Retry the dashboard before sending.</p>
-          ) : coldDmTodos.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No Cold DMs due.</p>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {coldDmTodos.map((todo) => (
-                todo.scraped_job_id ? (
-                  <Link
-                    key={todo.id}
-                    href={`/jobs/${todo.scraped_job_id}#cold-dm`}
-                    className="block space-y-3 rounded-lg border border-violet-500/40 bg-violet-500/5 p-4 transition-colors hover:border-primary/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                    aria-label={`Open Cold DM for ${todo.role} at ${todo.company}`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div><p className="font-semibold">{todo.company}</p><p className="text-sm text-muted-foreground">{todo.role}</p></div>
-                      <Badge variant="outline" className="shrink-0 border-violet-500/30 bg-violet-500/10 text-violet-400">
-                        {todo.cold_dm_ready ? "Ready to review" : "Not ready"}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Due {todo.follow_up_date}</p>
-                    {todo.readiness_issue && <p className="text-xs text-amber-400">{todo.readiness_issue}</p>}
-                    <span className="inline-flex items-center text-sm font-medium text-violet-400">Open Cold DM</span>
-                  </Link>
-                ) : (
-                  <div key={todo.id} className="space-y-2 rounded-lg border border-dashed p-4">
-                    <p className="font-semibold">{todo.company}</p>
-                    <p className="text-sm text-muted-foreground">{todo.role} · Due {todo.follow_up_date}</p>
-                    <p className="text-xs text-amber-400">Tracker detail unavailable; no matching scraped job. Do not guess a link or send a note.</p>
-                  </div>
-                )
-              ))}
+            <div className="space-y-3">
+              {readyColdDms.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No Cold DMs ready to review.</p>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {readyColdDms.map((todo) => (
+                    <Link
+                      key={todo.id}
+                      href={`/jobs/${todo.scraped_job_id}#cold-dm`}
+                      className="block space-y-3 rounded-lg border border-violet-500/40 bg-violet-500/5 p-4 transition-colors hover:border-primary/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                      aria-label={`Open Cold DM for ${todo.role} at ${todo.company}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div><p className="font-semibold">{todo.company}</p><p className="text-sm text-muted-foreground">{todo.role}</p></div>
+                        <Badge variant="outline" className="shrink-0 border-violet-500/30 bg-violet-500/10 text-violet-400">
+                          Ready to review
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Due {todo.follow_up_date}</p>
+                      <span className="inline-flex items-center text-sm font-medium text-violet-400">Open Cold DM</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+              {waitingColdDms > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {waitingColdDms} more {waitingColdDms === 1 ? "is" : "are"} due but not ready yet — each appears here once its note is written for your current resume.
+                </p>
+              )}
             </div>
           )}
         </CardContent>

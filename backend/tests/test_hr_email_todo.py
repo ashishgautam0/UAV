@@ -190,6 +190,16 @@ class HrEmailTodoTests(unittest.TestCase):
         self.assertIn("Todo now — email Company HR", detail)
         self.assertIn("--type hr_email", readme)
 
+    def test_dashboard_lists_a_cold_dm_only_once_its_note_is_ready(self):
+        """A due job whose note is not written yet is counted, not listed —
+        there is nothing to review until the routine writes it."""
+        dashboard = (ROOT.parent / "frontend/src/app/(app)/dashboard/page.tsx").read_text()
+        self.assertIn("coldDmTodos.filter((todo) => todo.cold_dm_ready && todo.scraped_job_id)",
+                      dashboard)
+        self.assertIn("readyColdDms.map(", dashboard)
+        self.assertNotIn("coldDmTodos.map(", dashboard)
+        self.assertNotIn('"Not ready"', dashboard)
+
     def test_hr_email_candidates_require_tracker_and_live_demo(self):
         apps = [
             {"url": "https://jobs.test/ready", "status": "Applied"},
