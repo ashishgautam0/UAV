@@ -18,7 +18,8 @@ PAUSED_SOURCES = ("Naukri", "Instahyre", "Cutshort", "Wellfound", "Shine",
                   "Glassdoor", "FirstNaukri", "Unstop", "Apna")
 
 
-def stub_tracker(handled_urls=(), applied_urls=(), scraped_id=None, insert_id=7):
+def stub_tracker(handled_urls=(), applied_urls=(), scraped_id=None, insert_id=7,
+                 applied_today=3):
     """Replace the data layer so router logic is tested without Supabase.
 
     scraped_id is the row the scraper already holds for this posting (None when
@@ -40,14 +41,38 @@ def stub_tracker(handled_urls=(), applied_urls=(), scraped_id=None, insert_id=7)
     module.mark_scraped_job = lambda job_id, action: calls["marked"].append((job_id, action))
     module.get_handled_job_urls = lambda: set(handled_urls)
     module.dedup_window_days = lambda: 14
+    module.count_applications_today = lambda: applied_today
+    module.DAILY_APPLICATION_TARGET = 10
     return module, calls
+
+
+def daily_progress(module):
+    return function(ROOT / "app/routers/desktop_agent.py", "_daily_progress", {
+        "count_applications_today": module.count_applications_today,
+        "DAILY_APPLICATION_TARGET": module.DAILY_APPLICATION_TARGET,
+    })
 
 
 class SeenUrlsTests(unittest.TestCase):
     def endpoint(self, module):
         return function(ROOT / "app/routers/desktop_agent.py", "seen_urls", {
             "get_handled_job_urls": module.get_handled_job_urls,
+            "_daily_progress": daily_progress(module),
         })
+
+    def test_the_skip_list_reports_todays_count_against_the_target(self):
+        """STEP 0 needs today's total so a second run the same day knows how
+        many are left, or that the target is already met."""
+        module, _ = stub_tracker(applied_today=4)
+        result = self.endpoint(module)()
+        self.assertEqual((result["applied_today"], result["daily_target"]), (4, 10))
+
+    def test_a_counting_failure_reports_unknown_instead_of_failing(self):
+        module, _ = stub_tracker()
+        def boom():
+            raise RuntimeError("database unavailable")
+        module.count_applications_today = boom
+        self.assertIsNone(self.endpoint(module)()["applied_today"])
 
     def test_returns_only_jobs_already_acted_on(self):
         module, _ = stub_tracker({"https://a/1", "https://b/2"})
@@ -162,6 +187,7 @@ class RecordJobTests(unittest.TestCase):
             "find_scraped_job_by_url": module.find_scraped_job_by_url,
             "mark_scraped_job": module.mark_scraped_job,
             "DesktopAgentJobRequest": SimpleNamespace,
+            "_daily_progress": daily_progress(module),
         })
 
     def job(self, **overrides):
@@ -198,8 +224,11 @@ class RecordJobTests(unittest.TestCase):
     def test_applied_job_reaches_both_the_job_list_and_the_tracker(self):
         module, calls = stub_tracker(scraped_id=None, insert_id=7)
         result = self.endpoint(module)(self.job())
+        # applied_today is the tracker's count after this insert; the agent
+        # stops once it reaches daily_target.
         self.assertEqual(result, {"saved": True, "applied": True,
-                                  "dismissed": False, "duplicate": False})
+                                  "dismissed": False, "duplicate": False,
+                                  "applied_today": 3, "daily_target": 10})
         self.assertEqual(len(calls["scraped"]), 1)
         self.assertEqual(calls["scraped"][0]["source"], "LinkedIn")
         self.assertEqual(len(calls["applied"]), 1)
@@ -412,10 +441,10 @@ class DesktopPromptTests(unittest.TestCase):
                          "STEP 2 — RECORD EVERY JOB THROUGH THE API",
                          "RULES THAT APPLY TO EVERY PORTAL",
                          "KEEP GOING UNTIL I SAY STOP",
-                         "There is no application cap and no time limit"):
+                         "### DAILY TARGET — 10 APPLICATIONS A DAY, THEN STOP"):
             self.assertIn(required, self.prompt)
-        # The run is open-ended now: nothing may reintroduce a per-portal or
-        # per-session ceiling that quietly ends it early.
+        # The one limit is the user's daily target. Nothing may reintroduce a
+        # per-portal or per-session ceiling that quietly ends a run early.
         for banned in ("Maximum 2 hours", "Maximum 10 applications per portal",
                        "stop after 10 applications", "SESSION LIMITS",
                        "10-application cap"):
@@ -829,6 +858,43 @@ class DesktopPromptTests(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, floor)
 
+    def test_the_run_stops_at_the_daily_target(self):
+        """10 applications a day across LinkedIn and Indeed, counted by the
+        tracker so earlier runs that day count, then stop."""
+        keep_going = self.prompt.split("## KEEP GOING UNTIL I SAY STOP", 1)[1] \
+                                .split("## SAFETY RULES", 1)[0]
+        for required in ("**My target is 10 applications a day, across LinkedIn and Indeed together.**",
+                         "do not\nstart another application once it does",
+                         "**Only a confirmed submission counts**",
+                         "**Use the tracker's number, not your own tally.**",
+                         "1. Today's target of 10 applications is met.",
+                         "after midnight\n  IST"):
+            with self.subTest(required=required):
+                self.assertIn(required, keep_going)
+        step0 = self.prompt.split("STEP 0 — LOAD THE SKIP LIST", 1)[1].split("## WHAT TO SEARCH", 1)[0]
+        self.assertIn('"applied_today": A, "daily_target": 10', step0)
+        self.assertIn("**If it is already 10 or more, today's target is met", step0)
+        self.assertNotIn("There is no application cap", self.prompt)
+
+    def test_the_prompt_target_matches_the_backend_constant(self):
+        source = (ROOT / "modules" / "tracker.py").read_text()
+        line = next(l for l in source.splitlines() if l.startswith("DAILY_APPLICATION_TARGET"))
+        self.assertEqual(line.split("=", 1)[1].strip(), "10")
+        self.assertIn("DAILY TARGET — 10 APPLICATIONS A DAY", self.prompt)
+
+    def test_todays_applications_are_counted_in_the_users_timezone(self):
+        from datetime import datetime
+        from unittest.mock import MagicMock
+        client = MagicMock()
+        query = client.table.return_value.select.return_value.eq.return_value
+        query.execute.return_value = SimpleNamespace(count=6, data=[])
+        count = function(ROOT / "modules" / "tracker.py", "count_applications_today", {
+            "_get_client": lambda: client,
+            "_user_now": lambda: datetime(2026, 9, 30, 23, 30)})()
+        self.assertEqual(count, 6)
+        client.table.return_value.select.return_value.eq.assert_called_once_with(
+            "date_applied", "2026-09-30")
+
     def test_prompt_never_asks_for_a_progress_update(self):
         """Every message the agent writes ends its turn, so "give me a short
         progress update after each portal" was an instruction to stop after
@@ -841,7 +907,7 @@ class DesktopPromptTests(unittest.TestCase):
         keep_going = self.prompt.split("## KEEP GOING UNTIL I SAY STOP", 1)[1] \
                                 .split("## SAFETY RULES", 1)[0]
         self.assertIn("**Do not send me progress updates.**", keep_going)
-        self.assertIn("**Your turn ends for three reasons only:**", keep_going)
+        self.assertIn("**Your turn ends for four reasons only:**", keep_going)
         self.assertIn("**Send me nothing until then**", self.prompt)
         # Two more mid-run "tell me" lines hid in the portal and API sections.
         self.assertNotIn("stop this portal, tell me, and move to Naukri", self.prompt)

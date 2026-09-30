@@ -10,7 +10,9 @@ from fastapi import APIRouter
 
 from ..models.schemas import DesktopAgentJobRequest
 from tracker import (
+    DAILY_APPLICATION_TARGET,
     add_application,
+    count_applications_today,
     find_application_by_url,
     find_scraped_job_by_url,
     get_handled_job_urls,
@@ -19,6 +21,21 @@ from tracker import (
 )
 
 router = APIRouter()
+
+
+def _daily_progress():
+    """Today's applications against the target, so the agent knows when to stop.
+
+    Counted from the tracker rather than by the agent, so earlier runs the same
+    day are included. A counting failure must not fail the call — the
+    application is already recorded — so the count is reported as unknown.
+    """
+    try:
+        applied_today = count_applications_today()
+    except Exception as exc:
+        print(f"[desktop-agent] could not count today's applications: {exc}")
+        applied_today = None
+    return {"applied_today": applied_today, "daily_target": DAILY_APPLICATION_TARGET}
 
 
 @router.get("/seen-urls", name="desktop_agent_seen_urls")
@@ -30,7 +47,7 @@ def seen_urls():
     to, so applying to them is still the agent's job.
     """
     urls = get_handled_job_urls()
-    return {"urls": sorted(urls), "count": len(urls)}
+    return {"urls": sorted(urls), "count": len(urls), **_daily_progress()}
 
 
 @router.post("/jobs", name="desktop_agent_record_job")
@@ -76,4 +93,5 @@ def record_job(body: DesktopAgentJobRequest):
     )
     if scraped:
         mark_scraped_job(scraped["id"], "applied")
-    return {"saved": True, "applied": True, "dismissed": False, "duplicate": False}
+    return {"saved": True, "applied": True, "dismissed": False, "duplicate": False,
+            **_daily_progress()}

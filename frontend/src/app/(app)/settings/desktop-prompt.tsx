@@ -95,7 +95,7 @@ export function DesktopPrompt() {
         }}>Copy starter message</Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Log into LinkedIn and Indeed in your browser before starting. Generate resolves the live tracker API and resume links. No application cap and no time limit — it keeps applying until you tell it to stop. Placeholders: {"{{seen_urls_url}}"}, {"{{record_url}}"}, {"{{resume_url}}"}, {"{{resume_filename}}"}, {"{{resume_sha256}}"}.
+        Log into LinkedIn and Indeed in your browser before starting. Generate resolves the live tracker API and resume links. It applies until today's target of 10 applications across LinkedIn and Indeed is met — counting any earlier runs that day — then stops. Placeholders: {"{{seen_urls_url}}"}, {"{{record_url}}"}, {"{{resume_url}}"}, {"{{resume_filename}}"}, {"{{resume_sha256}}"}.
       </p>
       <p className="text-xs text-muted-foreground">
         This prompt ships with the app and is not editable here, so improvements reach the agent on the next Generate. The answers it fills into forms — notice period, compensation, location, education — live in the prompt text itself.
