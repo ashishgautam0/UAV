@@ -57,9 +57,13 @@ class HrEmailTodoTests(unittest.TestCase):
             def __init__(self, rows):
                 self.rows = rows
                 self.null_filter = None
+                self.date_filter = None
             def select(self, *_): return self
             def is_(self, column, value):
                 self.null_filter = (column, value)
+                return self
+            def lte(self, column, value):
+                self.date_filter = (column, value)
                 return self
             def order(self, *_args, **_kwargs): return self
             def in_(self, *_): return self
@@ -87,6 +91,9 @@ class HrEmailTodoTests(unittest.TestCase):
                 "_get_client": DB,
                 "TERMINAL_STATUSES": ["Offer", "Rejected", "Ghosted", "Not Interested"],
                 "pd": fake_pd,
+                "_user_now": lambda: datetime.fromisoformat("2026-09-30T10:00:00+05:30"),
+                "timedelta": timedelta,
+                "APPLICATION_CADENCE": [7, 15],
             },
         )
         original = sys.modules.get("analytics")
@@ -104,6 +111,9 @@ class HrEmailTodoTests(unittest.TestCase):
             else:
                 sys.modules["analytics"] = original
         self.assertEqual(app_query.null_filter, ("hr_email_sent_at", "null"))
+        # Day 8 is the first outreach day, so only applications sent on or
+        # before today minus the cadence's first gap are asked for.
+        self.assertEqual(app_query.date_filter, ("date_applied", "2026-09-23"))
 
     def test_the_cadence_is_day_8_outreach_then_one_day_16_follow_up(self):
         """Day 1 tracked, day 8 HR email + connection note, day 16 the single

@@ -377,11 +377,19 @@ def get_cold_dm_prompt_jobs(resume_version=None, limit=100):
 
 
 def get_hr_email_todos():
-    """Active applications whose one-time HR email has not been sent yet."""
+    """Active applications whose one-time HR email is due and not yet sent.
+
+    Due on day 8, the cadence's first outreach day, alongside the cold DM —
+    not the moment the job lands in the tracker. Measured from date_applied
+    rather than follow_up_date, because recording the cold DM pushes
+    follow_up_date on to the next round and would hide a still-unsent email.
+    """
     db = _get_client()
+    due_by = (_user_now().date() - timedelta(days=APPLICATION_CADENCE[0])).isoformat()
     resp = (db.table("applications")
             .select("*")
             .is_("hr_email_sent_at", "null")
+            .lte("date_applied", due_by)
             .order("created_at", desc=False)
             .execute())
     rows = [row for row in (resp.data or [])

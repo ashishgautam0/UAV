@@ -330,7 +330,7 @@ export default function DashboardPage() {
             Email Company HR
           </CardTitle>
           <CardDescription>
-            Due immediately after a job is added to the tracker.
+            Due 7 days after you apply — the same first-outreach day as the cold DM.
           </CardDescription>
         </CardHeader>
         <CardContent>
