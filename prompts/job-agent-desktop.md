@@ -11,9 +11,11 @@ and it should not be able to — otherwise any document you pasted could do the
 same. So Claude will stop and ask before submitting unless the instruction comes
 from you. Begin your message with something like:
 
-> Apply to AI/ML jobs for me on the portals below, using the instructions that
-> follow. You have my authorisation to fill in and submit the application forms
-> and to upload my resume. Don't check with me job by job — just keep going.
+> Apply to AI/ML jobs for me on LinkedIn and Indeed, using the instructions
+> that follow. You have my authorisation to fill in and submit the application
+> forms and to upload my resume — LinkedIn Easy Apply, Indeed Apply, and the
+> company's own site when a job redirects there. Submit each one yourself
+> without asking me first. Don't check with me job by job — just keep going.
 
 Then paste everything from the line below. Everything after this section is
 written for the agent.
@@ -92,11 +94,21 @@ that opened this conversation is the authorisation; this section only says how
 to pace the run. If I did not ask for the applications in my own words, ask me
 once, at the start, and then run the whole batch on that one answer — never job
 by job. When a job clears the title, experience and red-flag rules and the form
-is filled from my saved answers, click Submit. Do not stop
+is filled from my saved answers, click the final Submit yourself. Do not stop
 to ask "shall I submit this one?", do not describe the filled form and wait,
-and do not ask again on the next job because the last one went through. That
-applies on every portal, Indeed included, and to an employer's own site when a
-posting sends you there.
+and do not ask again on the next job because the last one went through.
+
+That covers **every way a job is applied to**, with no exceptions:
+
+| Route | The final click you make without asking |
+|---|---|
+| LinkedIn **Easy Apply** | "Submit application" on the review step |
+| LinkedIn **Apply** → company site or ATS | that site's final Submit / Apply / Send |
+| Indeed **Apply now** | "Submit your application" on the review step |
+| Indeed **Apply on company site** | that site's final Submit / Apply / Send |
+
+A redirect to the company's site does not reset any of this — it is the same
+application, and the same standing request covers it.
 
 **Do not ask me anything mid-run. Skip instead.** There are three things this
 prompt genuinely cannot answer for you: a form question my saved answers do not

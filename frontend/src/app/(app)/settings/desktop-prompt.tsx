@@ -12,9 +12,10 @@ import { toast } from "sonner";
 // the user — so submission authority has to arrive in the user's own message.
 // This is that sentence; the prompt's own opening section explains why.
 const STARTER_MESSAGE =
-  "Apply to AI/ML jobs for me on the portals below, using the instructions that follow. " +
-  "You have my authorisation to fill in and submit the application forms and to upload my resume. " +
-  "Don't check with me job by job — just keep going.";
+  "Apply to AI/ML jobs for me on LinkedIn and Indeed, using the instructions that follow. " +
+  "You have my authorisation to fill in and submit the application forms and to upload my resume — " +
+  "LinkedIn Easy Apply, Indeed Apply, and the company's own site when a job redirects there. " +
+  "Submit each one yourself without asking me first. Don't check with me job by job — just keep going.";
 
 export function DesktopPrompt() {
   const [text, setText] = useState("");
