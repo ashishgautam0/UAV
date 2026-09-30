@@ -8,7 +8,8 @@ from unittest.mock import MagicMock, patch
 from test_settings_profile import ROOT, function
 from email_finder import extract_published_emails
 from outreach_quality import draft_recipient, unsourced_recipient
-from message_generator import build_cold_dm_prompt, build_hr_email_prompt
+from message_generator import (build_cold_dm_prompt, build_follow_up_prompt,
+                               build_hr_email_prompt)
 from outreach_quality import UNKNOWN_RECIPIENT
 from outreach_quality import validate_outreach_draft, wrong_demo_links
 
@@ -110,9 +111,63 @@ class OutreachDraftingTests(unittest.TestCase):
         self.assertIn("Coursework: Python", cold["prompt"])
         self.assertNotIn("VARIANT 1", cold["prompt"])
         email = build_hr_email_prompt("Acme", "ML Engineer", "Python needed", "https://demo/1", "Coursework: Python")
-        for text in ("70–110", "https://demo/1", "unknown — recipient verification required",
-                     "Coursework: Python", "never turn coursework", "Do not send email"):
+        for text in ("Body 60–90 words", "https://demo/1", "unknown — recipient verification required",
+                     "Coursework: Python", "Turn coursework", "Do not send email"):
             self.assertIn(text, email["prompt"])
+
+    def test_the_hr_email_is_short_and_drops_the_filler_opener(self):
+        """The stored drafts opened "I'm writing to express interest" and ran
+        60-word sentences. Short, plain and professional instead."""
+        email = build_hr_email_prompt("Acme", "ML Engineer", "JD", "https://demo/1",
+                                      "Fine-tuned an STT model")["prompt"]
+        for required in ("Body 60–90 words, never more than 110",
+                         'Open with "I\'m writing to express interest"',
+                         "Write a sentence longer than about 25 words",
+                         '"My resume is attached."',
+                         "Subject: ML Engineer — <verified sender name>"):
+            with self.subTest(required=required):
+                self.assertIn(required, email)
+
+    def test_a_shared_mailbox_never_gets_a_first_name(self):
+        """Greeting one person by name on an email to a team inbox reads as a
+        mail-merge slip; every cached contact name sits on a shared address."""
+        for prompt in (build_hr_email_prompt("Acme", "ML Engineer", "JD", "https://demo/1", "P")["prompt"],
+                       build_follow_up_prompt("Acme", "ML Engineer", 7, profile_text="P")["prompt"]):
+            with self.subTest(prompt=prompt[:40]):
+                self.assertIn('write "Hello," on its own line', prompt)
+                self.assertIn("role or shared mailbox (hr@, careers@, jobs@, info@", prompt)
+                self.assertIn("never when the recipient is unknown", prompt)
+
+    def test_the_follow_up_is_an_email_carrying_the_demo_and_resume(self):
+        """Follow-ups are delivered by Gmail, but were formatted by the job's
+        original platform — LinkedIn for nearly all of them — producing a
+        300-character blob with no greeting and no room for demo or resume."""
+        spec = build_follow_up_prompt("Acme", "ML Engineer", 7, original_platform="LinkedIn",
+                                      profile_text="Fine-tuned an STT model",
+                                      demo_url="https://demo/1",
+                                      recipient_email="hr@acme.test")
+        self.assertIsNone(spec["char_limit"])
+        prompt = spec["prompt"]
+        for required in ("Subject: Re: ML Engineer — <verified sender name>",
+                         "RECIPIENT (already evidenced): hr@acme.test",
+                         "Exact live demo URL for this job: https://demo/1",
+                         '"My resume is attached again."',
+                         "Body 50–80 words"):
+            with self.subTest(required=required):
+                self.assertIn(required, prompt)
+        # The LinkedIn-DM shape it used to emit is gone.
+        for banned in ("no greeting, no sign-off", "Max 300 characters", "No greetings like"):
+            with self.subTest(banned=banned):
+                self.assertNotIn(banned, prompt)
+        # "just following up" survives only as a banned-pattern rule for the writer.
+        self.assertIn('- "just following up", "circling back"', prompt)
+
+    def test_a_follow_up_without_a_recipient_or_demo_invents_neither(self):
+        prompt = build_follow_up_prompt("Acme", "ML Engineer", 7, profile_text="P")["prompt"]
+        self.assertIn("RECIPIENT: none on record", prompt)
+        self.assertIn("No demo exists for this job", prompt)
+        self.assertNotIn("https://", prompt.split("Greeting:", 1)[0].replace(
+            "r.neelam@company.com", ""))
 
     def test_an_address_the_posting_publishes_is_offered_as_evidence(self):
         """81% of stored drafts had no recipient because the only route was an

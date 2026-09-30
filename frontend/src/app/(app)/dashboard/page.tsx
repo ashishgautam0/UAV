@@ -226,6 +226,10 @@ export default function DashboardPage() {
   // are counted, not shown, until the routine writes their note.
   const readyColdDms = coldDmTodos.filter((todo) => todo.cold_dm_ready && todo.scraped_job_id);
   const waitingColdDms = coldDmTodos.length - readyColdDms.length;
+  // A follow-up is sendable only with both halves: the written draft and an
+  // address to send it to. The rest are counted, not shown.
+  const readyFollowUps = followUps.filter((fu) => fu.draft_ready && fu.recipient);
+  const waitingFollowUps = followUps.length - readyFollowUps.length;
   const dmCount = stats?.dms_today ?? 0;
   const dmTarget = stats?.dm_target || DEFAULT_DAILY_TARGET;
   const dmPct = Math.min(Math.round((dmCount / dmTarget) * 100), 100);
@@ -466,6 +470,7 @@ export default function DashboardPage() {
           </CardTitle>
           <CardDescription>
             Due seven days after a recorded LinkedIn connection note; opens the same Tracker job.
+            Listed once the draft is written and a recipient is on record.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -473,9 +478,15 @@ export default function DashboardPage() {
             <p className="text-muted-foreground text-sm">
               No follow-ups due. You&apos;re all caught up!
             </p>
+          ) : readyFollowUps.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No follow-ups ready to send. {waitingFollowUps}{" "}
+              {waitingFollowUps === 1 ? "is" : "are"} due but still waiting on a written
+              draft or a verified recipient.
+            </p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {followUps.map((fu) => {
+              {readyFollowUps.map((fu) => {
                 const today = indiaToday();
                 const isOverdue = fu.follow_up_date < today;
                 const isDueToday = fu.follow_up_date === today;
@@ -577,6 +588,12 @@ export default function DashboardPage() {
                 );
               })}
             </div>
+          )}
+          {readyFollowUps.length > 0 && waitingFollowUps > 0 && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              {waitingFollowUps} more {waitingFollowUps === 1 ? "is" : "are"} due but not
+              ready — each appears here once its draft is written and a recipient is on record.
+            </p>
           )}
         </CardContent>
       </Card>

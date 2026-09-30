@@ -493,6 +493,9 @@ def cmd_followups(args):
         company = app.get("company", "")
         demo = _demo_url_for_scraped_job_by_app_url(app.get("url", ""))
         intel = _company_intel_text(company)
+        # The follow-up goes out by Gmail, so it needs an address the research
+        # cache already evidenced; without one the draft keeps the unknown marker.
+        recipient = _cached_hiring_email(company)
 
         row = create_message_request("follow-up", {
             "company_name": company,
@@ -503,6 +506,7 @@ def cmd_followups(args):
             "previous_messages": [m for m in previous if m],
             "demo_url": demo,
             "company_intel": intel,
+            "recipient_email": recipient,
             "_application_id": app["id"],
         })
         if row:
