@@ -118,6 +118,9 @@ class HrEmailTodoTests(unittest.TestCase):
         moment = datetime.fromisoformat("2026-09-29T10:00:00+05:30")
         db = MagicMock()
         add_with_db = function(ROOT / "modules/tracker.py", "add_application", {
+            # Adding the company to the exclusion list is covered in
+            # test_desktop_agent; here only the cadence dates matter.
+            "_exclude_applied_company": lambda company: None,
             "_get_client": lambda: db, "_user_now": lambda: moment,
             "APPLICATION_CADENCE": [7, 15], "timedelta": timedelta,
         })

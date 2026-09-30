@@ -75,6 +75,55 @@ def add_application(company, role, job_type, platform, url="",
         "salary_range": salary,
         "notes": notes,
     }).execute()
+    _exclude_applied_company(company)
+
+
+# Company values that stand for "no company", left by older imports, which
+# must never become an exclusion the agent then matches against.
+_PLACEHOLDER_COMPANIES = {"", "nan", "none", "null", "unknown", "n a", "na"}
+
+
+def _is_real_company(name):
+    from intake_policy import normalize_employer
+    return normalize_employer(name) not in _PLACEHOLDER_COMPANIES
+
+
+def _exclude_applied_company(company):
+    """Add a company that reached the tracker to the Settings exclusion list.
+
+    The desktop prompt carries that list, so the agent never applies to the
+    same company twice. Best effort: the application is already recorded, and
+    failing to extend the list must not undo it. The read-modify-write is not
+    atomic, which is fine for one agent recording applications in sequence.
+    """
+    name = (company or "").strip()
+    try:
+        if not _is_real_company(name):
+            return
+        from intake_policy import normalize_employer
+        from profile import get_company_exclusions, save_company_exclusions
+
+        current = get_company_exclusions()
+        if normalize_employer(name) in {normalize_employer(c) for c in current}:
+            return
+        save_company_exclusions(companies=[*current, name])
+    except Exception as exc:
+        print(f"[tracker] could not add {name!r} to the company exclusions: {exc}")
+
+
+def exclude_all_tracked_companies():
+    """Add every company already in the tracker to the exclusion list.
+
+    New applications are added as they are recorded; this covers the ones
+    recorded before that. Returns how many companies were added.
+    """
+    from profile import get_company_exclusions, save_company_exclusions
+
+    rows = (_get_client().table("applications").select("company")
+            .execute()).data or []
+    tracked = [row["company"] for row in rows if _is_real_company(row.get("company"))]
+    before = get_company_exclusions()
+    return len(save_company_exclusions(companies=[*before, *tracked])) - len(before)
 
 
 def update_status(app_id, new_status):
