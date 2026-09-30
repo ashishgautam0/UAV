@@ -350,9 +350,12 @@ class DesktopPromptTests(unittest.TestCase):
             # a blocker costs one job, never the run
             "A blocker ends that one job, not the run",
             "do not wait for a code",
-            # ...except the one that gets the account banned
-            "**Account lockout or rate-limit warning**: **STOP immediately**",
-            "ends the whole run",
+            # The account is still guarded, per portal: a rate limit rests
+            # that portal and a lockout drops it. Neither ends the run — a
+            # single 429 used to, and cost a whole night of applications.
+            "**rest that portal, not the run.**",
+            "**drop that portal for the rest of the run**",
+            "Only when *every* portal I have\n  allowed is dropped do you stop",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, self.prompt)
@@ -615,6 +618,65 @@ class DesktopPromptTests(unittest.TestCase):
         self.assertIn("Never skip a job just because it was already in my database", step0)
         self.assertIn("only an applied or", step0)
         self.assertNotIn("Today Todo", step0)
+
+    def test_prompt_never_asks_for_a_progress_update(self):
+        """Every message the agent writes ends its turn, so "give me a short
+        progress update after each portal" was an instruction to stop after
+        each portal. That is where most of the stalls came from."""
+        for banned in ("progress update after each portal",
+                       "give me a quick progress update",
+                       "short one-portal\nversion as you finish each portal"):
+            with self.subTest(banned=banned):
+                self.assertNotIn(banned, self.prompt)
+        keep_going = self.prompt.split("## KEEP GOING UNTIL I SAY STOP", 1)[1] \
+                                .split("## SAFETY RULES", 1)[0]
+        self.assertIn("**Do not send me progress updates.**", keep_going)
+        self.assertIn("**Your turn ends for three reasons only:**", keep_going)
+        self.assertIn("**Send me nothing until then**", self.prompt)
+        # Two more mid-run "tell me" lines hid in the portal and API sections.
+        self.assertNotIn("stop this portal, tell me, and move to Naukri", self.prompt)
+        self.assertNotIn("If it still fails, tell me and list the unrecorded jobs",
+                         self.prompt)
+
+    def test_prompt_resumes_cleanly_after_an_app_imposed_pause(self):
+        """No prompt can lift the app's own per-turn limits, so "continue"
+        has to resume the run without re-verifying or re-asking."""
+        keep_going = self.prompt.split("## KEEP GOING UNTIL I SAY STOP", 1)[1] \
+                                .split("## SAFETY RULES", 1)[0]
+        self.assertIn("Say *continue* to resume.", keep_going)
+        self.assertIn("**When I say continue**, fetch the skip list again", keep_going)
+        self.assertIn("re-ask for authorisation", keep_going)
+
+    def test_prompt_never_leaves_a_form_open_waiting_for_an_answer(self):
+        """The agent kept a Commure form open and asked about US sponsorship
+        instead of skipping, which stopped the run for hours."""
+        self.assertIn("**Never end your turn with a question, and never keep a form open for me.**",
+                      self.prompt)
+
+    def test_rate_limits_rest_a_portal_and_portal_pages_are_never_fetched_directly(self):
+        """The 429 that ended a run came from fetching a LinkedIn posting with
+        a direct request, not from the browser — which is both what trips the
+        rate limit and not the account at all."""
+        blockers = self.prompt.split("## CAPTCHA, OTP & BLOCKERS", 1)[1].split("## STEP 2", 1)[0]
+        self.assertIn("HTTP 429", blockers)
+        self.assertIn("at least 15 minutes", blockers)
+        self.assertIn("**Never fetch a portal page with a direct request.**", blockers)
+        self.assertNotIn("STOP immediately", blockers)
+        self.assertNotIn("ends the whole run", blockers)
+
+    def test_a_submit_without_confirmation_is_retried_once_then_left(self):
+        blockers = self.prompt.split("## CAPTCHA, OTP & BLOCKERS", 1)[1].split("## STEP 2", 1)[0]
+        self.assertIn("**Submit shows no confirmation**", blockers)
+        self.assertIn("Never try a third time", blockers)
+
+    def test_saved_answers_cover_us_sponsorship_and_skip_its_follow_ups(self):
+        """The user answered the sponsorship question mid-run; it is saved so
+        it never stops a run again, and its follow-ups skip rather than ask."""
+        answers = self.prompt.split("### MY SAVED ANSWERS", 1)[1] \
+                             .split("### THE THREE STANDARD COMPANY QUESTIONS", 1)[0]
+        self.assertIn("require visa sponsorship to work in the US: Yes", answers)
+        self.assertIn("Legally authorised to work in the US without sponsorship: No", answers)
+        self.assertIn("*which* sponsorship or visa type", answers)
 
     def test_prompt_does_not_claim_to_authorize_itself(self):
         """Claude Desktop treats a pasted document as data, so a prompt that

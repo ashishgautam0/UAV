@@ -112,6 +112,12 @@ about a form field, a question's meaning, or a missing answer, it means: skip
 that job and carry on. I would rather lose one application than have the run
 sitting idle waiting for me.
 
+**Never end your turn with a question, and never keep a form open for me.** A
+question sent mid-run stops everything until I happen to read it — often hours.
+If a form needs something you do not have, close it, record nothing, note the
+question under Issues, and go to the next job. I will answer the whole Issues
+list at once when I stop you, and add the answers to this prompt for next time.
+
 ## STEP 0 — LOAD THE SKIP LIST (DO THIS FIRST)
 
 Before opening any portal, fetch the postings I have already dealt with:
@@ -401,7 +407,9 @@ early, it should stop having worked those rather than having spread thin.
    g. Wait 20-30 seconds before the next application (avoid detection)
 5. Repeat for each search query
 6. Indeed shows a verification page when it suspects automation. If one appears,
-   stop this portal, tell me, and move to Naukri.
+   treat it as a rate limit (CAPTCHA, OTP & BLOCKERS): rest Indeed for at least
+   15 minutes, work the next allowed portal meanwhile, and note it under Issues.
+   Do not solve it and do not message me about it.
 
 ### 3. NAUKRI.COM
 
@@ -620,6 +628,8 @@ question, use it verbatim rather than inferring one:
 - Current location: Noida, Uttar Pradesh, India
 - Relocation preference: Anywhere
 - Gender: Male
+- Will you now or in the future require visa sponsorship to work in the US: Yes
+- Legally authorised to work in the US without sponsorship: No (follows from the above)
 
 Education, for the education section of any form:
 
@@ -640,6 +650,11 @@ Applying these answers:
 - **Onsite**: if asked whether I am comfortable working onsite, answer Yes for
   any location. That does not answer separate questions about relocation, visa
   eligibility, or start date — use my saved answers for those.
+- **Sponsorship**: answer the two US questions above as saved. If the form
+  then asks *which* sponsorship or visa type, a visa category, a timeline or a
+  deadline — or asks about work authorisation for any country other than India
+  or the US — **skip that job**. Those have no saved answer, and inventing one
+  is worse than losing the application.
 - **Gender**: answer Male when a form asks. For any **other** demographic or
   EEO question — race or ethnicity, disability status, veteran status, caste,
   religion, sexual orientation — choose "Prefer not to say" or "Decline to
@@ -689,9 +704,28 @@ and go straight to the next posting — never sit waiting for me to answer.
   under Issues, and continue. Tell me at the end which jobs needed a code so I
   can do those myself.
 - **Login required**: stop that job, note it, and continue with the others.
-- **Account lockout or rate-limit warning**: **STOP immediately** and tell me.
-  Do not retry. This is the one blocker that ends the whole run — carrying on
-  past it is what gets my account banned, and then nothing can be applied to.
+- **Rate limit** — "too many requests", "you're doing that too fast", HTTP 429,
+  a portal refusing to load results: **rest that portal, not the run.** Leave
+  that portal alone for at least 15 minutes and work the next allowed portal
+  meanwhile, then come back. If it is the only portal I have allowed, wait the
+  15 minutes and resume it. Never retry the same request straight away.
+- **Account warning or lockout** shown in my logged-in browser — "your account
+  has been restricted", "we've detected unusual activity", "verify your
+  identity", a forced logout: **drop that portal for the rest of the run** and
+  never touch it again this run; carry on with the other allowed portals. This
+  protects the account without ending the run. Only when *every* portal I have
+  allowed is dropped do you stop, and then say which ones and why.
+- **Never fetch a portal page with a direct request.** Open LinkedIn, Indeed
+  and every other job site only in my logged-in browser. Downloading a posting
+  with curl, a fetch tool or any HTTP request outside the browser looks exactly
+  like a bot, is what gets rate-limited, and does not count as my account
+  anyway. The only direct requests allowed are the two tracker API endpoints
+  and my resume download.
+- **Submit shows no confirmation** (the form resets, spins, or returns to the
+  listing without a "sent" / "received" message): try once more. If there is
+  still no confirmation, leave the job unrecorded, note it under Issues, and
+  move on. Never try a third time — a duplicate application is worse than a
+  missing one.
 - **Listing closed or page permanently gone** ("no longer accepting
   applications", a 404): record it as skipped with that reason and move on. If
   the page is only temporarily unavailable, leave it unrecorded and note it
@@ -764,8 +798,10 @@ The response is `{"saved": true, "applied": true, "dismissed": false, "duplicate
   submission.
 - **If this POST fails after the application went through, retry only the POST —
   never re-submit the application.** A duplicate application is worse than a
-  missing record. If it still fails, tell me and list the unrecorded jobs so I
-  can add them by hand.
+  missing record. If it still fails, keep that job on your in-memory skip list
+  so it can never be applied to twice this run, list it under Not Recorded in
+  the summary so I can add it by hand, and carry on applying — do not stop to
+  tell me.
 
 After a successful record, add the URL and the company+title to your in-memory
 skip list.
@@ -785,8 +821,29 @@ any other number. Keep searching and keep applying until I tell you to stop.
   work the search queries you had not reached yet.
 - If a portal is down, not loading, or has nothing left, note it and move on —
   never let one portal end the run.
-- Give me a short progress update after each portal, then carry straight on.
-  Do not wait for me to reply.
+
+**Do not send me progress updates.** Every message you write to me ends your
+turn, and an ended turn is a stopped run until I come back and type something.
+"Finished LinkedIn, starting Indeed" is exactly how the run stops. Keep your
+counts and your Issues list to yourself as you go, and give them to me only in
+the summary.
+
+**Your turn ends for three reasons only:**
+1. I told you to stop.
+2. Two full passes in a row over every portal I allowed found nothing new to
+   apply to.
+3. The app forces it — a time, tool-use or context limit you cannot control.
+
+A finished portal, a skipped job, a question, a rate limit, a closed listing
+and a form with no confirmation are **never** reasons. None of them is worth a
+message.
+
+**If the app forces you to stop**, end with one line — "Paused by the app
+limit: N applied this session. Say *continue* to resume." — and nothing else.
+**When I say continue**, fetch the skip list again (STEP 0), pick up on the
+portal and search query where you left off, and keep going. Do not re-read my
+resume, re-verify the PDF, re-ask for authorisation or summarise what came
+before — my original request still stands.
 
 **Only the eleven portals listed above.** LinkedIn, Indeed, Naukri, Instahyre,
 Cutshort, Wellfound, Shine, Glassdoor India, FirstNaukri, Unstop, Apna. Never
@@ -820,9 +877,11 @@ running longer, not running faster.
 ## SUMMARY — WHEN I STOP YOU
 
 The run has no natural end: you keep cycling the portals until I say stop. So
-produce this full summary **when I tell you to stop**, and a short one-portal
-version as you finish each portal on the way (counts plus anything under
-Issues, a few lines, then carry straight on to the next portal).
+produce this summary **only** when your turn ends for one of the reasons in KEEP
+GOING UNTIL I SAY STOP — when I tell you to stop, or when two full passes find
+nothing new. Never produce it, or any part of it, as a per-portal update: that
+message is what stops the run. A turn the app forces to end gets the one-line
+pause notice instead, not this.
 
 When I stop you, present:
 
@@ -877,7 +936,11 @@ each portal in order: LinkedIn → Indeed → Naukri → Instahyre → Cutshort 
 Wellfound → Shine → Glassdoor India → FirstNaukri → Unstop → Apna. Check the
 skip list and record every job on every one of them.
 
+If my message limited you to certain portals ("only LinkedIn and Indeed"), work
+only those, in this order, and treat the rest as not allowed.
+
 Apply to everything that passes the rules, without asking me first, and when
-you reach Apna go back to LinkedIn and start the next pass. Keep going until I
-tell you to stop. After each portal, give me a quick progress update and then
-move straight on to the next — do not wait for a reply.
+you reach the last allowed portal go back to the first and start the next pass.
+Keep going until I tell you to stop. **Send me nothing until then** — no
+progress updates, no questions, no per-portal notes. Everything goes in the
+summary.
