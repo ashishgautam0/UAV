@@ -38,6 +38,8 @@ export interface DashboardStats {
   offer: number;
   rejected: number;
   this_week: number;
+  today: number;
+  daily_target: number;
   [key: string]: number;
 }
 

@@ -66,7 +66,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-const WEEKLY_TARGET = 50;
+// Fallback only — the backend sends the real target with the stats.
+const DEFAULT_DAILY_TARGET = 10;
 const indiaToday = () => new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
 }).format(new Date());
@@ -216,11 +217,10 @@ export default function DashboardPage() {
     },
   ];
 
-  const weeklyProgress = stats?.this_week ?? 0;
-  const weeklyPct = Math.min(
-    Math.round((weeklyProgress / WEEKLY_TARGET) * 100),
-    100
-  );
+  const todayCount = stats?.today ?? 0;
+  const dailyTarget = stats?.daily_target || DEFAULT_DAILY_TARGET;
+  const dailyPct = Math.min(Math.round((todayCount / dailyTarget) * 100), 100);
+  const dailyMet = todayCount >= dailyTarget;
 
   return (
     <div className="space-y-8">
@@ -270,21 +270,23 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* ---- Weekly Progress ---- */}
+      {/* ---- Daily Target ---- */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-emerald-400" />
-            Weekly Progress
+            Daily Target
           </CardTitle>
           <CardDescription>
-            {weeklyProgress} / {WEEKLY_TARGET} applications this week
+            {todayCount} / {dailyTarget} applications today across LinkedIn and Indeed
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          <Progress value={weeklyPct} className="h-3" />
+          <Progress value={dailyPct} className="h-3" />
           <p className="text-muted-foreground text-right text-sm">
-            {weeklyPct}%
+            {dailyMet
+              ? "Target reached — the agent stops for today"
+              : `${dailyTarget - todayCount} to go · ${dailyPct}%`}
           </p>
         </CardContent>
       </Card>

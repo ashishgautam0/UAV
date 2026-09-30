@@ -150,9 +150,15 @@ Before opening any portal, fetch the postings I have already dealt with:
 GET {{seen_urls_url}}
 ```
 
-The response is `{"urls": [...], "count": N}`. Keep that URL list for the whole
-run and treat it as the skip list. It contains every job I already applied to
-and every job already dismissed as a bad fit.
+The response is `{"urls": [...], "count": N, "applied_today": A, "daily_target": 10}`.
+Keep that URL list for the whole run and treat it as the skip list. It contains
+every job I already applied to and every job already dismissed as a bad fit.
+
+`applied_today` is how many applications my tracker already holds for today,
+earlier runs included. **If it is already 10 or more, today's target is met:
+do not search or apply — end with the one line "Today's target is already met:
+A applications recorded today." and stop.** Otherwise the run applies until
+the total reaches 10 (see DAILY TARGET below).
 
 **Note what it does NOT contain:** postings that merely sit in my database
 unapplied, left over from an older job scraper I have since removed. Those were
@@ -723,7 +729,8 @@ summary instead.
 
 The response is `{"saved": true, "applied": true, "dismissed": false, "duplicate": false}`.
 - `applied: true` means the job is now in my tracker and on the next run's skip
-  list.
+  list. That response also carries `applied_today` and `daily_target` — stop
+  once `applied_today` reaches `daily_target` (see DAILY TARGET).
 - `dismissed: true` comes back for a skip — the job is hidden and will be on the
   next run's skip list, so you never re-read that JD.
 - `duplicate: true` means I had already applied to this job, so nothing was
@@ -744,8 +751,25 @@ skip list.
 
 ## KEEP GOING UNTIL I SAY STOP
 
-**There is no application cap and no time limit.** Do not stop at ten, or at
-any other number. Keep searching and keep applying until I tell you to stop.
+### DAILY TARGET — 10 APPLICATIONS A DAY, THEN STOP
+
+**My target is 10 applications a day, across LinkedIn and Indeed together.**
+Keep searching and applying until today's total reaches 10, then stop — do not
+start another application once it does.
+
+- **Only a confirmed submission counts** — a job the tracker answered with
+  `applied: true`. Skips, duplicates, jobs left for me under "Needs an
+  account" and forms that never confirmed do not count.
+- **Use the tracker's number, not your own tally.** Every `applied: true`
+  response carries `applied_today`; when it reaches 10, today's target is met.
+  If it is ever missing or `null`, count your own confirmed applications and
+  add them to the `applied_today` you got in STEP 0.
+- **When the target is met,** finish recording that last job, then give me the
+  summary and stop. Do not look for "one more".
+- The day is my day in India: the count starts again from zero after midnight
+  IST, so a run started the next day has a fresh 10.
+
+Until the target is met:
 
 - Work each portal until you run out of matching jobs there, then move to the
   next one.
@@ -764,11 +788,12 @@ turn, and an ended turn is a stopped run until I come back and type something.
 counts and your Issues list to yourself as you go, and give them to me only in
 the summary.
 
-**Your turn ends for three reasons only:**
-1. I told you to stop.
-2. Two full passes in a row over every portal I allowed found nothing new to
+**Your turn ends for four reasons only:**
+1. Today's target of 10 applications is met.
+2. I told you to stop.
+3. Two full passes in a row over every portal I allowed found nothing new to
    apply to.
-3. The app forces it — a time, tool-use or context limit you cannot control.
+4. The app forces it — a time, tool-use or context limit you cannot control.
 
 A finished portal, a skipped job, a question, a rate limit, a closed listing
 and a form with no confirmation are **never** reasons. None of them is worth a
@@ -791,8 +816,8 @@ is the normal apply path and you should follow it.
 
 The waits between applications stay, and so do the stop-this-portal rules
 below. They are what keeps my accounts alive: a portal that decides I am a bot
-locks me out and then nothing gets applied to at all. Removing the cap means
-running longer, not running faster.
+locks me out and then nothing gets applied to at all. The daily target is
+about how many to send, never about sending them faster.
 
 ## SAFETY RULES
 
@@ -811,10 +836,9 @@ running longer, not running faster.
 
 ## SUMMARY — WHEN I STOP YOU
 
-The run has no natural end: you keep cycling the portals until I say stop. So
-produce this summary **only** when your turn ends for one of the reasons in KEEP
-GOING UNTIL I SAY STOP — when I tell you to stop, or when two full passes find
-nothing new. Never produce it, or any part of it, as a per-portal update: that
+The run ends when today's target of 10 is met. Produce this summary **only**
+when your turn ends for one of the reasons in KEEP GOING UNTIL I SAY STOP —
+the target is met, I tell you to stop, or two full passes find nothing new. Never produce it, or any part of it, as a per-portal update: that
 message is what stops the run. A turn the app forces to end gets the one-line
 pause notice instead, not this.
 
@@ -870,6 +894,6 @@ one.
 
 Apply to everything that passes the rules, without asking me first, and when
 you reach the last allowed portal go back to the first and start the next pass.
-Keep going until I tell you to stop. **Send me nothing until then** — no
+Keep going until today's target of 10 applications is met, then stop. **Send me nothing until then** — no
 progress updates, no questions, no per-portal notes. Everything goes in the
 summary.

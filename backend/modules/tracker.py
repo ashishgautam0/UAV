@@ -56,6 +56,18 @@ def init_db():
 
 # ===================== APPLICATION FUNCTIONS =====================
 
+# Applications per day the dashboard tracks and the desktop agent stops at.
+DAILY_APPLICATION_TARGET = 10
+
+
+def count_applications_today():
+    """Applications recorded today, in the user's timezone, from any source."""
+    today = _user_now().strftime("%Y-%m-%d")
+    resp = (_get_client().table("applications").select("id", count="exact")
+            .eq("date_applied", today).execute())
+    return resp.count if resp.count is not None else len(resp.data or [])
+
+
 def add_application(company, role, job_type, platform, url="",
                     noc_compatible="Unknown", conversion="N/A",
                     salary="", notes=""):
@@ -414,6 +426,8 @@ def get_stats():
         stats['offer'] = 0
         stats['rejected'] = 0
         stats['this_week'] = 0
+        stats['today'] = 0
+        stats['daily_target'] = DAILY_APPLICATION_TARGET
         stats['jobs'] = 0
         stats['internships'] = 0
         stats['by_platform'] = []
@@ -431,6 +445,9 @@ def get_stats():
     start_of_week = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
     df_dates = pd.to_datetime(df['date_applied'], errors='coerce')
     stats['this_week'] = int((df_dates >= start_of_week).sum())
+    stats['today'] = int((df['date_applied'].astype(str).str[:10]
+                          == today.strftime("%Y-%m-%d")).sum())
+    stats['daily_target'] = DAILY_APPLICATION_TARGET
 
     stats['jobs'] = len(df[df['type'] == 'Job'])
     stats['internships'] = len(df[df['type'] == 'Internship'])
