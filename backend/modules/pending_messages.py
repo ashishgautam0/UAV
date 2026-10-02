@@ -61,15 +61,27 @@ def _tracked_jobs_missing(message_type, limit):
 
     Content is generated ONLY for jobs the user logged to the tracker (an
     application row whose URL matches a scraped job, terminal statuses
-    excluded), newest first. Returns (jobs, tracked_total).
+    excluded). Returns (jobs, tracked_total).
+
+    Soonest-due first: every run is capped, so the order decides what actually
+    gets written. Sorting by job id wrote the newest jobs first and left the
+    oldest — the ones whose outreach date has already arrived — until last, so
+    a job could come due with no draft to send. The follow-up date is the
+    cadence's own clock, which is what the cap should spend itself on.
     """
     from tracker import TERMINAL_STATUSES, _get_client, get_job_message
 
     db = _get_client()
-    apps = db.table("applications").select("url,status").execute().data or []
+    apps = (db.table("applications").select("url,status,follow_up_date")
+            .execute()).data or []
     urls = [a["url"] for a in apps
             if (a.get("url") or "").strip()
             and a.get("status") not in TERMINAL_STATUSES]
+
+    # follow_up_date is a "YYYY-MM-DD" string, so it sorts lexicographically.
+    # A row without one goes last rather than jumping the queue.
+    due_by_url = {(a.get("url") or "").strip(): str(a.get("follow_up_date") or "")
+                  for a in apps if (a.get("url") or "").strip()}
 
     tracked = []
     for i in range(0, len(urls), 100):
@@ -79,8 +91,12 @@ def _tracked_jobs_missing(message_type, limit):
                 .execute())
         tracked.extend(resp.data or [])
 
+    def _soonest_due_first(row):
+        return (due_by_url.get(row.get("url") or "") or "9999-12-31",
+                -int(row["id"]))
+
     need = []
-    for r in sorted(tracked, key=lambda r: r["id"], reverse=True):
+    for r in sorted(tracked, key=_soonest_due_first):
         if len(need) >= limit:
             break
         if get_job_message(r["id"], message_type=message_type):

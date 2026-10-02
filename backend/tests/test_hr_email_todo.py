@@ -244,6 +244,55 @@ class HrEmailTodoTests(unittest.TestCase):
             other, _ = load("resume_points", 10)
         self.assertEqual([row["id"] for row in other], [20, 10])
 
+    def test_the_capped_run_writes_the_soonest_due_jobs_first(self):
+        """Every run is capped, so the order decides what gets written. Sorting
+        by job id served the newest first and left the already-due ones until
+        last, so a job could come due with no draft to send."""
+        apps = [
+            {"url": "https://jobs.test/newest", "status": "Applied", "follow_up_date": "2026-10-09"},
+            {"url": "https://jobs.test/overdue", "status": "Applied", "follow_up_date": "2026-09-20"},
+            {"url": "https://jobs.test/duetoday", "status": "Applied", "follow_up_date": "2026-09-30"},
+            {"url": "https://jobs.test/nodate", "status": "Applied", "follow_up_date": None},
+        ]
+        jobs = [
+            {"id": 900, "url": "https://jobs.test/newest", "title": "T", "company": "C",
+             "location": "", "description": "d"},
+            {"id": 100, "url": "https://jobs.test/overdue", "title": "T", "company": "C",
+             "location": "", "description": "d"},
+            {"id": 200, "url": "https://jobs.test/duetoday", "title": "T", "company": "C",
+             "location": "", "description": "d"},
+            {"id": 950, "url": "https://jobs.test/nodate", "title": "T", "company": "C",
+             "location": "", "description": "d"},
+        ]
+
+        class Query:
+            def __init__(self, rows): self.rows = rows
+            def select(self, *_): return self
+            def is_(self, *_): return self
+            def lte(self, *_): return self
+            def order(self, *_a, **_k): return self
+            def in_(self, column, values):
+                self.rows = [r for r in self.rows if r.get(column) in values]
+                return self
+            def execute(self): return types.SimpleNamespace(data=self.rows)
+
+        tracker = types.ModuleType("tracker")
+        tracker.TERMINAL_STATUSES = ["Offer", "Rejected", "Ghosted", "Not Interested"]
+        tracker._get_client = lambda: types.SimpleNamespace(
+            table=lambda name: Query(list(apps if name == "applications" else jobs)))
+        tracker.get_job_message = lambda job_id, message_type: (
+            {"content": "demo"} if message_type == "demo_html" else None)
+        load = function(ROOT / "modules/pending_messages.py", "_tracked_jobs_missing", {"os": os})
+        with patch.dict(sys.modules, {"tracker": tracker}):
+            got, _ = load("cold_dm", 10)
+        # Overdue, then due today, then the future one, and no date goes last.
+        self.assertEqual([r["id"] for r in got], [100, 200, 900, 950])
+
+        # The cap spends itself on the soonest-due jobs, not the newest.
+        with patch.dict(sys.modules, {"tracker": tracker}):
+            capped, _ = load("cold_dm", 2)
+        self.assertEqual([r["id"] for r in capped], [100, 200])
+
     def test_hr_email_candidates_require_tracker_and_live_demo(self):
         apps = [
             {"url": "https://jobs.test/ready", "status": "Applied"},
