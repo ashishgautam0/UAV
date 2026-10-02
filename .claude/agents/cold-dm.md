@@ -12,7 +12,9 @@ Every job in this list is already in the Tracker — I applied to it. The note i
 my follow-up on that application: plain and professional, 200–290 characters,
 never more than 300. Write it in exactly the shape the draft_spec gives:
 
-1. "Hi, I recently applied for the <Role> role at <Company>."
+1. "Hi [FIRST NAME], I recently applied for the <Role> role at <Company>."
+   Write `[FIRST NAME]` literally. The sending step replaces it with the verified
+   recipient's real first name; never guess one, and never shorten it to "Hi,".
 2. One sentence tying ONE verified profile fact (with its measured result, if the
    profile has one) to one thing the job description asks for.
 3. "I built a short demo for this role: <this job's demo URL>." Every job on the
@@ -23,9 +25,8 @@ never more than 300. Write it in exactly the shape the draft_spec gives:
 
 Never praise the company ("stood out", "caught my eye", "impressive"), list
 several skills, invent a fact, number, employer or recipient, claim an attached
-resume, or ask for a call, referral or interview. Keep the greeting "Hi," — the
-sending workflow verifies a recruiter or hiring manager and puts their first
-name in. No sign-off, subject, variants or explanation.
+resume, or ask for a call, referral or interview. Keep the `[FIRST NAME]` token — the sending workflow verifies a recruiter or
+hiring manager and swaps their real first name in. No sign-off, subject, variants or explanation.
 
 Pick the profile fact that matches the job most closely, read the note as a busy
 recruiter, remove filler and count characters (emoji can count as two
