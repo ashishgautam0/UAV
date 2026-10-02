@@ -865,13 +865,27 @@ a company yourself, and never write a note for a job that is not on the list.
 
 ### For each job on the list, in order
 
-1. **Find one person.** Open `recruiters_search_url`. Open the profiles that
-   look relevant — at most five — and pick one who **currently** works at that
-   exact company (their headline or current Experience entry says so) as a
-   recruiter, talent-acquisition or HR person. If there is none, try
-   `hiring_managers_search_url` for someone who currently leads the team the
-   role is in. If nobody is verified, skip the job — never guess a person — and
-   list it under "Cold DMs not sent".
+1. **Find one person — work down this list until someone checks out.** Whoever
+   you land on must **currently** work at that exact company, with their own
+   headline or current Experience entry saying so. Open at most five profiles
+   per job.
+   1. Open `recruiters_search_url` and look for a recruiter,
+      talent-acquisition or HR person.
+   2. No recruiter? Open `hiring_managers_search_url` and look for someone
+      who currently leads the team the role sits in.
+   3. Still nobody? Go back to the job posting and look for **the person who
+      posted it** — many listings name the poster or show "Posted by". If
+      their profile confirms they work there, they are a good recipient:
+      they are the one hiring.
+   4. Still nobody, and it is a small company or startup? A **founder,
+      co-founder, CTO or head of engineering** is the right person — at that
+      size they do the hiring themselves.
+
+   Only skip the job when every step above comes up empty, and then list it
+   under "Cold DMs not sent" with which steps you tried. A verified founder
+   beats no message at all; a guessed person is still never acceptable — the
+   bar is "their profile shows they work there now", not "the name looks
+   plausible".
 2. **Check the connection first.** If we are already connected, or an
    invitation is already Pending, skip the job. Never withdraw and re-invite.
    Never invite the same person twice in a run, even for a different job.

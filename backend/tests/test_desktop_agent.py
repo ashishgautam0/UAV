@@ -1217,10 +1217,36 @@ class ColdDmPromptTests(unittest.TestCase):
                          "so **do not ask me before\n   sending**",
                          "**Only these jobs get a cold DM**",
                          "never re-send the invitation",
-                         "never guess a person",
+                         "a guessed person is still never acceptable",
                          "never\n   send an invitation without a note"):
             with self.subTest(required=required):
                 self.assertIn(required, self.phase2)
+
+    def test_a_verified_founder_beats_skipping_the_job(self):
+        """Three jobs were skipped for want of a recruiter. At a startup the
+        founder does the hiring, so the search widens — without loosening the
+        bar that the profile must show they work there now."""
+        for required in ("**the person who\n      posted it**",
+                         "founder,\n      co-founder, CTO or head of engineering",
+                         "Only skip the job when every step above comes up empty",
+                         "A verified founder\n   beats no message at all",
+                         'their profile shows they work there now'):
+            with self.subTest(required=required):
+                self.assertIn(required, self.phase2)
+        # Widening who counts must not widen whether they are checked.
+        self.assertIn("must **currently** work at that exact company", self.phase2)
+        self.assertIn("a guessed person is still never acceptable", self.phase2)
+
+    def test_the_settings_cold_dm_prompt_widens_the_same_way(self):
+        """Both prompts pick recipients; if only one widens they disagree."""
+        rules = (ROOT / "modules" / "outreach_prompts.py").read_text()
+        block = rules.split("LINKEDIN_CONNECTION_RULES", 1)[1].split('"""', 2)[1]
+        for required in ("the person who posted the job",
+                         "founder, co-founder, CTO or head of engineering",
+                         "Report blocked only when every step comes up empty",
+                         "never guess a person"):
+            with self.subTest(required=required):
+                self.assertIn(required, block)
 
     def test_phase_two_stops_when_linkedin_pushes_back(self):
         self.assertIn("**LinkedIn pushes back**", self.phase2)
