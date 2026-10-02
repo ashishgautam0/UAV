@@ -889,20 +889,34 @@ a company yourself, and never write a note for a job that is not on the list.
 2. **Check the connection first.** If we are already connected, or an
    invitation is already Pending, skip the job. Never withdraw and re-invite.
    Never invite the same person twice in a run, even for a different job.
-3. **Write the note from the job's `cold_dm`.** Use it as it is, changing only
-   the greeting to the person's first name, the exact company and role, and the
-   length. Keep it inside the character limit LinkedIn shows in the note box,
-   spaces included — shorten it and check again until it fits. Never add a fact
-   the note and my resume do not support, never claim an attachment, and never
-   send an invitation without a note.
-4. **Send it yourself.** Connect (under "More" if it is not shown) → Add a note
+3. **Write the note from the job's `cold_dm`.** Use it as it is, changing only:
+   - **`[FIRST NAME]` → this person's actual first name**, exactly as their
+     profile spells it. The stored note opens `Hi [FIRST NAME], ` and that
+     token is the only thing standing between a personal note and one addressed
+     to nobody — replace it, never delete it. "Hi, I recently applied…" is a
+     complete-looking sentence, which is exactly why a missed replacement slips
+     through unnoticed.
+   - the exact company and role, if the stored note has them slightly off;
+   - the length, to fit the character limit LinkedIn shows in the note box,
+     spaces included — shorten and recheck until it fits, **after** substituting
+     the name, since the real name changes the count.
+
+   Never add a fact the note and my resume do not support, never claim an
+   attachment, and never send an invitation without a note.
+4. **Read the note back before you click Send.** It must start with this
+   person's real first name, and must contain no square-bracket placeholder
+   left in it. A note still holding `[FIRST NAME]`, or opening with a bare `Hi,`, is **not
+   finished — do not send it**: go back to step 3 and put the name in. This
+   check costs two seconds and is the difference between a personal note and
+   one that reads as a mail-merge failure to a founder.
+5. **Send it yourself.** Connect (under "More" if it is not shown) → Add a note
    → your note → Send. My message at the top of this conversation already asked
    you to send these without checking with me, so **do not ask me before
    sending**.
-5. **Check it went.** The button turns to Pending, or LinkedIn confirms the
+6. **Check it went.** The button turns to Pending, or LinkedIn confirms the
    invitation was sent. If you cannot tell, look at My Network → Sent
    invitations before doing anything else — never send a second one blindly.
-6. **Record it immediately:**
+7. **Record it immediately:**
 
 ```
 POST {{cold_dm_record_url}}
@@ -921,7 +935,7 @@ Content-Type: application/json
    on. **If the POST fails after the invitation went, retry only the POST —
    never re-send the invitation.** If it still fails, list it under Not Recorded
    and carry on.
-7. **Wait 30–60 seconds** before the next invitation, as you do between
+8. **Wait 30–60 seconds** before the next invitation, as you do between
    applications.
 
 **Only a confirmed, recorded invitation counts.** Use `dms_today` from the

@@ -71,4 +71,10 @@ def validate_outreach_draft(kind, content, scraped_job_id=None, evidenced_emails
         if re.search(r"(?i)stood out|caught my eye|impress(?:ed|ive)|exciting work|love what", content):
             return ("Connection note praises the company; follow up on the application "
                     "instead, in the draft_spec's four-sentence shape.")
+        # "Hi," reads as a finished sentence, so a skipped personalisation ships
+        # silently — one went out to a founder addressed to nobody. The stored
+        # draft carries a token the sending step must visibly replace.
+        if "[FIRST NAME]" not in content:
+            return ('Connection note must open "Hi [FIRST NAME], " with that token written '
+                    'literally; the sending step swaps in the verified recipient\'s first name.')
     return None

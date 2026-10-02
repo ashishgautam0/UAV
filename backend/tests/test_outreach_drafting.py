@@ -21,13 +21,13 @@ class DemoLinkValidationTests(unittest.TestCase):
     DEMO = "https://uav-6qe7.vercel.app/api/demo/"
 
     def test_the_job_s_own_demo_link_passes(self):
-        note = f"Built a demo for the role: {self.DEMO}54144 — open to connecting."
+        note = f"Hi [FIRST NAME], built a demo for the role: {self.DEMO}54144 — glad to connect."
         self.assertEqual(wrong_demo_links(note, 54144), [])
         self.assertIsNone(validate_outreach_draft("cold_dm", note, 54144))
 
     def test_another_job_s_demo_link_is_rejected(self):
         # The real slip: Lear Labs (54144) received Viraaj's draft and link.
-        note = f"Built a demo for the role: {self.DEMO}54075 — open to connecting."
+        note = f"Hi [FIRST NAME], built a demo for the role: {self.DEMO}54075 — glad to connect."
         self.assertEqual(wrong_demo_links(note, 54144), ["54075"])
         problem = validate_outreach_draft("cold_dm", note, 54144)
         self.assertIsNotNone(problem)
@@ -40,7 +40,7 @@ class DemoLinkValidationTests(unittest.TestCase):
 
     def test_a_draft_with_no_demo_link_is_unaffected(self):
         self.assertEqual(wrong_demo_links("No link here.", 54144), [])
-        self.assertIsNone(validate_outreach_draft("cold_dm", "No link here.", 54144))
+        self.assertIsNone(validate_outreach_draft("cold_dm", "Hi [FIRST NAME], no link here.", 54144))
 
     def test_string_and_int_job_ids_compare_the_same(self):
         note = f"{self.DEMO}54144"
@@ -49,7 +49,7 @@ class DemoLinkValidationTests(unittest.TestCase):
 
     def test_missing_job_id_skips_the_check_rather_than_failing(self):
         self.assertEqual(wrong_demo_links(f"{self.DEMO}1", None), [])
-        self.assertIsNone(validate_outreach_draft("cold_dm", f"{self.DEMO}1"))
+        self.assertIsNone(validate_outreach_draft("cold_dm", f"Hi [FIRST NAME], {self.DEMO}1"))
 
     def test_every_foreign_id_is_reported_once(self):
         note = f"{self.DEMO}1 and {self.DEMO}2 and {self.DEMO}1"
@@ -98,10 +98,12 @@ class SaveJobMessageDemoGuardTests(unittest.TestCase):
 
 class OutreachDraftingTests(unittest.TestCase):
     def test_connection_note_boundaries_and_malformed_outputs(self):
-        self.assertIsNone(validate_outreach_draft("cold_dm", "x" * 300))
+        self.assertIsNone(validate_outreach_draft("cold_dm", "Hi [FIRST NAME], " + "x" * 281))
         for text in ("x" * 301, "😀" * 151, "VARIANT 1: Hello", "Subject: Hello",
                      "To: hr@example.test", "My resume is attached."):
-            self.assertIsNotNone(validate_outreach_draft("cold_dm", text))
+            # Token on its own line so each case still fails for its own reason
+            # (the header patterns are line-anchored), not for a missing greeting.
+            self.assertIsNotNone(validate_outreach_draft("cold_dm", "Hi [FIRST NAME],\n" + text))
         self.assertIsNone(validate_outreach_draft("hr_email", "My resume is attached."))
 
     def test_builders_separate_purpose_and_preserve_facts(self):
@@ -309,7 +311,7 @@ class OutreachDraftingTests(unittest.TestCase):
         demo = "https://uav-6qe7.vercel.app/api/demo/53891"
         spec = build_cold_dm_prompt("Docusign", "GenAI Engineer", "LLM gateway work",
                                     profile_text="Fine-tuned an LLM", demo_url=demo)["prompt"]
-        for required in ('1. "Hi, I recently applied for the GenAI Engineer role at Docusign."',
+        for required in ('1. "Hi [FIRST NAME], I recently applied for the GenAI Engineer role at Docusign."',
                          f'3. "I built a short demo for this role: {demo}."',
                          '4. "Glad to connect."', "stood out", "caught my eye"):
             with self.subTest(required=required):
@@ -319,6 +321,28 @@ class OutreachDraftingTests(unittest.TestCase):
         self.assertIn("No demo exists for this job", bare)
         self.assertNotIn("/api/demo/", bare.split("Example (for shape only", 1)[0])
 
+    def test_a_draft_without_the_name_placeholder_is_rejected(self):
+        """A note reading "Hi, I recently applied..." is a complete-looking
+        sentence, so a skipped personalisation ships silently — one went out to
+        a founder addressed to nobody. The token makes the gap visible."""
+        good = ("Hi [FIRST NAME], I recently applied for the ML Engineer role at Acme. "
+                "Glad to connect.")
+        self.assertIsNone(validate_outreach_draft("cold_dm", good))
+        bare = good.replace("Hi [FIRST NAME],", "Hi,")
+        self.assertIn("[FIRST NAME]", validate_outreach_draft("cold_dm", bare))
+        guessed = good.replace("[FIRST NAME]", "Nitin")
+        self.assertIsNotNone(validate_outreach_draft("cold_dm", guessed))
+
+    def test_the_builder_asks_for_the_placeholder_not_a_bare_hi(self):
+        spec = build_cold_dm_prompt("Acme", "ML Engineer", "JD",
+                                    profile_text="P", demo_url="https://d/1")["prompt"]
+        self.assertIn('1. "Hi [FIRST NAME], I recently applied for the ML Engineer role at Acme."',
+                      spec)
+        self.assertIn("Write the token [FIRST NAME] literally", spec)
+        # The worked example must teach the same token, not a bare greeting.
+        self.assertIn("Hi [FIRST NAME], I recently applied for the GenAI Engineer", spec)
+        self.assertNotIn("\nHi, I recently applied", spec)
+
     def test_a_note_that_praises_the_company_is_rejected(self):
         for opener in ("Your real-time voice agents stood out.",
                        "Docusign's gateway work caught my eye.",
@@ -327,7 +351,7 @@ class OutreachDraftingTests(unittest.TestCase):
                 self.assertIn("praises the company",
                               validate_outreach_draft("cold_dm", f"{opener} Glad to connect."))
         self.assertIsNone(validate_outreach_draft(
-            "cold_dm", "Hi, I recently applied for the ML Engineer role at Acme. Glad to connect."))
+            "cold_dm", "Hi [FIRST NAME], I recently applied for the ML Engineer role at Acme. Glad to connect."))
 
     def test_saving_requires_the_application_and_this_jobs_demo(self):
         save = MagicMock(return_value=True)
@@ -336,7 +360,7 @@ class OutreachDraftingTests(unittest.TestCase):
             return function(ROOT / "modules/pending_messages.py", "cmd_save", {
                 "sys": sys, "save_job_message": save, "_demo_url_for_job": lambda _: demo_url,
                 "get_job_message": lambda *a, **kw: {"content": "saved"}})
-        good = (f"Hi, I recently applied for the ML Engineer role at Acme. I built RAG systems "
+        good = (f"Hi [FIRST NAME], I recently applied for the ML Engineer role at Acme. I built RAG systems "
                 f"like the one in the posting. I built a short demo for this role: {demo}. "
                 "Glad to connect.")
         with patch("sys.stderr", new_callable=io.StringIO), \
@@ -357,7 +381,7 @@ class OutreachDraftingTests(unittest.TestCase):
         queue = function(ROOT / "modules/pending_messages.py", "cmd_fulfil", {
             "sys": sys, "get_message_request": lambda _: {"message_type": "cold-dm", "params": {}},
             "_build_prompt": lambda *_: {"char_limit": 300}, "complete_message_request": complete})
-        note = "Interested in Acme’s ML role. My Python coursework is relevant; I would be glad to connect."
+        note = "Hi [FIRST NAME], interested in Acme’s ML role. My Python coursework is relevant; glad to connect."
         with patch("sys.stdout", new_callable=io.StringIO):
             self.assertEqual(queue(SimpleNamespace(request_id=8, content=note)), 0)
         complete.assert_called_once_with(8, note)

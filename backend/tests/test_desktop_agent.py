@@ -1218,7 +1218,7 @@ class ColdDmPromptTests(unittest.TestCase):
                          "**Only these jobs get a cold DM**",
                          "never re-send the invitation",
                          "a guessed person is still never acceptable",
-                         "never\n   send an invitation without a note"):
+                         "never send an invitation without a note"):
             with self.subTest(required=required):
                 self.assertIn(required, self.phase2)
 
@@ -1245,6 +1245,28 @@ class ColdDmPromptTests(unittest.TestCase):
                          "founder, co-founder, CTO or head of engineering",
                          "Report blocked only when every step comes up empty",
                          "never guess a person"):
+            with self.subTest(required=required):
+                self.assertIn(required, block)
+
+    def test_the_name_placeholder_must_be_replaced_before_sending(self):
+        """A note went to a founder reading "Hi, I recently applied..." — the
+        personalisation was skipped and nothing flagged it, because that is a
+        complete-looking sentence. The token and a read-back make it visible."""
+        for required in ("**`[FIRST NAME]` → this person's actual first name**",
+                         "replace it, never delete it",
+                         "**Read the note back before you click Send.**",
+                         "must contain no square-bracket placeholder",
+                         "opening with a bare `Hi,`, is **not\n   finished — do not send it**",
+                         "**after** substituting\n     the name"):
+            with self.subTest(required=required):
+                self.assertIn(required, self.phase2)
+
+    def test_the_settings_cold_dm_prompt_checks_the_placeholder_too(self):
+        rules = (ROOT / "modules" / "outreach_prompts.py").read_text()
+        block = rules.split("LINKEDIN_CONNECTION_RULES", 1)[1].split('"""', 2)[1]
+        for required in ("replace that token with this recipient's actual first",
+                         "is unfinished and must not be sent",
+                         "counted after the name is substituted"):
             with self.subTest(required=required):
                 self.assertIn(required, block)
 
